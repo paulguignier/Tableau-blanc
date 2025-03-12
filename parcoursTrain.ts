@@ -11,7 +11,7 @@ function main(workbook: ExcelScript.Workbook) {
 	let end = sheet.getRange("B2").getValue() as string;
 
 	// 🔹 Récupération des connexions de A5:D55
-	let data = sheet.getRange("H1:K92").getValues() as string[][];
+	let data = sheet.getRange("H1:M108").getValues() as string[][];
 
 	// 🔹 Création du graphe
 	let graph: { [key: string]: string[] } = {};
