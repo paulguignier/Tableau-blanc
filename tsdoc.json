@@ -1,0 +1,5 @@
+{
+    "out": "docs",
+    "mode": "file",
+    "includeDeclarations": true
+  }

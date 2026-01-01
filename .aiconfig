@@ -1,0 +1,75 @@
+Code en anglais
+Commentaires en français
+
+Commentaire de fonctions
+Commence par un verbe conjugué à la 3°personne
+Chaque ligne se termine par un point
+/**
+ * Permet de faire telle action.
+ * @param {string} param1 - Paramètre1 (sans déterminant devant Paramètre1).
+ * @returns {string} - Valeur retournée. (sans déterminant devant Valeur).
+ */
+Une seule ligne vide entre la fin d'un fonction et le commentaire de la fonction suivante
+
+Commentaire dans le code, commençant par un verble conjugué à la 3°personne. Pas de point à la fin
+ // Lecture de la base, ou // Lire la base, devient // Lit la base
+
+Commentaire de description du fichier (en haut du code)
+/**
+ * Titre du fichier
+ * 
+ * Description du fichier
+ * 
+ * @author Paul Guignier
+ * @version 1.0
+ * @package scr\nomfichier.ts
+ */
+
+Exemple de fonction avec un renvoi à la ligne pour chaque paramètre s'il y a au moins 3 paramètres
+/**
+ * Commentaire fonction.
+ * @param param1 - Description du paramètre1.
+ * @param param2 - Description du paramètre2.
+ * @param param3 - Description du paramètre3.
+ * @returns Valeur retournée.
+ */
+function nomFonction(
+    param1: string,
+    param2: string,
+    param3: boolean = true
+): String | null {
+
+Exemple d'interface
+/* Interface InterfaceName, qui ... */
+interface InterfaceName {
+    /* Propriété 1 */
+    property1: string;
+
+
+Exemple de classe
+/**
+ * Classe ClassName qui définit ...
+ */
+class ClassName {
+    property1: string;                  // Propriété 1
+    property2: string;                  // Propriété 2
+    property3: string;                  // Propriété 3
+
+    constructor(
+        property1: string = "",
+        property2: string = "",
+        property3: string = ""
+    ) {
+        this.property1 = property1;
+        this.property2 = property2;
+        this.property3 = property3;
+    }
+
+    /*
+     * Définit ...
+     * @param param1 - Description du paramètre1.
+     */
+    method1(param1: string) {
+        // Code
+    }
+}

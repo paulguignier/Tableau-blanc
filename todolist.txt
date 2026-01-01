@@ -1,0 +1,30 @@
+supprimer stationName
+
+vérifier la largeur de tout le code
+faire le template des classes
+remplacer les as number par Number() et les as boolean par !!
+
+faire un Parity.setFromTrainNumber(TrainNumber) à différencier de TrainNumber
+
+mettre toutes les classes au nouveau format comme Day
+calcul date et heure à vérifier
+chargement des temps avec adaptTime
+
+addStop : enlever le lien avec firstStop et lastStop : le faire lors du check + enlever firstStation et lastStation car non lue dans load
+Vérif prise en compte temps de retournement ds calcul des temps FindPath
+changeNumber
+Fichier test complet avec train factice
+
+FindPath Déduire du temps de parcours les accélérations freinage : différence entre temps sans arrêt et temps avec arrêt, divisé par le nombre de gare sans arrêt => déduire 1/2 sur les connexions encadrantes, et 1 au milieu
+Optimiser liste sillons avec compareTo
+Ajouter nom Pdt dans sillons
+lecture des extractions Solfe : trouver si un sillon existe déjà
+
+Evolutions
+Trains double (ex transbo)
+
+ajout d'une méthode pour temps de réut, et savoir si RBT avant réut
+
+
+classe Trains
+firstStation et lastStation en get avec firstStationName et lastStationName

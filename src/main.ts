@@ -5,5 +5,5 @@ import { loadParams, loadConnections, findShortestPath, generateCombinations } f
 loadParams();
 loadConnections();
 
-const combinaisons = generateCombinations("MPU", "ETP", "PRU");
-console.log(findShortestPath(combinaisons));
+// const combinaisons = generateCombinations("MPU", "ETP", "PRU");
+console.log('a');

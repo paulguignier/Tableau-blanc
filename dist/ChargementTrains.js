@@ -9,6 +9,10 @@ var WORKBOOK;
 /* Liste des paramètres. */
 const PARAM = {
     loaded: false,
+    evenLetter: "",
+    oddLetter: "",
+    evenFigure: 0,
+    oddFigure: 0,
     maxConnectionNumber: 0,
     turnaroundTime: 0,
     wTrainsRegex: new RegExp(""),
@@ -21,12 +25,31 @@ const CACHE = {
 };
 /* Liste des trains plannifiés sur un ou plusieurs jours, avec les mêmes horaires. Ils sont référencés pour chaque jour de circulation */
 const TRAINS = new Map();
-/* Liste des trains associés à un jour donné et leurs réutilisations  */
+/* Liste des trains associés à un jour donné et leurs réutilisations */
 const REUSES = new Map();
 /* Liste gares et leurs coordonnées. */
 const STATIONS = new Map();
 /* Liste des connexions entre les gares, incluant le temps de trajet et l'information sur le besoin de changement de sens. */
 const CONNECTIONS = new Map();
+function main(workbook) {
+    WORKBOOK = workbook;
+    const sheet = WORKBOOK.getActiveWorksheet();
+    // Lire les paramètres
+    loadParams();
+    loadConnections();
+    loadTrains("", "141243");
+    loadStops();
+    printTrains("Test", "Trains1");
+    TRAINS.get("141243_2").findPath();
+    printStops("Test", "Stops1", "A10");
+    // findPath2(TRAINS.get("147490_2"));
+    console.log(TRAINS.get("141243_2"));
+    // const allCombinations = generateCombinations("MPU", "ETP", "".split(";"));
+    // console.log(allCombinations);
+    // const shortestPath = findShortestPath(allCombinations);
+    //     console.log(shortestPath);
+    return;
+}
 function tests() {
     loadParams();
     console.log(isWTrain("146490"));
@@ -106,7 +129,7 @@ function calculatePathTime(path) {
         if (connection) {
             totalTime += connection.time;
             // Ajouter le temps de changement de sens sauf pour le premier segment
-            if (i > 0 && connection.needsTurnaround) {
+            if (i > 0 && connection.withTurnaround) {
                 totalTime += PARAM.turnaroundTime;
             }
         }
@@ -139,7 +162,7 @@ function dijkstra(start, end) {
         // Examiner les voisins avec les nouveaux attributs
         for (let [neighbor, connexion] of CONNECTIONS.get(currentNode) || []) {
             let additionalTime = connexion.time;
-            if (connexion.needsTurnaround && currentNode !== start) { // Si un changement de sens est nécessaire, ajouter du temps
+            if (connexion.withTurnaround && currentNode !== start) { // Si un changement de sens est nécessaire, ajouter du temps
                 additionalTime += PARAM.turnaroundTime;
             }
             let newDist = distances.get(currentNode) + additionalTime;
@@ -165,18 +188,15 @@ function dijkstra(start, end) {
  * @param via - Les gares intermédiaires à passer par.
  * @returns Un tableau de tableaux, chaque sous-tableau représentant une combinaison de route possible.
  */
-function generateCombinations(start, end, via = "") {
+function generateCombinations(start, end, via) {
     // Filtrer les gares intermédiaires pour éliminer les chaînes vides
-    const filteredVia = via.split(";").filter(v => v.trim() !== "");
+    const filteredVia = via.filter(v => v.trim() !== "");
     // Générer les permutations des gares intermédiaires
     const viaPermutations = permute(filteredVia);
-    console.log(viaPermutations);
     // Ajouter start au début et end à la fin de chaque permutation
     const routes = viaPermutations.map(permutation => [start, ...permutation, end]);
-    // console.log(routes);
     // Étendre chaque route pour inclure toutes les variantes possibles
     const allCombinations = routes.flatMap((route) => expandPermutations(route));
-    // console.log(allCombinations);
     return allCombinations;
 }
 /**
@@ -352,8 +372,12 @@ function printTable(headers, data, sheetName, tableName, startCell = "A1", failO
 }
 const PARAM_SHEET = "Param";
 const PARAM_TABLE = "Paramètres";
-const PARAM_LINE_MAX_CONNEXIONS_NUMBER = 1;
-const PARAM_LINE_TURNAROUND_TIME = 4;
+const PARAM_LINE_EVEN_LETTER = 1;
+const PARAM_LINE_ODD_LETTER = 2;
+const PARAM_LINE_EVEN_DIRECTION = 3;
+const PARAM_LINE_ODD_DIRECTION = 4;
+const PARAM_LINE_MAX_CONNEXIONS_NUMBER = 5;
+const PARAM_LINE_TURNAROUND_TIME = 6;
 /**
  * Charge les paramètres du tableau "Paramètres" de la feuille "Param".
  * Si PARAM.loaded est true et que erase est false, ne fait rien.
@@ -365,6 +389,11 @@ function loadParams(erase = false) {
     if (PARAM.loaded && !erase)
         return;
     const data = getDataFromTable(PARAM_SHEET, PARAM_TABLE);
+    // Extraction des valeurs
+    PARAM.evenLetter = data[PARAM_LINE_EVEN_LETTER][1];
+    PARAM.oddLetter = data[PARAM_LINE_ODD_LETTER][1];
+    PARAM.evenFigure = data[PARAM_LINE_EVEN_DIRECTION][1];
+    PARAM.oddFigure = data[PARAM_LINE_ODD_DIRECTION][1];
     PARAM.maxConnectionNumber = data[PARAM_LINE_MAX_CONNEXIONS_NUMBER][1];
     PARAM.turnaroundTime = data[PARAM_LINE_TURNAROUND_TIME][1];
     loadWTrainsRegex();
@@ -493,14 +522,106 @@ function daysToNumbers(input) {
     CACHE.daysCombinations.set(input, result);
     return result;
 }
+/* Classe Parity qui permet de manipuler la parité */
+class Parity {
+    constructor(value) {
+        // Si numéro de train avec double parité explicite (contient un '/')
+        if (value.toString().includes('/')) {
+            this.value = Parity.double;
+            return;
+        }
+        switch (value) {
+            case Parity.odd:
+            case PARAM.oddLetter:
+            case PARAM.oddFigure:
+            case PARAM.oddFigure.toString():
+                this.value = Parity.odd;
+                break;
+            case Parity.even:
+            case PARAM.evenLetter:
+            case PARAM.evenFigure:
+            case PARAM.evenFigure.toString():
+                this.value = Parity.even;
+                break;
+            case Parity.double:
+                this.value = Parity.double;
+                break;
+            case Parity.undefined:
+                this.value = Parity.undefined;
+                break;
+            default:
+                switch (isNaN(parseInt(value)) || parseInt(value) <= 0 ? null : parseInt(value) % 2) {
+                    case 0:
+                        this.value = Parity.even;
+                        break;
+                    case 1:
+                        this.value = Parity.odd;
+                        break;
+                    default:
+                        this.value = Parity.undefined;
+                        break;
+                }
+                break;
+        }
+    }
+    /**
+     * Inverse la parité actuelle.
+     * Si la parité actuelle est paire, elle devient impaire, et inversement.
+     * Si la parité actuelle est indéfinie, elle reste inchangée.
+     */
+    invert() {
+        switch (this.value) {
+            case Parity.even:
+                this.value = Parity.odd;
+                break;
+            case Parity.odd:
+                this.value = Parity.even;
+                break;
+            default:
+                this.value = Parity.undefined;
+                break;
+        }
+    }
+    /**
+     * Adapte le numéro du train en fonction de la parité demandée.
+     * Si le numéro du train est pair, il est inchangé si la parité demandée est paire,
+     * et incrémenté de 1 si la parité demandée est impaire.
+     * Si le numéro du train est impair, il est décrémenté de 1 si la parité demandée est paire,
+     * et inchangé si la parité demandée est impaire.
+     * Si la parité demandée est indéfinie, le numéro du train est inchangé.
+     * @param trainNumber Numéro du train, qui peut être un nombre ou une chaine de caractères
+     * @returns Numéro du train adapté
+     */
+    adaptTrainNumber(trainNumber) {
+        if (isNaN(parseInt(trainNumber))) {
+            return 0;
+        }
+        let evenTrainNumber = parseInt(trainNumber);
+        evenTrainNumber = evenTrainNumber - (evenTrainNumber % 2);
+        switch (this.value) {
+            case Parity.even:
+                return evenTrainNumber;
+            case Parity.odd:
+                return evenTrainNumber + 1;
+            case Parity.double:
+            default:
+                return trainNumber;
+        }
+    }
+}
+Parity.even = 0;
+Parity.odd = 1;
+Parity.double = -2;
+Parity.undefined = -1;
 /**
  * Classe Train qui définit un train, plannifié sur un ou plusieurs jours de la semaine,
  * ou sur plusieurs dates précises, avec les mêmes horaires.
  * Plusieurs trains associés à un jour donné et leurs réutilisations y font référence
  */
 class Train {
-    constructor(number, days, missionCode, departureTime, departureStation, arrivalTime, arrivalStation, viaStations) {
-        this.number = number;
+    constructor(number, lineParity, days, missionCode, departureTime, departureStation, arrivalTime, arrivalStation, viaStations) {
+        this.number = parseInt(number);
+        this.lineParity = new Parity(lineParity);
         this.days = days;
         this.trainsByDay = new Map();
         this.missionCode = missionCode;
@@ -512,12 +633,15 @@ class Train {
         this.stops = new Map();
         this.firstStop = departureStation;
         this.lastStop = arrivalStation;
-        // Détermine le sens principal pour la ligne C
+        // Calcule Détermine si la gare d'arrivée change de parité, auquel cas le train a une double parité
         const departureStationObj = STATIONS.get(departureStation);
-        this.line_C_direction = departureStationObj ? ((this.number + (departureStationObj.lineC_reverse_direction ? 1 : 0)) % 2) : -1;
-        // Détermine si la gare d'arrivée change de parité, auquel cas le train a une double parité
         const arrivalStationObj = STATIONS.get(arrivalStation);
-        this.changeParity = (departureStationObj && arrivalStationObj) ? (departureStationObj.lineC_reverse_direction != arrivalStationObj.lineC_reverse_direction) : false;
+        this.doubleParity = departureStationObj && arrivalStationObj && departureStationObj.reverseLineParity !== arrivalStationObj.reverseLineParity;
+        // Détermine le sens principal pour la ligne C
+        this.lineParity = new Parity(number);
+        if (departureStationObj || departureStationObj.reverseLineParity) {
+            this.lineParity.invert();
+        }
     }
     /**
      * Retourne la clé du train qui est composée du numéro du train
@@ -525,7 +649,7 @@ class Train {
      * @returns {string} Clé du train plannifié
      */
     get key() {
-        return `${this.number}_${this.days.split(';')[0]}`;
+        return `${this.number}_${this.days.toString().split(';')[0]}`;
     }
     /**
      * Retourne le numéro du train avec changement de parité.
@@ -534,9 +658,9 @@ class Train {
      * @param {boolean} [withNumber4Figures=false] - Si true, le numéro est renommé en 4 chiffres pour les trains commerciaux de la ligne C
      * @returns {string} Le numéro du train avec changement de parité.
      */
-    double_parity_number(withNumber4Figures = false) {
+    doubleParityNumber(withNumber4Figures = false) {
         const evenNumber = this.number - (this.number % 2);
-        const doubleParityNumber = this.changeParity ? evenNumber + "/" + ((evenNumber + 1) % 10) : this.number.toString();
+        const doubleParityNumber = this.doubleParity ? evenNumber + "/" + ((evenNumber + 1) % 10) : this.number.toString();
         return withNumber4Figures ? renameWith4Figures(doubleParityNumber) : doubleParityNumber;
     }
     /**
@@ -547,7 +671,7 @@ class Train {
      * @returns {string} Le numéro du train à 4 ou 6 chiffres utilisé par les opérateurs de la ligne C.
      */
     number4Figures(withDoubleParity = false) {
-        return withDoubleParity ? this.double_parity_number(true) : renameWith4Figures(this.number.toString());
+        return withDoubleParity ? this.doubleParityNumber(true) : renameWith4Figures(this.number.toString());
     }
     /**
      * Ajoute un arrêt au train.
@@ -571,6 +695,9 @@ class Train {
      * @returns {number} Numéro du train au départ
      */
     getStop(station, updateParity = false) {
+        if (this.stops.has(station)) {
+            return this.stops.get(station);
+        }
         let [stationName, parity] = station.split("_");
         parity = parity !== null && parity !== void 0 ? parity : this.number % 2;
         const stop = this.stops.get(stationName + "_" + parity)
@@ -588,14 +715,13 @@ class Train {
      * @returns {void}
      */
     findPath() {
-        var _a;
+        var _a, _b;
         // Cherche toutes les combinaisons possibles de départ, d'arrivée et de passages via
         const allCombinations = generateCombinations(this.departureStation, this.arrivalStation, this.viaStations);
         // Trouve le chemin le plus court parmi toutes les combinaisons
         const shortestPath = findShortestPath(allCombinations);
-        // console.log(shortestPath);
         // Quitte la fonction si aucun chemin n'est trouvé
-        if (shortestPath.path.length = 0) {
+        if (shortestPath.path.length === 0) {
             return;
         }
         // Crée la nouvelle liste d'arrêts
@@ -604,9 +730,22 @@ class Train {
         let lastTimedTime = 0;
         let segmentPath = [];
         // Remplit la liste des arrêts en reprenant les arrêts déjà renseignés et en ajoutant les gares de passage     
-        for (const stopName of shortestPath) {
+        for (const stopName of shortestPath.path) {
             const currentStop = this.getStop(stopName, true) || Stop.newStopIncludingParity(stopName);
             newStops.set(stopName, currentStop);
+            // Recherche de la gare suivante et de la connexion entre les deux gares
+            const nextStopName = shortestPath.path[shortestPath.path.indexOf(stopName) + 1];
+            if (nextStopName) {
+                const nextStop = newStops.get(nextStopName);
+                if (nextStop) {
+                    const connection = (_a = CONNECTIONS.get(stopName)) === null || _a === void 0 ? void 0 : _a.get(nextStopName);
+                    if (connection) {
+                        currentStop.nextStop = nextStop;
+                        currentStop.connection = connection;
+                    }
+                }
+            }
+            // Calcul du temps de parcours depuis la dernière gare avec une heure de départ
             const hasTime = currentStop.arrivalTime > 0 || currentStop.passageTime > 0;
             if (hasTime) {
                 const currentTime = currentStop.arrivalTime || currentStop.passageTime;
@@ -616,7 +755,7 @@ class Train {
                     const segmentTimes = [];
                     let from = lastTimedStopName;
                     for (const to of segmentPath) {
-                        const connection = (_a = CONNECTIONS.get(from)) === null || _a === void 0 ? void 0 : _a.get(to);
+                        const connection = (_b = CONNECTIONS.get(from)) === null || _b === void 0 ? void 0 : _b.get(to);
                         if (!connection) {
                             console.warn(`Pas de connexion entre ${from} et ${to}`);
                             segmentTimes.push(0);
@@ -653,7 +792,7 @@ const TRAINS_TABLE = "Trains";
 const TRAINS_HEADERS = [[
         "Id",
         "Numéro du train",
-        "Direction ligne C",
+        "Parité de ligne",
         "Jours",
         "Code mission",
         "Heure de départ",
@@ -664,14 +803,14 @@ const TRAINS_HEADERS = [[
     ]];
 const TRAINS_COL_KEY = 0; // Non lue car calculée
 const TRAINS_COL_NUMBER = 1;
-const TRAINS_COL_LINE_C_DIRECTION = 2; // Non lue car calculée
+const TRAINS_COL_LINE_PARITY = 2;
 const TRAINS_COL_DAYS = 3;
 const TRAINS_COL_MISSION_CODE = 4;
 const TRAINS_COL_DEPARTURE_TIME = 5;
-const TRAINS_COL_DEPARTURE_STATION = 5;
-const TRAINS_COL_ARRIVAL_TIME = 6;
-const TRAINS_COL_ARRIVAL_STATION = 7;
-const TRAINS_COL_VIA_STATIONS = 8;
+const TRAINS_COL_DEPARTURE_STATION = 6;
+const TRAINS_COL_ARRIVAL_TIME = 7;
+const TRAINS_COL_ARRIVAL_STATION = 8;
+const TRAINS_COL_VIA_STATIONS = 9;
 /**
  * Charge les trains à partir du tableau "Trains" de la feuille "Trains".
  * Les trains sont stockés dans un objet avec comme clés le numéro de train
@@ -710,6 +849,7 @@ function loadTrains(days = "JW", trains = "") {
             continue;
         }
         // Extraction des valeurs
+        const lineParity = row[TRAINS_COL_LINE_PARITY];
         const missionCode = row[TRAINS_COL_MISSION_CODE];
         const departureTime = row[TRAINS_COL_DEPARTURE_TIME];
         const departureStation = row[TRAINS_COL_DEPARTURE_STATION];
@@ -717,7 +857,7 @@ function loadTrains(days = "JW", trains = "") {
         const arrivalStation = row[TRAINS_COL_ARRIVAL_STATION];
         const viaStations = row[TRAINS_COL_VIA_STATIONS];
         // Création de l'objet Train
-        const train = new Train(number, days, missionCode, departureTime, departureStation, arrivalTime, arrivalStation, viaStations);
+        const train = new Train(number, lineParity, days, missionCode, departureTime, departureStation, arrivalTime, arrivalStation, viaStations);
         // Insertion du train dans la table avec plusieurs clés d'accès
         // - une référence pour la clé unique du train
         TRAINS.set(train.key, train);
@@ -730,6 +870,7 @@ function loadTrains(days = "JW", trains = "") {
 }
 /**
  * Affiche les trains dans un tableau.
+ * Les données sont celles stockées dans l'objet TRAINS.
  * @param {string} sheetName - Nom de la feuille de calcul.
  * @param {string} tableName - Nom du tableau.
  * @param {string} [startCell="A1"] - Adresse de la cellule de départ pour le tableau.
@@ -744,7 +885,7 @@ function printTrains(sheetName, tableName, startCell = "A1") {
     const data = uniqueTrains.map(train => [
         train.key,
         train.number,
-        train.line_C_direction,
+        train.lineParity,
         train.days,
         train.missionCode,
         train.departureTime,
@@ -756,8 +897,13 @@ function printTrains(sheetName, tableName, startCell = "A1") {
     // Imprimer le tableau
     const table = printTable(TRAINS_HEADERS, data, sheetName, tableName, startCell);
     // Mettre les heures au format "hh:mm:ss"
-    table.getRange().getColumn(TRAINS_COL_DEPARTURE_TIME).setNumberFormat("hh:mm:ss");
-    table.getRange().getColumn(TRAINS_COL_ARRIVAL_TIME).setNumberFormat("hh:mm:ss");
+    const timeColumns = [
+        TRAINS_COL_DEPARTURE_TIME,
+        TRAINS_COL_ARRIVAL_TIME,
+    ];
+    for (const col of timeColumns) {
+        table.getRange().getColumn(col).setNumberFormat("hh:mm:ss");
+    }
 }
 /**
  * Classe Reuse qui définit un train pour un unique jour, étant la réutilisation
@@ -790,8 +936,8 @@ class Reuse {
      * Sinon, le numéro est sous la forme "XX".
      * @returns {string} Le numéro du train avec changement de parité.
      */
-    get double_parity_number() {
-        return this.plannedTrain.double_parity_number();
+    get doubleParityNumber() {
+        return this.plannedTrain.doubleParityNumber();
     }
 }
 const REUSES_SHEET = "Réuts";
@@ -826,6 +972,7 @@ function loadReuses(days = "JW", trains = "") {
 }
 /**
  * Affiche les réutilisations dans un tableau.
+ * Les données sont celles stockées dans l'objet REUSES.
  * @param {string} sheetName - Nom de la feuille de calcul.
  * @param {string} tableName - Nom du tableau.
  * @param {string} [startCell="A1"] - Adresse de la cellule de départ pour le tableau.
@@ -894,6 +1041,16 @@ class Stop {
 }
 const STOPS_SHEET = "Arrêts";
 const STOPS_TABLE = "Arrêts";
+const STOPS_HEADERS = [[
+        "Numéro du train",
+        "Jour",
+        "Gare",
+        "Parité",
+        "Arrivée",
+        "Départ",
+        "Passage",
+        "Voie"
+    ]];
 const STOPS_COL_TRAIN_NUMBER = 0;
 const STOPS_COL_TRAIN_DAYS = 1;
 const STOPS_COL_STATION = 2;
@@ -934,8 +1091,48 @@ function loadStops() {
         train.addStop(stop);
     }
 }
+/**
+ * Affiche les arrêts des trains dans un tableau.
+ * Les données sont celles stockées dans les objets Train et Stop de l'objet TRAINS.
+ * @param {string} sheetName - Nom de la feuille de calcul.
+ * @param {string} tableName - Nom du tableau.
+ * @param {string} [startCell="A1"] - Adresse de la cellule de départ pour le tableau.
+ */
+function printStops(sheetName, tableName, startCell = "A1") {
+    // Filtrer l'objet TRAINS en ne prennant qu'une seule fois les trains ayant la même clé   
+    const seenKeys = new Set();
+    const uniqueTrains = Array.from(TRAINS.entries())
+        .filter(([mapKey, train]) => mapKey === train.key)
+        .map(([_, train]) => train);
+    // Créer le tableau final avec les données de chaque arrêt pour chaque train
+    const data = [];
+    for (const train of uniqueTrains) {
+        for (const [stationName, stop] of train.stops.entries()) {
+            data.push([
+                train.number,
+                train.days,
+                stop.stationName,
+                stop.parity,
+                stop.arrivalTime,
+                stop.departureTime,
+                stop.passageTime,
+                stop.track
+            ]);
+        }
+    }
+    // Imprimer le tableau
+    const table = printTable(STOPS_HEADERS, data, sheetName, tableName, startCell);
+    const timeColumns = [
+        STOPS_COL_ARRIVAL_TIME,
+        STOPS_COL_DEPARTURE_TIME,
+        STOPS_COL_PASSAGE_TIME
+    ];
+    for (const col of timeColumns) {
+        table.getRange().getColumn(col).setNumberFormat("hh:mm:ss");
+    }
+}
 class Station {
-    constructor(abbreviation, name, variants_stations, odd_reversal, even_reversal, lineC_reverse_direction) {
+    constructor(abbreviation, name, variants_stations, oddTurnaround, evenTurnaround, reverseLineParity) {
         this.abbreviation = abbreviation;
         this.name = name;
         this.variants = [];
@@ -944,9 +1141,9 @@ class Station {
                 .filter(v => v.trim() !== '')
                 .flatMap(v => [v + '_0', v + '_1'])
         ];
-        this.odd_reversal = odd_reversal;
-        this.even_reversal = even_reversal;
-        this.lineC_reverse_direction = lineC_reverse_direction;
+        this.oddTurnaround = oddTurnaround;
+        this.evenTurnaround = evenTurnaround;
+        this.reverseLineParity = reverseLineParity;
     }
 }
 const STATIONS_SHEET = "Gares";
@@ -955,13 +1152,14 @@ const STATIONS_HEADERS = [[
         "Abréviation",
         "Nom",
         "Variantes",
-        "Changements de parité"
+        "Gare de rebroussement",
+        "Parité de ligne inversée"
     ]];
 const STATIONS_COL_ABBR = 0;
 const STATIONS_COL_NAME = 1;
 const STATIONS_COL_VARIANTS_STATIONS = 2;
-const STATIONS_COL_REVERSAL = 3;
-const STATIONS_COL_LINEC_REVERSE_DIRECTION = 4;
+const STATIONS_COL_TURNAROUND = 3;
+const STATIONS_COL_REVERSE_LINE_PARITY = 4;
 /**
  * Charge les gares à partir du tableau "Gares" de la feuille "Gares".
  * Les gares sont stockées dans une Map avec comme clés l'abréviation
@@ -987,16 +1185,17 @@ function loadStations(erase = false) {
         const abbreviation = row[STATIONS_COL_ABBR];
         const name = row[STATIONS_COL_NAME];
         const variants_stations = row[STATIONS_COL_VARIANTS_STATIONS].split(";");
-        const odd_reversal = row[STATIONS_COL_REVERSAL].indexOf('I') >= 0;
-        const even_reversal = row[STATIONS_COL_REVERSAL].indexOf('P') >= 0;
-        const lineC_reverse_direction = row[STATIONS_COL_LINEC_REVERSE_DIRECTION] === 1;
+        const oddTurnaround = row[STATIONS_COL_TURNAROUND].indexOf(PARAM.oddLetter) >= 0;
+        const evenTurnaround = row[STATIONS_COL_TURNAROUND].indexOf(PARAM.evenLetter) >= 0;
+        const reverseLineParity = row[STATIONS_COL_REVERSE_LINE_PARITY];
         // Création de la gare
-        const station = new Station(abbreviation, name, variants_stations, odd_reversal, even_reversal, lineC_reverse_direction);
+        const station = new Station(abbreviation, name, variants_stations, oddTurnaround, evenTurnaround, reverseLineParity);
         STATIONS.set(abbreviation, station);
     }
 }
 /**
  * Affiche les stations dans un tableau.
+ * Les données sont celles stockées dans l'objet STATIONS.
  * @param {string} sheetName - Nom de la feuille de calcul.
  * @param {string} tableName - Nom du tableau.
  * @param {string} [startCell="A1"] - Adresse de la cellule de départ pour le tableau.
@@ -1010,25 +1209,34 @@ function printStations(sheetName, tableName, startCell = "A1") {
         station.connectedStationsWithParityChange.join(", ")
     ]);
     // Imprimer le tableau
-    printTable(headers, data, sheetName, tableName, startCell);
+    printTable(STATIONS_HEADERS, data, sheetName, tableName, startCell);
 }
 class Connection {
-    constructor(from, to, time, needsTurnaround) {
+    constructor(from, to, time, withTurnaround, withMovement, changeParity) {
         this.from = from;
         this.to = to;
         this.time = time;
-        this.needsTurnaround = needsTurnaround;
-        const fromParity = parseInt(from.split('_')[1], 10) % 2;
-        const toParity = parseInt(to.split('_')[1], 10) % 2;
-        this.changeParity = toParity - fromParity;
+        this.withTurnaround = withTurnaround;
+        this.withMovement = withMovement;
+        this.changeParity = changeParity;
     }
 }
 const CONNECTIONS_SHEET = "Param";
 const CONNECTIONS_TABLE = "Connexions";
+const CONNECTIONS_HEADERS = [[
+        "De",
+        "Vers",
+        "Temps",
+        "Rebroussement",
+        "Evolution",
+        "Changement de parité"
+    ]];
 const CONNECTIONS_COL_FROM = 0;
 const CONNECTIONS_COL_TO = 1;
 const CONNECTIONS_COL_TIME = 2;
-const CONNECTIONS_COL_NEEDS_TURNAROUND = 3;
+const CONNECTIONS_COL_TURNAROUND = 3;
+const CONNECTIONS_COL_MOVEMENT = 4;
+const CONNECTIONS_COL_CHANGE_PARITY = 5;
 /**
  * Charge les connexions entre les gares et les variantes de ces gares.
  * Les connexions sont stockées dans un objet avec comme clés les gares de départ
@@ -1061,29 +1269,48 @@ function loadConnections(erase = false) {
         const from = row[CONNECTIONS_COL_FROM];
         const to = row[CONNECTIONS_COL_TO];
         const time = row[CONNECTIONS_COL_TIME];
-        const needsTurnaround = row[CONNECTIONS_COL_NEEDS_TURNAROUND];
+        const withTurnaround = row[CONNECTIONS_COL_TURNAROUND];
+        const withMovement = row[CONNECTIONS_COL_MOVEMENT];
+        const changeParity = row[CONNECTIONS_COL_CHANGE_PARITY];
         // Création de la connexion
-        const connection = new Connection(from, to, time, needsTurnaround);
+        const connection = new Connection(from, to, time, withTurnaround, withMovement, changeParity);
         if (!CONNECTIONS.has(from)) {
             CONNECTIONS.set(from, new Map());
         }
         CONNECTIONS.get(from).set(to, connection);
     }
 }
-function main2(workbook) {
-    // WORKBOOK = workbook;
-    // const sheet = WORKBOOK.getActiveWorksheet();
-    // Lire les paramètres
-    loadParams();
-    loadConnections();
-    // loadTrains("", "147490");
-    // loadStops();
-    // printTrains("Test", "Test");
-    // console.log(TRAINS.get("147490_2")?.findPath());
-    // console.log(TRAINS.get("147490_2").number4Figures());
-    const allCombinations = generateCombinations("MPU", "ETP", "PRU");
-    console.log(allCombinations);
-    const shortestPath = findShortestPath(allCombinations);
-    console.log(shortestPath);
-    return;
+/**
+ * Affiche les connexions entre les gares dans un tableau.
+ * Les données sont celles stockées dans l'objet CONNECTIONS.
+ * @param {string} sheetName - Nom de la feuille de calcul.
+ * @param {string} tableName - Nom du tableau.
+ * @param {string} [startCell="A1"] - Adresse de la cellule de départ pour le tableau.
+ */
+function printConnections(sheetName, tableName, startCell = "A1") {
+    // Convertir l'objet CONNECTIONS en un tableau de données
+    const data = [];
+    for (const [from, connections] of CONNECTIONS) {
+        for (const [to, connection] of connections) {
+            data.push([
+                from,
+                to,
+                connection.time,
+                connection.withTurnaround
+            ]);
+        }
+    }
+    // Imprimer le tableau
+    printTable(CONNECTIONS_HEADERS, data, sheetName, tableName, startCell);
+}
+function saveConnectionsTimes(train) {
+    train.stops.forEach((stop) => {
+        var _a;
+        if (stop.nextStop && CONNECTIONS.has(stop.key) && CONNECTIONS.has(stop.nextStop.key)) {
+            const connection = (_a = CONNECTIONS.get(stop.key)) === null || _a === void 0 ? void 0 : _a.get(stop.nextStop.key);
+            if (connection && stop.nextStop.arrivalTime !== 0 && stop.departureTime !== 0) {
+                connection.time = stop.nextStop.arrivalTime - stop.departureTime;
+            }
+        }
+    });
 }
