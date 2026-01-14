@@ -28,3 +28,17 @@ ajout d'une méthode pour temps de réut, et savoir si RBT avant réut
 
 classe Trains
 firstStation et lastStation en get avec firstStationName et lastStationName
+
+
+
+
+3/1/26
+intégrer renameTrainNumberWithParity
+commentaire adaptWithParity
+poser la question de faire un loadParam dans le constructeur?
+
+toutes constantes en majuscules? => odd et even
+verifie map loaded => pas la ligne des titres
+
+
+doubleParity
