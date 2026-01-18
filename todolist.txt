@@ -32,13 +32,7 @@ firstStation et lastStation en get avec firstStationName et lastStationName
 
 
 
-3/1/26
-intégrer renameTrainNumberWithParity
-commentaire adaptWithParity
-poser la question de faire un loadParam dans le constructeur?
-
-toutes constantes en majuscules? => odd et even
-verifie map loaded => pas la ligne des titres
 
 
-doubleParity
+classes loaded?
+Log.debug : choisir si c'est un objet ou une chaine à concaténer
