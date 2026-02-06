@@ -33,6 +33,12 @@ firstStation et lastStation en get avec firstStationName et lastStationName
 
 
 
+renommer commentaires avec des verbes
 
-classes loaded?
-Log.debug : choisir si c'est un objet ou une chaine à concaténer
+intégrer WorkbookService.getString de partout
+
+isValid => throw error
+
+adapter les tests pour inclure la vérification des exception avec assert.throws
+
+check TrainNumber à partir d'un autre numéro pour voir si c'est le même train, et si oui maj parité double
