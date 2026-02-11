@@ -37,7 +37,6 @@ renommer commentaires avec des verbes
 
 intégrer WorkbookService.getString de partout
 
-isValid => throw error
 
 adapter les tests pour inclure la vérification des exception avec assert.throws
 
