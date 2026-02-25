@@ -644,9 +644,68 @@ class Params {
     }
 }
 
+/*
+ * Classe utilitaire immuable contenant les valeurs d'une date Excel
+ */
+class DateExcel {
+
+    // Constante de valeur initiale (epoch) des dates Excel
+    public static readonly EXCEL_EPOCH = new Date(Date.UTC(1899, 11, 30));
+        
+    // Propriétés de l'objet DateTime
+    public readonly value: number;
+    public readonly year: number;
+    public readonly month: number;
+    public readonly day: number;
+    public readonly dayOfWeek: Day | undefined;
+
+    /**
+     * Constructeur de l'objet DateExcel.
+     * @param {number} excelValue Valeur Excel du jour, qui représente le nombre de jours
+     *  écoulés depuis le 30 décembre 1899.
+     */
+    constructor(excelValue: number) {
+
+        this.value = Math.floor(excelValue);
+
+        const ms = DateExcel.EXCEL_EPOCH.getTime() + this.value * 86400000;
+        const d = new Date(ms);
+
+        this.year = d.getUTCFullYear();
+        this.month = d.getUTCMonth() + 1;
+        this.day = d.getUTCDate();
+        this.dayOfWeek = Day.fromNumber(d.getUTCDay());
+    }
+}
+
+/*
+ * Classe utilitaire immuable contenant les valeurs d'une heure Excel
+ */
+class TimeExcel {
+
+    // Propriétés de l'objet DateTime
+    public readonly value: number;
+    public readonly hour: number;
+    public readonly minute: number;
+    public readonly second: number;
+
+    /**
+     * Constructeur de l'objet TimeExcel.
+     * @param {number} excelValue Valeur Excel du temps, dont la fraction de jour représente l'heure.
+     */
+    constructor(excelValue: number) {
+        this.value = excelValue;
+        const abs = Math.abs(this.value);
+        const totalSeconds = Math.round(abs * 86400);
+        this.hour = Math.floor(totalSeconds / 3600);
+        this.minute = Math.floor((totalSeconds % 3600) / 60);
+        this.second = totalSeconds % 60;
+    }
+}
+
 /**
  * Classe utilitaire immutable pour la gestion des dates et horaires Excel.
- *  Si l'heure est inférieure à l'heure de changement de journée,
+ *  Si le temps est absolu et non daté, et que l'heure est inférieure à l'heure de changement de journée,
  *  elle est incrémentée de 1 pour rester comparable aux autres heures de la journée précédente.
  */
 class DateTime {
@@ -675,28 +734,31 @@ class DateTime {
                                                     //  à partir du 01/01/1900 00:00:00
     public readonly isRelative: boolean = false;    // Indique si le temps est relatif
                                                     //  (différence entre 2 horaires)
-    private _dateComputed = false;                  // Indique si les éléments de la date
-                                                    //  et de l'heure ont été calculés                                              
-    public year: number = 0;                        // Année
-    public month: number = 0 ;                      // Mois
-    public day: number = 0 ;                        // Jour
-    public dayOfWeek: Day | undefined;              // Jour de la semaine
-    public hours: number = 0;                       // Heures
-    public minutes: number = 0;                     // Minutes
-    public seconds: number = 0;                     // Secondes               
+    private _computed = false;                      // Indique si les éléments de la date sont calculés
+
+    // Valeurs des éléments
+    private _realDate: DateExcel | undefined;       // Date réelle
+    private _adaptedDate: DateExcel | undefined;    // Date adaptée si l'heure de la date est inférieure
+                                                    //  à l'heure de changement de jour
+
+    private _time: TimeExcel | undefined;           // Heure de la journée
 
     /**
-     * Constructeur de l'objet DateTime.
-     * @param {number|string} excelValue Valeur Excel du temps en nombre décimal ou en chaîne de caractères.
-     * @param {boolean} [isRelative=false] Indique si le temps est relatif (différence entre 2 horaires).
-     * @param {boolean} [adaptTime=true] Indique si l'heure doit être adaptée ou non.
-     * Si la valeur est inférieure à l'heure de changement de journée et que l'horaire est absolu,
-     *  elle est incrémentée de 1.
-     * @param {boolean} [isRelative=false] Indique si le temps est relatif (différence entre 2 horaires).
+     * Constructeur privé de l'objet DateTime.
+     * @param {number} [excelValue=0] Valeur du temps en format Excel
+     *  à partir du 01/01/1900 00:00:00.
+     * @param {boolean} [isRelative=false] Indique si le temps est relatif
+     *  (différence entre 2 horaires).
+     * @param {boolean} [adaptTime=true] Indique si le temps doit être adapté pour
+     *  tenir compte de l'heure de changement de jour (temps absolu non daté uniquement).
+     *  Si la valeur est inférieure à l'heure de changement de journée
+     *  et que l'horaire est absolu, elle est incrémentée de 1.
+     *  Si le temps est daté, il sera adapté dans la méthode compute.
+     *  Si le temps est relatif, il ne peut pas être adapté.
      */
     private constructor(excelValue: number = 0, isRelative: boolean = false, adaptTime: boolean = true) {
         this.isRelative = isRelative;
-        this.excelValue = (adaptTime && !this.isRelative) ? DateTime.adaptTime(excelValue) : excelValue;
+        this.excelValue = (!isRelative && adaptTime) ? DateTime.adaptTime(excelValue) : excelValue;
     }
 
     /**
@@ -716,11 +778,9 @@ class DateTime {
         value: number | string | DateTime | null | undefined,
         isRelative: boolean = false,
         adaptTime: boolean = true
-    ): DateTime | undefined{
+    ): DateTime | undefined {
         
-        if (value == null || value === "") {
-            return undefined;
-        }
+        if (value == null || value === "") return undefined;
 
         if (value instanceof DateTime) {
             if (value.isRelative !== isRelative) {
@@ -732,7 +792,7 @@ class DateTime {
             return value;
         }
 
-        const v = value == null ? 0 : Number(value);
+        const v = Number(value);
 
         // Un temps absolu doit être supérieur ou égal à 0
         if (!isRelative && v < 0) return undefined;
@@ -741,36 +801,111 @@ class DateTime {
     }  
 
     /**
-     * Calcule les éléments de la date et de l'heure.
-     * Si le temps est absolu et pas seulement une heure, calcule les éléments de la date.
-     * Sinon, calcule uniquement les éléments de l'heure.
-     * Les éléments sont stockés dans les propriétés de l'objet DateTime.
+     * Accesseurs utilitaires
      */
-    private computeDate(): void {
-        if (this._dateComputed) return;
+    // Objet Date (selon s'il est demandé adapté ou non)
+    private getDateObj(adapted: boolean): DateExcel | undefined {
+        return (adapted && this._adaptedDate) ? this._adaptedDate : this._realDate;
+    }
+    // Date
+    public getDate(adaptedValue: boolean = true): number {
+        if (!this._computed) this.compute();
+        const dateObj = this.getDateObj(adaptedValue);
+        return dateObj?.value ?? 0;
+    }
+    // Année
+    public getYear(adaptedValue: boolean = true): number {
+        if (!this._computed) this.compute();
+        const dateObj = this.getDateObj(adaptedValue);
+        return dateObj?.year ?? 0;
+    }
+    // Mois
+    public getMonth(adaptedValue: boolean = true): number {
+        if (!this._computed) this.compute();
+        const dateObj = this.getDateObj(adaptedValue);
+        return dateObj?.month ?? 0;
+    }
+    // Jour
+    public getDay(adaptedValue: boolean = true): number {
+        if (!this._computed) this.compute();
+        const dateObj = this.getDateObj(adaptedValue);
+        return dateObj?.day ?? 0;
+    }
+    // Jour de la semaine
+    public getDayOfWeek(adaptedValue: boolean = true): Day | undefined {
+        if (!this._computed) this.compute();
+        const dateObj = this.getDateObj(adaptedValue);
+        return dateObj?.dayOfWeek;
+    }
+    // Temps
+    //  Si le temps est daté, il correspond à la fraction d'une journée.
+    //  Si la temps est adapté, il est incrémenté de 1 (ex : 25h00)
+    public getTime(adaptedValue: boolean = true): number {
+        if (!this._computed) this.compute();
+        const timeObj = this._time;
+        if (!timeObj) return 0;
+        if (!this.isRelative && !adaptedValue) {
+            return timeObj.value % 1;
+        }
+        return timeObj.value;
+    }
+    // Heure
+    //  Si le temps est adapté, l'heure est incrémentée de 24 (ex : 25h00)
+    public getHours(adaptedValue: boolean = false): number {
+        if (!this._computed) this.compute();
+        const timeObj = this._time;
+        if (!timeObj) return 0;
+        if (!this.isRelative && !adaptedValue) {
+            return timeObj.hour % 24;
+        }
+        return timeObj.hour;
+    }
+    // Minute
+    public getMinutes(): number {
+        if (!this._computed) this.compute();
+        const timeObj = this._time;
+        return timeObj?.minute ?? 0;
+    }
+    // Seconde
+    public getSeconds(): number {
+        if (!this._computed) this.compute();
+        const timeObj = this._time;
+        return timeObj?.second ?? 0;
+    }
 
-        // Calcul des éléments de la date (si absolu et pas seulement une heure)
+    /**
+     * Calcule les éléments de la date et de l'heure de la journée.
+     * Si le temps est relatif, seule l'heure est calculée.
+     * Si le temps est absolu et non daté (<1), il a déjà été adapté dans le constructeur,
+     *  seule l'heure est donc calculée.
+     * Si le temps est absolu et daté, l'heure et la date sont calculées, et également adaptées
+     *  si l'heure est inférieure à l'heure de changement de journée. Dans ce cas la date adaptée
+     *  correspond à la date du jour précédent, et l'heure est incrémentée de 1 (+24h).
+     */
+    private compute(): void {
+        if (this._computed) return;
+
+        // Récupère la valeur du temps, inchangé si le temps est relatif ou absolu non daté
+        let timeOfDay = this.excelValue;
+
+        // Calcul des éléments de la date (si temps absolu et daté)
         if (!this.isRelative && this.excelValue > DateTime.MIN_EXCEL_DATE) {
-            const excelBase = new Date(Date.UTC(1899, 11, 30));
-            const days = Math.floor(this.excelValue);
-            const date = new Date(excelBase.getTime() + days * 86400000);
-
-            this.year = date.getUTCFullYear();
-            this.month = date.getUTCMonth() + 1;
-            this.day = date.getUTCDate();
-            const jsDay = date.getUTCDay();
-            this.dayOfWeek = Day.fromNumber(jsDay);
+            this._realDate = new DateExcel(this.excelValue);
+            timeOfDay = this.excelValue % 1;
+            if (timeOfDay < DateTime.rolloverHour) {
+                this._adaptedDate = new DateExcel(this.excelValue - 1);
+                timeOfDay += 1;
+            }
         }
 
-        // Calcul des éléments de l'heure
-        const absValue = Math.abs(this.excelValue);
-        const dayFraction = absValue % 1;
-        const totalSeconds = Math.round(dayFraction * 86400);
-        this.hours = Math.floor(totalSeconds / 3600);
-        this.minutes = Math.floor((totalSeconds % 3600) / 60);
-        this.seconds = totalSeconds % 60;
-
-        this._dateComputed = true;
+        // Calcul des éléments de l'heure de la journée
+        //  - si le temps est relatif, l'heure correspond au temps total, positif ou négatif,
+        //  - si le temps est absolu, l'heure est la fraction de la journée,
+        //     adaptée si l'heure est inférieure à l'heure de changement de jour,
+        //     d'une valeur comprise entre 0 et 1, ou dépassant 1 si adaptée
+        this._time = new TimeExcel(timeOfDay);
+        
+        this._computed = true;
     }
 
     /**
@@ -879,34 +1014,34 @@ class DateTime {
      * @param {string} format Format de la date ou de l'heure.
      * @returns {string} Date ou heure formattée.
      */
-    public format(format: string): string {
-        this.computeDate();
+    public format(format: string, adaptTime: boolean = true): string {
+        this.compute();
         let prefix = "";
         if (this.excelValue < 0) prefix = "-";
         const pad = (v: number) => v.toString().padStart(2, "0");
     
         const tokens: Record<string, string> = {
         // Année
-        "yyyy": this.year.toString(),
-        "yy": pad(this.year % 100),
+        "yyyy": this.getYear().toString(),
+        "yy": pad(this.getYear(adaptTime) % 100),
         // Mois
-        "mm": pad(this.month),
-        "m": this.month.toString(),
-        // Jour de semaine
-        "dddd": this.dayOfWeek?.fullName ?? "",
-        "ddd": this.dayOfWeek?.abreviation ?? "",
+        "mm": pad(this.getMonth()),
+        "m": this.getMonth(adaptTime).toString(),
         // Jour
-        "dd": pad(this.day),
-        "d": this.day.toString(),
-        // Heures
-        "hh": pad(this.hours),
-        "h": this.hours.toString(),
-        // Minutes
-        "nn": pad(this.minutes),
-        "n": this.minutes.toString(),
-        // Secondes
-        "ss": pad(this.seconds),
-        "s": this.seconds.toString(),
+        "dd": pad(this.getDay()),
+        "d": this.getDay(adaptTime).toString(),
+        // Jour de semaine
+        "dddd": this.getDayOfWeek(adaptTime)?.fullName ?? "",
+        "ddd": this.getDayOfWeek(adaptTime)?.abreviation ?? "",
+        // Heure
+        "hh": pad(this.getHours(adaptTime)),
+        "h": this.getHours().toString(),
+        // Minute
+        "nn": pad(this.getMinutes()),
+        "n": this.getMinutes().toString(),
+        // Seconde
+        "ss": pad(this.getSeconds()),
+        "s": this.getSeconds().toString(),
         };
 
         // Création des clés temporaires
@@ -933,30 +1068,16 @@ class DateTime {
     }
 
     /**
-     * Vérifie si les deux parités sont identiques ou si elles sont toutes les deux undefined.
-     * @param {DateTime | undefined} a Première parité à comparer.
-     * @param {DateTime | undefined} b Seconde parité à comparer.
-     * @returns {boolean} Vrai si les deux parités sont identiques
-     *  ou si elles sont toutes les deux undefined, faux sinon.
-     */
-    public static equalsOrUndefined(
-        a?: DateTime,
-        b?: DateTime
-    ): boolean {
-        return a === b || (!!a && !!b && a.equalsTo(b));
-    }
-
-    /**
      * Ajuste une heure pour tenir compte du changement de journée.
      * Si l'heure est inférieure à l'heure de changement de journée,
      *  on ajoute 1 pour passer à la journée suivante.
      *  Par exemple : 01:00 → 25:00 si changement de journée à 03:00
-     * Cela ne s'applique pas sur les heures datées (valeur > 2).
+     * Cela ne s'applique que sur les heures non datées (valeur < 1).
      * @param {number} time Heure à ajuster.
      * @returns {number} Heure ajustée.
      */
     public static adaptTime(time: number): number {
-        return (time < DateTime.rolloverHour && time < 2) ? time + 1 : time;
+        return (time < DateTime.rolloverHour) ? time + 1 : time;
     }
     
     /**
@@ -1024,6 +1145,28 @@ class Day {
         const number = parseInt(this.numbersString);
         this.number = number > 7 ? 0 : number;
     }
+
+    /**
+     * Renvoie l'objet Day correspondant au numéro de jour fourni,
+     * en chargeant les paramètres des jours de la semaine si ce n'est pas déjà fait.
+     * @param {string} n Numéro du jour de la semaine (de 1 : lundi à 6 : samedi, 0 ou 7 : dimanche).
+     * @returns {Day} Objet Day correspondant au numéro de jour fourni.
+     */
+    private static getDayConst(n: string): Day {
+        // if (!Day.loaded) Day.load();
+        return Day.daysByNumbers.get(n)!;
+    }
+
+    /**
+     * Accesseurs des jours de la semaine
+     */
+    public static get MONDAY(): Day { return Day.getDayConst('1'); }
+    public static get TUESDAY(): Day { return Day.getDayConst('2'); }
+    public static get WEDNESDAY(): Day { return Day.getDayConst('3'); }
+    public static get THURSDAY(): Day { return Day.getDayConst('4'); }
+    public static get FRIDAY(): Day { return Day.getDayConst('5'); }
+    public static get SATURDAY(): Day { return Day.getDayConst('6'); }
+    public static get SUNDAY(): Day { return Day.getDayConst('7'); }
 
     /**
      * Renvoie un objet Day correspondant au numéro de jour fourni.
@@ -1201,11 +1344,11 @@ class Parity {
     private static digits = new Map<number, number>();
 
     // Propriétés de l'objet Parity
-    public readonly value: number;                         // Valeur de la parité
-    private readonly doubleParityAllowed: boolean;           // Autorise une double parité
+    public readonly value: number;                          // Valeur de la parité
+    private readonly doubleParityAllowed: boolean;          // Autorise une double parité
 
     /**
-     * Constructeur de la classe Parity.
+     * Constructeur privé de la classe Parity.
      * Initialise une instance de parité avec une valeur spécifiée,
      *  qui peut être une lettre de parité, un chiffre de parité, ou un numéro de train.
      * Analyse la valeur donnée pour déterminer la parité.
@@ -1385,16 +1528,43 @@ class Parity {
     public invert(): Parity {
         switch (this.value) {
             case Parity.ODD:
-                return Parity.from(Parity.EVEN, this.doubleParityAllowed);
+                return Parity.even(this.doubleParityAllowed);
             case Parity.EVEN:
-                return Parity.from(Parity.ODD, this.doubleParityAllowed);
+                return Parity.odd(this.doubleParityAllowed);
             case Parity.DOUBLE:
-                return Parity.from(Parity.DOUBLE, this.doubleParityAllowed);
+            case Parity.UNDEFINED:
             default:
-                return Parity.from(Parity.UNDEFINED, this.doubleParityAllowed);
+                return this;
         }
     }
     
+    /**
+     * Combine une parité avec une autre en les aditionnant.
+     * Si la parité de départ n'autorise pas les parités doubles, il est impossible de combiner
+     * cette parité avec une autre. Le résultat est forcément une parité qui accepte les parités doubles.
+     * Si la parité de départ n'est pas définie, on utilise la parité fournie en paramètre.
+     * Si la parité fournie en paramètre n'est pas définie, on utilise la parité de départ.
+     * Si les deux parités sont identiques, on retourne la parité de départ.
+     * Sinon, on combine ces deux parités en une parité double.
+     * @param {Parity} other Parité à combiner avec la parité actuelle.
+     * @returns {Parity} Parité combinée.
+     */
+    public combineWith(other: Parity): Parity {
+
+        if (!this.doubleParityAllowed) throw new Error(`Il n'est pas possible de combiner une`
+            + ` parité à une autre si celle de départ n'autorise pas les parités doubles.`
+            + ` Le résultat est forcément une parité qui accepte les parités doubles.`);
+    
+        if (!this.isDefined()) return other.isDefined()
+            ? Parity.from(other.value, true)
+            : this;
+
+        if (!other.isDefined() || this.value === other.value) {
+            return this;
+        }
+        
+        return Parity.double();
+    }    
     
     /**
      * Retourne le chiffre de parité correspondant.
@@ -1438,6 +1608,45 @@ class Parity {
             default:
                 return "";
         }
+    }
+
+    /**
+     * Crée une parité qui n'a pas de valeur définie.
+     * @param {boolean} [doubleParityAllowed=false] Si vrai, la parité
+     *  accepte les parités doubles, sinon elle les refuse.
+     * @returns {Parity} La parité sans valeur définie.
+     */
+    public static undefined(doubleParityAllowed: boolean = false): Parity {
+        return new Parity(Parity.UNDEFINED, doubleParityAllowed);
+    }
+
+    /**
+     * Crée une parité qui correspond à une parité impaire.
+     * @param {boolean} [doubleParityAllowed=false] Si vrai, la parité
+     *  accepte les parités doubles, sinon elle les refuse.
+     * @returns {Parity} La parité impaire.
+     */
+    public static odd(doubleParityAllowed: boolean = false): Parity {
+        return new Parity(Parity.ODD, doubleParityAllowed);
+    }
+
+    /**
+     * Crée une parité qui correspond à une parité paire.
+     * @param {boolean} [doubleParityAllowed=false] Si vrai, la parité
+     *  accepte les parités doubles, sinon elle les refuse.
+     * @returns {Parity} La parité paire.
+     */
+    public static even(doubleParityAllowed: boolean = false): Parity {
+        return new Parity(Parity.EVEN, doubleParityAllowed);
+    }
+
+    /**
+     * Crée une parité qui correspond à une parité double.
+     * Elle est représentée par le chiffre -2.
+     * @returns {Parity} La parité double.
+     */
+    public static double(): Parity {
+        return new Parity(Parity.DOUBLE, true);
     }
 
     /**
@@ -1775,7 +1984,7 @@ class Station {
     // Propriétés de l'objet Station
     public readonly abbreviation!: string;                  // Abréviation de la gare
     public readonly name: string;                           // Nom de la gare
-    public readonly referenceStation: Station | null;       // Gare de rattachement
+    public referenceStation: Station | null;                // Gare de rattachement
     public childStations: Station[];                        // Sous-gares
     public readonly turnaround: Parity;                     // Parité d'un rebroussement possible
                                                             //  (la parité est celle du train avant rebroussement)
@@ -1988,7 +2197,7 @@ class StationWithParity {
     private readonly _parity: Parity;
 
     /**
-     * Constructeur de la classe StationWithParity.
+     * Constructeur privé de la classe StationWithParity.
      * @param {Station | string} stationValue Gare (Station) ou nom de gare avec ou sans suffixe _PARITE
      * @param {Parity | string | number} [parity] Parité associée à la gare d'arrêt ou de passage.
      * Si une parité explicite est fournie, on vérifie la cohérence avec la parité de la gare.
@@ -2084,7 +2293,7 @@ class StationWithParity {
         if (value instanceof Station) {
             return {
                 station: value,
-                parity: Parity.from(Parity.UNDEFINED, false)
+                parity: Parity.undefined()
             };
         }
 
@@ -2805,8 +3014,6 @@ class Stops {
                 const passageTime =
                     WorkbookService.getNumber(row, Stops.COL_PASSAGE_TIME);
                 const tracks = WorkbookService.getString(row, Stops.COL_TRACK);
-                const nextStation =
-                    WorkbookService.getString(row, Stops.COL_NEXT_STATION);
 
                 // Instancie l'objet Stop
                 const stop = new Stop(
@@ -2816,8 +3023,7 @@ class Stops {
                     departureTime,
                     passageTime,
                     true,
-                    tracks,
-                    nextStation
+                    tracks
                 );
 
             } catch (e) {
@@ -2872,7 +3078,7 @@ class Stops {
                     stop.departureTime ? stop.departureTime.excelValue : "",
                     stop.passageTime ? stop.passageTime.excelValue : "",
                     stop.tracks.join(";"),
-                    stop.nextStation ? stop.nextStation.key : ""
+                    path.nextStation(stop)
                 ]);
             }
         }
@@ -2918,10 +3124,11 @@ class Stops {
             try {
 
                 // Récupère les champs
-                const trainNumber = WorkbookService.getString(row, Stops.COL_IMPORT_TRAIN_NUMBER);
-                const date = WorkbookService.getNumber(row, Stops.COL_IMPORT_DATE);
-                const pathKey = WorkbookService.getString(row, Stops.COL_IMPORT_PATH_KEY);
-                if (!pathKey) throw new Error(`pathKey manquant.`);
+                const trainNumber = WorkbookService.getString(row, Stops.COL_IMPORT_TRAIN_NUMBER) || "";
+                const date = WorkbookService.getNumber(row, Stops.COL_IMPORT_DATE) || 0;
+                const service = WorkbookService.getString(row, Stops.COL_IMPORT_SERVICE) || "";
+                const days = WorkbookService.getString(row, Stops.COL_IMPORT_DAYS) || "";
+                
                 const station = WorkbookService.getString(row, Stops.COL_IMPORT_STATION) || "";
                 const stationAfterTurnaround =
                     WorkbookService.getString(row, Stops.COL_IMPORT_STATION_AFTER_TURNAROUND);
@@ -2932,8 +3139,6 @@ class Stops {
                 const passageTime =
                     WorkbookService.getNumber(row, Stops.COL_IMPORT_PASSAGE_TIME);
                 const tracks = WorkbookService.getString(row, Stops.COL_IMPORT_TRACK);
-                const nextStation =
-                    WorkbookService.getString(row, Stops.COL_IMPORT_NEXT_STATION);
 
                 // Instancie l'objet Stop
                 const stop = new Stop(
@@ -2943,8 +3148,7 @@ class Stops {
                     departureTime,
                     passageTime,
                     true,
-                    tracks,
-                    nextStation
+                    tracks
                 );
 
             } catch (e) {
@@ -3041,32 +3245,44 @@ class Path {
         // Le parcours a été calculé => contient des arrêts avec parité
         if (this.stopsChecked === Path.FIND_PATH_OK) {
             if (!hasParityDefined) {
-                throw new Error(`Le parcours calculé ${this.key} ne doit comporter`
-                    + `que des arrêts avec parité définie.`);
+                Log.warn(`Le parcours calculé ${this.key} ne doit comporter`
+                    + ` que des arrêts avec parité définie.`
+                    + ` L'arrêt ${stop.key} ne sera donc pas pris en compte.`);
+                return;
             }
             if (this._stopIndex.has(stop.key)) {
                 if (!erase) {
-                    throw new Error(`L'arrêt "${stop.key}" est déjà associé aux trains`
+                    Log.warn(`L'arrêt "${stop.key}" est déjà associé aux trains`
                         + ` du parcours ${this.key}. Un même train ne peut pas revenir`
-                        + ` dans la même gare et avec le même sens.`);
+                        + ` dans la même gare et avec le même sens.`
+                        + ` Le deuxième arrêt ne sera donc pas pris en compte.`);                
+                    return;
                 }
                 this.stops.splice(this.stops.indexOf(this._stopIndex.get(stop.key)!), 1);
             }
+            // Mise à jour des parités (parité sur l'ensemble du parcours et parité de ligne)
+            this.parity = this.parity.combineWith(stop.station.parity);
+            this.lineDirection = this.lineDirection.combineWith(
+                stop.station.station.reverseLineDirection
+                    ? stop.station.parity.invert()
+                    : stop.station.parity
+            );
 
         // Le parcours n'a pas été calculé => ne contient pas d'arrêts avec parité
         } else {
             if (hasParityDefined) {
-                Log.warn(`Le parcours ${this.key} n'a pas été calculé. Il ne peut donc pas `
-                    + ` contenir d'arrêts avec parité. L'arrêt ${stop.key} sera donc pris en compte`
-                    + ` sans parité.`);
-                stop.station = StationWithParity.from(stop.station, Parity.UNDEFINED); 
+                Log.warn(`Le parcours ${this.key} n'a pas été calculé.`
+                    + ` Il ne peut donc pas contenir d'arrêts avec parité.`
+                    + ` L'arrêt ${stop.key} ne sera donc pas pris en compte.`);
+                return; 
             }
             if (this._stopIndex.has(stop.key)) {
                 if (!erase) {
-                    throw new Error(`L'arrêt "${stop.key}" est déjà associé aux trains`
+                    Log.warn(`L'arrêt "${stop.key}" est déjà associé aux trains`
                         + ` du parcours ${this.key}. Si le train dessert une gare dans les deux sens,`
                         + ` il est nécessaire de calculer les parités de passage en gare.`
-                        + ` L'arrêt ne sera pas pris en compte.`);
+                        + ` Le deuxième arrêt ne sera donc pas pris en compte.`);
+                    return;
                 }
                 this.stops.splice(this.stops.indexOf(this._stopIndex.get(stop.key)!), 1);
             }
@@ -3150,6 +3366,9 @@ class Path {
   
 }
 
+/**
+ * Classe Paths contenant la liste des parcours.
+ */
 class Paths {
 
     // Constantes de lecture de la base de données Excel
@@ -3314,7 +3533,6 @@ class Paths {
 
 }
 
-
 /**
  * Classe Train définissant un train, pour un unique jour, étant la réutilisation
  * d'un ou deux trains précédents, et ayant une ou deux réutilisations,
@@ -3325,7 +3543,7 @@ class Train {
     // Propriétés de l'objet Train
     public readonly number: TrainNumber;            // Numéro du train
     public readonly path: Path;                     // Parcours sur lequel le train circule
-    public readonly day: DateTime;                  // Jour du train    (1 à 7 = lundi à dimanche, >7 = date précise)
+    public readonly date: DateTime;                 // Jour du train    (1 à 7 = lundi à dimanche, >7 = date précise)
     public readonly service: string;                // Service auquel le train est rattaché
     public readonly firstStation?: string;          // Gare de départ si différente de celle du sillon
     public readonly lastStation?: string;           // Gare d'arrivée si différente de celle du sillon
@@ -3540,6 +3758,229 @@ class Trains {
     }
 }
 
+/**
+ * Classe représentant un train.
+ */
+class TrainPath {
+
+    // Propriétés de l'objet Train
+    public readonly number: TrainNumber;            // Numéro du train
+    public readonly path: Path;                     // Parcours sur lequel le train circule
+    public readonly day: DateTime;                  // Jour du train    (1 à 7 = lundi à dimanche, >7 = date précise)
+    public readonly service: string;                // Service auquel le train est rattaché
+    public readonly firstStation?: string;          // Gare de départ si différente de celle du sillon
+    public readonly lastStation?: string;           // Gare d'arrivée si différente de celle du sillon
+    public readonly unit1: string;                  // Element 1 Nord (numéro de matériel)
+    public readonly unit2: string;                  // Element 2 Sud (numéro de matériel)
+    public readonly previous1: string;              // Clé du train précédent de l'élément 1
+    public readonly previous2: string;              // Clé du train précédent de l'élément 2
+    public readonly reuse1?: Train;                 // Train de réutilisation de l'élément 1
+    public readonly reuse1Key: string;              // Clé du train de réutilisation de l'élément 1
+    public readonly reuse2?: Train;                 // Train de réutilisation de l'élément 2
+    public readonly reuse2Key: string;              // Clé du train de réutilisation de l'élément 2
+
+    constructor(
+        number: string,
+        pathKey: string,
+        day: number,
+        service: string,
+        unit1: string = "",
+        unit2: string = "",
+        previous1: string = "",
+        previous2: string = "",
+        reuse1Key: string = "",
+        reuse2Key: string = ""
+    ) {
+        this.number = new TrainNumber(number);
+        this.path = Paths.map.get(pathKey) as Path;
+        this.day = day;
+        this.service = service;
+        this.unit1 = unit1;
+        this.unit2 = unit2;
+        this.previous1 = previous1;
+        this.previous2 = previous2;
+        this.reuse1Key = reuse1Key;
+        this.reuse2Key = reuse2Key;
+        if (!this.path) {
+            Log.warn(`Train n° ${this.number}_${this.day} : le sillon rattaché est inconnu : ${pathKey}.`);
+            return;
+        }
+    }
+
+    /**
+     * Vérifie la validité de l'objet Train en envoyant un message d'erreur si :
+     *  - le sillon est inconnu.
+     * @returns {Train | undefined} Objet Train s'il est valide, undefined sinon.
+     */
+    check(): Train | undefined {
+        if (!this.path) {
+            Log.warn(`Train n° ${this.number}_${this.day} : le sillon rattaché est inconnu : ${this.pathKey}.`);
+            return undefined;
+        }
+        return this;
+    }
+
+    /**
+     * Retourne la clé du train qui est composée du numéro du train
+     *  suivi de la liste des jours de circulation.
+     * @returns {string} Clé du train
+     */
+    get key(): string {
+        return `${this.number}_${this.day}`;
+    }
+
+    /**
+     * Retourne le numéro du train, éventuellement modifié pour :
+     *  - donner le numéro abrégé de 6 à 4 chiffres si with4Digits est vrai
+     *  - ajouter la double parité si withDoubleParity est vrai
+     * @param {boolean} [with4Digits=false] Si vrai, le numéro est abrégé
+     *  de 6 à 4 chiffres pour les trains commerciaux.
+     *  Si faux (par défaut), le numéro est renommé.
+     * @param {boolean} [withDoubleParity=false] Si vrai, le numéro est renommé
+     *  pour indiquer le changement de parité. Si faux (par défaut), le numéro de train
+     *  en gare origine est renvoyé.
+     * @returns {string} Numéro du train.
+     */
+    getTrainNumber(with4Digits: boolean = false, withDoubleParity: boolean = false): string {
+        return this.path.getTrainNumber(with4Digits, withDoubleParity);;
+    }
+}
+
+/**
+ * Classe Trains contenant la liste des trains
+ */
+class TrainPaths {
+
+    // Constantes de lecture de la base de données Excel
+    private static readonly SHEET = "Trains";               // Feuille contenant la liste des trains
+    private static readonly TABLE = "Trains";               // Tableau contenant la liste des trains
+    private static readonly HEADERS = [[                    // En-têtes du tableau des trains
+        "Id",
+        "Numéro du train",
+        "Jours",
+        "Parcours",
+        "Elément Nord",
+        "Elément Sud",
+        "Train Précédent Nord",
+        "Train Précédent Sud",
+        "Réutilisation Nord",
+        "Réutilisation Sud",
+    ]];
+    private static readonly COL_KEY = 0;                    // Colonne de la clé du train
+    private static readonly COL_NUMBER = 1;                 // Colonne du numéro du train
+    private static readonly COL_DAYS = 2;                   // Colonne des jours de circulation
+    private static readonly COL_TRAIN_PATH = 3;
+    private static readonly COL_UNIT1 = 4;
+    private static readonly COL_UNIT2 = 5;
+    private static readonly COL_PREVIOUS1 = 6;
+    private static readonly COL_PREVIOUS2 = 7;
+    private static readonly COL_REUSE1 = 8;
+    private static readonly COL_REUSE2 = 9;
+
+    // Constantes de classe
+    public static readonly UNKNOWN_UNIT = "?";
+    
+    // Map des trains indexées par abréviation
+    public static readonly map: Map<string, Train> = new Map();
+    
+    /**
+     * Charge les arrêts à partir du tableau "Arrêts" de la feuille "Arrêts".
+     * Les gares sont stockées dans une Map avec comme clés l'abréviation 
+     * Les arrêts sont stockés dans la propriété "stops" des trains et parcours correspondants.
+     * Si un train n'existe pas, un message d'erreur est affiché.
+     */
+    public static load(erase: boolean = false): void {
+
+        const data = WorkbookService.getDataFromTable(Stops.SHEET, Stops.TABLE);
+        
+        // Parcourt la base de données
+        for (const row of data.slice(1)) {
+    // private static readonly COL_KEY = 0;
+    // private static readonly COL_NUMBER = 1;
+    // private static readonly COL_DAYS = 2;
+    // private static readonly COL_TRAIN_PATH = 3;
+    // private static readonly COL_UNIT1 = 4;
+    // private static readonly COL_UNIT2 = 5;
+    // private static readonly COL_PREVIOUS1 = 6;
+    // private static readonly COL_PREVIOUS2 = 7;
+    // private static readonly COL_REUSE1 = 8;
+    // private static readonly COL_REUSE2 = 9;
+            // Vérifie si le train existe
+            const trainNumber = String(row[COL_TRAIN_NUMBER]);
+            const trainDays = String(row[COL_TRAIN_DAYS]);
+            if (!trainNumber || !trainDays) continue;
+
+            const trainKey = trainNumber + "_" + trainDays;
+            if (!Paths.map.has(trainKey)) continue;
+
+            const train = Paths.map.get(trainKey) as Path;
+
+            // Extrait les valeurs
+            const stationName = String(row[COL_STATION]);
+            if (!stationName) continue;
+            const parity = row[COL_PARITY] as number;
+            const arrivalTime = row[COL_ARRIVAL_TIME] as number;
+            const departureTime = row[COL_DEPARTURE_TIME] as number;
+            const passageTime = row[COL_PASSAGE_TIME] as number;
+            const tracks = String(row[COL_TRACK]);
+            const changeNumber = row[COL_CHANGE_NUMBER] as number;
+            const nextStopName = String(row[COL_NEXT_STOP]);
+
+            const stop = new Stop(
+                train.key,
+                stationName,
+                parity,
+                arrivalTime,
+                departureTime,
+                passageTime,
+                tracks,
+                changeNumber,
+                nextStopName
+            );
+            if (!stop) continue;
+
+            // Ajoute l'arrêt au train
+            train.addStop(stop);
+        }
+
+        // Boucle pour reparcourir tous les trains et vérifier leurs arrêts
+        for (const train of Paths.map.values()) {
+            train.checkStops();
+        }
+    }
+
+    /**
+     * Affiche les trains de la map dans un tableau.
+     * @param {string} [sheetName=Trains.SHEET] Nom de la feuille de calcul.
+     * @param {string} [tableName=Trains.TABLE] Nom du tableau.
+     * @param {string} [startCell="A1"] Adresse de la cellule de départ pour le tableau.
+     */
+    public static print(
+        sheetName: string = Trains.SHEET,
+        tableName: string = Trains.TABLE,
+        startCell: string = "A1"
+    ): void {
+
+        // Convertit la map en un tableau de données
+        const data: (string | number)[][] = Array
+            .from(Trains.map.values())
+            .map((train: Train) => [
+                train.key,
+                train.number.toString(false, true),
+                train.day,
+                train.path.key,
+                train.unit1,
+                train.unit2,
+                train.previous1,
+                train.previous2,
+                train.reuse1.key,
+                train.reuse2.key
+            ]);
+
+        WorkbookService.printTable(Trains.HEADERS, data, sheetName, tableName, startCell);
+    }
+}
+
 function testWorkbookService(options: Partial<AssertDDOptions> = {}) {
     const assert = new AssertDD(options);
     const testSheetName = "testWorkbookService";
@@ -3614,18 +4055,15 @@ function testWorkbookService(options: Partial<AssertDDOptions> = {}) {
     assert.printSummary("Tests WorkbookService");
 }
 
-function testDateTime(options: Partial<AssertDDOptions> = {}) {
+function testDateTime(options: Partial<AssertDDOptions> = {}) { 
 
     const assert = new AssertDD(options);
     DateTime.load();
 
+    const round = (v: number) => Math.round(v * 1e10) / 1e10;
+
     /* ==========================================================
-    1. CONSTRUCTION via DateTime.from
-    ----------------------------------------------------------
-    Vérifie :
-    - Rollover appliqué ou non
-    - Temps relatifs
-    - Parsing number / string
+    1. CONSTRUCTION & ROLLOVER
     ========================================================== */
 
     const constructorTests = [
@@ -3648,12 +4086,6 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
             expected: 1
         },
         {
-            desc: 'Valeur string "0.5" (12:00)',
-            value: "0.5",
-            isRelative: false,
-            expected: 0.5
-        },
-        {
             desc: 'Durée relative (01:00)',
             value: 1 / 24,
             isRelative: true,
@@ -3663,264 +4095,157 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
 
     constructorTests.forEach(t => {
         const dt = DateTime.from(t.value, t.isRelative);
-
         assert.check(
-            `DateTime.from(${t.value}, ${t.isRelative}) → excelValue (${t.desc})`,
-            dt?.excelValue,
-            t.expected
+            `from(${t.value}, ${t.isRelative}) → excelValue (${t.desc})`,
+            round(dt?.excelValue ?? 0),
+            round(t.expected)
         );
     });
 
     /* ==========================================================
-    2. DateTime.from()
-    ----------------------------------------------------------
-    Règle :
-    - null | undefined → undefined
-    - DateTime → même instance (si type compatible)
+    2. GETTERS HEURE
     ========================================================== */
 
-    const base = DateTime.from(10 / 24)!;
+    const time = DateTime.from(4.5 / 24)!; // 04:30
+
+    assert.check('getHours()', time.getHours(), 4);
+    assert.check('getMinutes()', time.getMinutes(), 30);
+    assert.check('getSeconds()', time.getSeconds(), 0);
+
+    /* ==========================================================
+    3. GETTERS DATE & ADAPTATION
+    ========================================================== */
+
+    // 22/06/2025 01:00 → adapté = 21/06/2025
+    const dtAdapt = DateTime.from(45830 + 1/24)!;
+
+    assert.check('getDay(adapted)', dtAdapt.getDay(true), 21);
+    assert.check('getDay(real)', dtAdapt.getDay(false), 22);
 
     assert.check(
-        'DateTime.from(DateTime) retourne la même instance',
-        DateTime.from(base) === base,
-        true
+        'getDayOfWeek(adapted)',
+        dtAdapt.getDayOfWeek(true)?.number,
+        Day.SATURDAY.number
     );
 
     assert.check(
-        'DateTime.from(number)',
-        DateTime.from(10 / 24)?.excelValue,
-        10 / 24
-    );
-
-    assert.check(
-        'DateTime.from(string)',
-        DateTime.from("0.5")?.excelValue,
-        0.5
-    );
-
-    assert.check(
-        'DateTime.from(undefined) → undefined',
-        DateTime.from(undefined),
-        undefined
-    );
-
-    assert.check(
-        'DateTime.from(null) → undefined',
-        DateTime.from(null),
-        undefined
-    );
-
-    assert.check(
-        'DateTime.from("") → undefined',
-        DateTime.from(""),
-        undefined
-    );
-
-    // ---- from() incohérence relatif / absolu ----
-    let fromErrorCaught = false;
-    try {
-        const relative = DateTime.from(1 / 24, true)!;
-        DateTime.from(relative, false);
-    } catch (e) {
-        fromErrorCaught = e.message.includes('relatif');
-    }
-
-    assert.check(
-        'DateTime.from() erreur relatif → absolu',
-        fromErrorCaught,
-        true
+        'getDayOfWeek(real)',
+        dtAdapt.getDayOfWeek(false)?.number,
+        Day.SUNDAY.number
     );
 
     /* ==========================================================
-       3. format() — heure
-       ========================================================== */
+    4. getTime() adapté / non adapté
+    ========================================================== */
+
+    const t = DateTime.from(1/24)!; // 01:00
+
+    assert.check(
+        'getTime(adapted) → 25:00',
+        round(t.getTime(true)),
+        round(1/24 + 1)
+    );
+
+    assert.check(
+        'getTime(real) → 01:00',
+        round(t.getTime(false)),
+        round(1/24)
+    );
+
+    /* ==========================================================
+    5. format() heure
+    ========================================================== */
 
     const formatTimeTests = [
-        {
-            desc: '04:30:00',
-            value: 4.5 / 24,
-            format: DateTime.TIME_FORMAT_WITH_SECONDS,
-            expected: '04:30:00'
-        },
-        {
-            desc: '04:30',
-            value: 4.5 / 24,
-            format: DateTime.TIME_FORMAT_WITHOUT_SECONDS,
-            expected: '04:30'
-        },
-        {
-            desc: '-04:30',
-            value: -4.5 / 24,
-            format: DateTime.TIME_FORMAT_WITHOUT_SECONDS,
-            expected: '-04:30'
-        }
+        { value: 4.5/24, fmt: DateTime.TIME_FORMAT_WITH_SECONDS, exp: '04:30:00' },
+        { value: 4.5/24, fmt: DateTime.TIME_FORMAT_WITHOUT_SECONDS, exp: '04:30' },
+        { value: -4.5/24, fmt: DateTime.TIME_FORMAT_WITHOUT_SECONDS, exp: '-04:30' },
     ];
 
     formatTimeTests.forEach(t => {
-        const dt = DateTime.from(t.value, true);
+        const dt = DateTime.from(t.value, true)!;
         assert.check(
-            `format("${t.format}") (${t.desc})`,
-            dt.format(t.format),
-            t.expected
+            `format("${t.fmt}")`,
+            dt.format(t.fmt),
+            t.exp
         );
     });
 
     /* ==========================================================
-       4. format() — date
-       ========================================================== */
+    6. format() date
+    ========================================================== */
 
-    const formatDateTests = [
-        {
-            desc: 'Date Excel valide (22/06/2025)',
-            value: 45830,
-            format: DateTime.DATE_FORMAT_WITH_YEAR,
-            expected: '22/06/2025'
-        },
-        {
-            desc: 'Date sans année',
-            value: 45830,
-            format: DateTime.DATE_FORMAT_WITHOUT_YEAR,
-            expected: '22/06'
-        },
-        {
-            desc: 'Date avec heure',
-            value: 45830.94347,
-            format: DateTime.DATE_FORMAT_WITH_YEAR,
-            expected: '22/06/2025'
-        },
-        {
-            desc: 'Date avec jour de la semaine',
-            value: 45830.94347,
-            format: "dddd dd/mm/yyyy",
-            expected: 'Dimanche 22/06/2025'
-        }
-    ];
+    const dt = DateTime.from(45830.75)!; // 22/06/2025
 
-    formatDateTests.forEach(t => {
-        const dt = DateTime.from(t.value);
-        assert.check(
-            `format("${t.format}") (${t.desc})`,
-            dt.format(t.format),
-            t.expected
-        );
-    });
+    assert.check(
+        'format DATE_WITH_YEAR',
+        dt.format(DateTime.DATE_FORMAT_WITH_YEAR),
+        '22/06/2025'
+    );
+
+    assert.check(
+        'format DATE_WITHOUT_YEAR',
+        dt.format(DateTime.DATE_FORMAT_WITHOUT_YEAR),
+        '22/06'
+    );
+
+    assert.check(
+        'format DATE_WITH_DAY',
+        dt.format('dddd dd/mm/yyyy'),
+        'Dimanche 22/06/2025'
+    );
+
+    assert.check(
+        'format DATE_ID',
+        dt.format(DateTime.DATE_FORMAT_FOR_ID),
+        '250622'
+    );
 
     /* ==========================================================
-       5. format() — ID
-       ========================================================== */
+    7. resolveAgainst / relativeTo / equals / compare
+    ========================================================== */
 
-    const formatIdTests = [
-        {
-            desc: 'Date Excel valide',
-            value: 45830,
-            expected: '250622'
-        },
-        {
-            desc: 'Date avec heure',
-            value: 45830.75,
-            expected: '250622'
-        }
-    ];
+    const ref = DateTime.from(45830 + 10/24)!;
+    const rel = DateTime.from(3/24, true)!;
+    const abs = DateTime.from(45830 + 10/24)!;
 
-    formatIdTests.forEach(t => {
-        const dt = DateTime.from(t.value);
-        assert.check(
-            `format(DATE_FORMAT_FOR_ID) (${t.desc})`,
-            dt.format(DateTime.DATE_FORMAT_FOR_ID),
-            t.expected
-        );
-    });
+    assert.check(
+        'resolveAgainst',
+        round(rel.resolveAgainst(ref).excelValue),
+        round(45830 + 13/24)
+    );
 
-    /* ==========================================================
-       6. resolveAgainst(), relativeTo(), equalsTo(), compareTo()
-       ========================================================== */
+    assert.check(
+        'relativeTo',
+        abs.relativeTo(ref).excelValue,
+        0
+    );
 
-    const testCases = [
-        {
-            desc: 'Temps relatif positif (+3h)',
-            ref: 45830 + 10 / 24,
-            rel: 3 / 24,
-            expectedResolve: 45830 + 13 / 24
-        },
-        {
-            desc: 'Temps relatif négatif (-2h)',
-            ref: 45830 + 15 / 24,
-            rel: -2 / 24,
-            expectedResolve: 45830 + 13 / 24
-        },
-        {
-            desc: 'Temps absolu inchangé',
-            ref: 45830 + 15 / 24,
-            rel: 0,
-            expectedResolve: 45830 + 15 / 24
-        }
-    ];
+    assert.check(
+        'equalsTo',
+        abs.equalsTo(DateTime.from(45830 + 10/24)),
+        true
+    );
 
-    testCases.forEach(t => {
-
-        const reference = DateTime.from(t.ref)!;
-        const relative  = DateTime.from(t.rel, true)!;
-        const absolute  = DateTime.from(t.ref)!;
-
-        assert.check(
-            `resolveAgainst() (${t.desc})`,
-            relative.resolveAgainst(reference).excelValue,
-            t.expectedResolve
-        );
-
-        assert.check(
-            `relativeTo() (${t.desc})`,
-            absolute.relativeTo(reference).excelValue,
-            0
-        );
-
-        assert.check(
-            `equalsTo() (${t.desc})`,
-            absolute.equalsTo(DateTime.from(t.ref)),
-            true
-        );
-
-        assert.check(
-            `compareTo() (${t.desc})`,
-            absolute.compareTo(DateTime.from(t.ref)),
-            0
-        );
-    });
+    assert.check(
+        'compareTo',
+        abs.compareTo(DateTime.from(45830 + 10/24)!),
+        0
+    );
 
     /* ==========================================================
-       7. add(), subtract() – temps relatifs uniquement
-       ========================================================== */
+    8. add / subtract relatifs
+    ========================================================== */
 
-    const round = (v: number) => Math.round(v * 1e10) / 1e10;
+    const A = DateTime.from(2/24, true)!;
+    const B = DateTime.from(3/24, true)!;
 
-    const relativeTestCases = [
-        { a: 2 / 24, b: 3 / 24, add: 5 / 24, sub: -1 / 24 },
-        { a: 3 / 24, b: -2 / 24, add: 1 / 24, sub: 5 / 24 },
-        { a: -1 / 24, b: -2 / 24, add: -3 / 24, sub: 1 / 24 },
-    ];
-
-    relativeTestCases.forEach(t => {
-
-        const A = DateTime.from(t.a, true)!;
-        const B = DateTime.from(t.b, true)!;
-
-        assert.check(
-            'add()',
-            round(A.add(B).excelValue),
-            round(t.add)
-        );
-
-        assert.check(
-            'subtract()',
-            round(A.subtract(B).excelValue),
-            round(t.sub)
-        );
-    });
+    assert.check('add', round(A.add(B).excelValue), round(5/24));
+    assert.check('subtract', round(A.subtract(B).excelValue), round(-1/24));
 
     /* ==========================================================
-       SYNTHÈSE
-       ========================================================== */
+    SYNTHÈSE
+    ========================================================== */
 
     assert.printSummary('testDateTime');
 }
@@ -4046,6 +4371,42 @@ function testDay(options: Partial<AssertDDOptions> = {}) {
     });
 
     /* ==========================================================
+    5. Constantes Day.*
+    ========================================================== */
+
+    const constantsTests = [
+        { const: Day.MONDAY,    num: 1, name: "Lundi" },
+        { const: Day.TUESDAY,   num: 2, name: "Mardi" },
+        { const: Day.WEDNESDAY, num: 3, name: "Mercredi" },
+        { const: Day.THURSDAY,  num: 4, name: "Jeudi" },
+        { const: Day.FRIDAY,    num: 5, name: "Vendredi" },
+        { const: Day.SATURDAY,  num: 6, name: "Samedi" },
+        { const: Day.SUNDAY,    num: 7, name: "Dimanche" },
+    ];
+
+    constantsTests.forEach(t => {
+
+        assert.check(
+            `Day constant number (${t.name})`,
+            t.const.number,
+            t.num
+        );
+
+        assert.check(
+            `Day constant fullName (${t.name})`,
+            t.const.fullName,
+            t.name
+        );
+
+        assert.check(
+            `Day constant identity fromNumber (${t.name})`,
+            Day.fromNumber(t.num) === t.const,
+            true
+        );
+
+    });
+
+    /* ==========================================================
        SYNTHÈSE
        ========================================================== */
 
@@ -4107,7 +4468,7 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
     });
 
     /* ==========================================================
-       3. is() / isDefined() / isOpposedTo()
+       3. is() / isDefined()
        ========================================================== */
 
 
@@ -4137,6 +4498,10 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
         );
     });
 
+    /* ==========================================================
+       4. isOpposedTo()
+       ========================================================== */
+
     const isOpposedTests = [
         { a: "I", b: "P", expected: true },
         { a: "P", b: "I", expected: true },
@@ -4155,8 +4520,21 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
         );
     });
 
+    assert.check(
+        "DOUBLE n'est opposé à rien",
+        Parity.double().isOpposedTo(Parity.odd()),
+        false
+    );
+
+    assert.check(
+        "UNDEFINED n'est opposé à rien",
+        Parity.undefined().isOpposedTo(Parity.even()),
+        false
+    );
+
+
     /* ==========================================================
-       4. equalsTo() / 
+       5. equalsTo() / 
        ========================================================== */
 
     const equalsTests = [
@@ -4187,8 +4565,17 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
         false
     );
 
+    const oddSimple = Parity.odd(false);
+    const oddDoubleAllowed = Parity.odd(true);
+
+    assert.check(
+        "equalsTo faux si doubleParityAllowed différent",
+        oddSimple.equalsTo(oddDoubleAllowed),
+        false
+    );
+
     /* ==========================================================
-        5. Parity.includes()
+        6. Parity.includes()
         ----------------------------------------------------------
         Vérifie :
         - parité simple vs simple
@@ -4228,8 +4615,17 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
         );
     });
 
+    const simpleParity = Parity.odd(false);
+
+    assert.check(
+        "includes refuse double si non autorisée",
+        simpleParity.includes("IP"),
+        false
+    );
+   
+
     /* ==========================================================
-       6. invert()
+       7. invert()
        ========================================================== */
 
     const invertTests = [
@@ -4248,8 +4644,95 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
         );
     });
 
+    const pDouble = Parity.double();
+    const pUndefined = Parity.undefined();
+
+    assert.check(
+        "invert DOUBLE retourne la même instance",
+        pDouble.invert() === pDouble,
+        true
+    );
+
+    assert.check(
+        "invert UNDEFINED retourne la même instance",
+        pUndefined.invert() === pUndefined,
+        true
+    );
+
     /* ==========================================================
-       7. printDigit() / printLetter()
+       8. combineWith()
+       ========================================================== */
+
+       const combineTests = [
+        // undefined + odd → odd
+        {
+            a: Parity.undefined(true),
+            b: Parity.odd(),
+            expected: Parity.ODD
+        },
+
+        // odd + undefined → odd
+        {
+            a: Parity.odd(true),
+            b: Parity.undefined(),
+            expected: Parity.ODD
+        },
+
+        // odd + odd → odd
+        {
+            a: Parity.odd(true),
+            b: Parity.odd(),
+            expected: Parity.ODD
+        },
+
+        // even + even → even
+        {
+            a: Parity.even(true),
+            b: Parity.even(),
+            expected: Parity.EVEN
+        },
+
+        // odd + even → double
+        {
+            a: Parity.odd(true),
+            b: Parity.even(),
+            expected: Parity.DOUBLE
+        }
+    ];
+
+    combineTests.forEach(t => {
+        const result = t.a.combineWith(t.b);
+        assert.check(
+            `combineWith ${t.a.value} + ${t.b.value}`,
+            result.value,
+            t.expected
+        );
+    });
+
+    // Test erreur si double non autorisé
+    assert.throws(
+        "combineWith interdit si doubleParityAllowed = false",
+        () => Parity.odd(false).combineWith(Parity.even())
+    );
+
+    // Test immutabilité
+    const original = Parity.odd(true);
+    const combined = original.combineWith(Parity.even());
+
+    assert.check(
+        "combineWith ne modifie pas l'instance d'origine",
+        original.value,
+        Parity.ODD
+    );
+
+    assert.check(
+        "combineWith retourne une nouvelle instance si changement",
+        combined !== original,
+        true
+    );
+
+    /* ==========================================================
+       9. printDigit() / printLetter()
        ========================================================== */
 
     const printTests = [
@@ -4271,7 +4754,7 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
     });
 
     /* ==========================================================
-       8. printDigit(withUnderscores)
+       10. printDigit(withUnderscores)
        ========================================================== */
 
     const underscoreTests = [
@@ -4291,7 +4774,63 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
     });
 
     /* ==========================================================
-       9. containsParityLetter()
+       11. static factories
+       ========================================================== */
+
+    assert.check(
+        "Parity.odd() crée une parité impaire",
+        Parity.odd().value,
+        Parity.ODD
+    );
+
+    assert.check(
+        "Parity.even() crée une parité paire",
+        Parity.even().value,
+        Parity.EVEN
+    );
+
+    assert.check(
+        "Parity.double() crée une parité double",
+        Parity.double().value,
+        Parity.DOUBLE
+    );
+
+    assert.check(
+        "Parity.undefined() crée une parité undefined",
+        Parity.undefined().value,
+        Parity.UNDEFINED
+    );
+
+    assert.check(
+        "Parity.double() autorise toujours doubleParityAllowed",
+        Parity.double().combineWith(Parity.odd()).value,
+        Parity.DOUBLE
+    );
+
+    /* ==========================================================
+       12. equalsOrUndefined()
+       ========================================================== */
+
+    const equalsOrUndefinedTests = [
+        { a: undefined, b: undefined, expected: true },
+        { a: Parity.odd(), b: undefined, expected: false },
+        { a: undefined, b: Parity.even(), expected: false },
+        { a: Parity.odd(), b: Parity.odd(), expected: true },
+        { a: Parity.even(), b: Parity.even(), expected: true },
+        { a: Parity.odd(), b: Parity.even(), expected: false },
+        { a: Parity.double(), b: Parity.double(), expected: true }
+    ];
+
+    equalsOrUndefinedTests.forEach((t, index) => {
+        assert.check(
+            `equalsOrUndefined test #${index + 1}`,
+            Parity.equalsOrUndefined(t.a, t.b),
+            t.expected
+        );
+    });
+
+    /* ==========================================================
+       13. static containsParityLetter()
        ========================================================== */
 
     const containsTests = [
@@ -4309,7 +4848,7 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
     });
 
     /* ==========================================================
-       10. static letter() / digit()
+       14. static letter() / digit()
        ========================================================== */
 
     const staticTests = [

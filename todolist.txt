@@ -35,9 +35,12 @@ firstStation et lastStation en get avec firstStationName et lastStationName
 
 renommer commentaires avec des verbes
 
-intégrer WorkbookService.getString de partout
 
 
 adapter les tests pour inclure la vérification des exception avec assert.throws
 
 check TrainNumber à partir d'un autre numéro pour voir si c'est le même train, et si oui maj parité double
+
+add parity ?
+nextStop dans Path
+
