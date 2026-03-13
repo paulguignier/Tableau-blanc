@@ -37,10 +37,7 @@ renommer commentaires avec des verbes
 
 
 
-adapter les tests pour inclure la vérification des exception avec assert.throws
 
-check TrainNumber à partir d'un autre numéro pour voir si c'est le même train, et si oui maj parité double
 
-add parity ?
-nextStop dans Path
+vérifier que lors de la lecture des horaires, ce n'est pas la valeur 0 qui est lue mais " quand la cellule est vide
 
