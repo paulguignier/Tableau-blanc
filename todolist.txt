@@ -41,3 +41,7 @@ renommer commentaires avec des verbes
 
 vérifier que lors de la lecture des horaires, ce n'est pas la valeur 0 qui est lue mais " quand la cellule est vide
 
+
+voir pour remplacer les map avec chaine
+
+ajouter 8 : jour férié

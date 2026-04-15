@@ -1,20 +1,19 @@
-public expandRoutes(): string[][] {
+private static optimiseCode(numbersString: string): string {
 
-    let result: string[][] = [[]];
+    let remaining = numbersString;
+    let result = '';
 
-    for (const group of this.routeStations) {
+    const rules = [...this.compressionRules]
+        .sort((a, b) => b.numbers.length - a.numbers.length);
 
-        const perms = Path.permutations(group);
-        const newResult: string[][] = [];
-
-        for (const base of result) {
-            for (const perm of perms) {
-                newResult.push([...base, ...perm]);
+        for (const r of rules) {
+            if (r.numbers.split('').every(n => remaining.includes(n))) {
+                result += r.code;
+                r.numbers.split('').forEach(n => {
+                    remaining = remaining.replace(n, '');
+                });
             }
         }
-
-        result = newResult;
-    }
-
-    return result;
+    
+        return result + remaining;
 }
