@@ -4,11 +4,12 @@
  * Code Excel Automate pour la création et l'utilisation de la base de données des trains.
  * 
  * @author Paul Guignier
- * @version 2.0
+ * @version 2.1
  * @package scr\ChargementTrains.ts
  */
 
-/* Variables globales nécessaires dans ExcelScript (pas d'injection possible) */
+
+//Variables globales nécessaires dans ExcelScript (pas d'injection possible).
 var WORKBOOK: ExcelScript.Workbook;     // Classeur principal
 var CONSOLE: Console;                   // Console pour l'affichage de messages
 
@@ -26,7 +27,7 @@ function main(workbook: ExcelScript.Workbook) {
 
 
 
-    // Lance la fonction de tests
+    // Lance la fonction de tests.
     // Si les tests sont actifs, la suite du programme n'est pas exécuté. 
     if (runAllTests(testMode)) return;
 
@@ -71,6 +72,7 @@ function runAllTests(testMode: boolean = false): boolean {
     Connections.load();
 
     Log.info(`Début des tests`);
+
     try {
         // testWorkbookService({ printSuccess: false, printFailure: true });
         // testDateTime({ printSuccess: false, printFailure: true });
@@ -81,8 +83,11 @@ function runAllTests(testMode: boolean = false): boolean {
         // testStationWithParity({ printSuccess: false, printFailure: true });
         // testConnection({ printSuccess: false, printFailure: true });
         // testStop({ printSuccess: false, printFailure: true });
-        testPath({ printSuccess: true, printFailure: true });
+        // testPath({ printSuccess: false, printFailure: true });
 
+        // Trains.import();
+        // Trains.print();
+        // Paths.print();
 
     } catch (e) {
         Log.warn("Erreur lors des tests", e.message);
@@ -95,22 +100,6 @@ function runAllTests(testMode: boolean = false): boolean {
 
   
 
-    /* Lecture des gares et test des variants */
-
-    // Log.info(Paths.getAllVariants("VC"));
-
-    // const allCombinations = Paths.generateCombinations("MPU", "ETP", "".split(";"));
-    // Log.info(allCombinations);
-    // const shortestPath = Paths.findShortestPath(allCombinations);
-    // Log.info(shortestPath);
-    // Paths.findShortestPath
-    // Paths.calculateCompletePath
-    // Paths.calculatePathTime
-    // Dijkstra
-    // Paths.generateCombinations
-    // Paths.permute
-    // expandPermutations
-    // Paths.getAllVariants
 
 
 
@@ -149,7 +138,7 @@ type LogOptions = {
 }
 
 /*
- * Classe Logs contenant les trois types de messages du console, et leurs options d'affichage
+ * Classe Logs contenant les trois types de messages du console, et leurs options d'affichage.
  */
 class Log {
 
@@ -180,15 +169,12 @@ class Log {
     /**
      * Méthode interne qui écrit un message dans la console.
      * Elle prend en paramètre le niveau du message (debug, info, warn) et
-     * un tableau d'arguments qui peuvent être des strings, des numbers, des
-     * booleans, des null, des undefined, des objets.
-     * Les arguments concaténables sont transformés en string et ajoutés
-     * au buffer. Les objets sont ajoutés au tableau output sans
-     * modification.
-     * Lorsque le buffer contient un objet, il est flush (vide) pour
-     * laisser place à l'objet.
-     * Enfin, le tableau output est passé à CONSOLE.log pour afficher le
-     * message.
+     *  un tableau d'arguments qui peuvent être des strings, des numbers,
+     *  des booleans, des null, des undefined, des objets.
+     * Les arguments concaténables sont transformés en string et ajoutés au buffer.
+     * Les objets sont ajoutés au tableau output sans modification.
+     * Lorsque le buffer contient un objet, il est flush (vide) pour laisser place à l'objet.
+     * Enfin, le tableau output est passé à CONSOLE.log pour afficher le message.
      * @param {string} level - Niveau du message (debug, info, warn)
      * @param {unknown[]} args - Tableau des arguments à afficher
      */
@@ -220,10 +206,10 @@ class Log {
     
     /**
      * Configure les options de l'affichage des logs.
-     * @param {Partial<LogOptions>} - options Options de l'affichage des logs.
-     *      - debug: Afficher les messages de debug.
-     *      - info: Afficher les messages d'information.
-     *      - warn: Afficher les messages d'avertissement.
+     * @param {Partial<LogOptions>} options - Options de l'affichage des logs :
+     *  - debug: Afficher les messages de debug,
+     *  - info: Afficher les messages d'information,
+     *  - warn: Afficher les messages d'avertissement.
      */
     public static configure(options: Partial<LogOptions>) {
         Object.assign(this.options, options);
@@ -231,7 +217,7 @@ class Log {
 
     /**
      * Envoie un message au console avec le niveau "DEBUG".
-     * @param {...unknown[]} args - Arguments à passer au console.log
+     * @param {...unknown[]} args - Arguments à passer au console.log.
      */
     public static debug(...args: unknown[]): void {
         if (!this.options.debug) return;
@@ -240,7 +226,7 @@ class Log {
     
     /**
      * Envoie un message au console avec le niveau "INFO".
-     * @param {...unknown[]} args - Arguments à passer au console.log
+     * @param {...unknown[]} args - Arguments à passer au console.log.
      */
     public static info(...args: unknown[]): void {
         if (!this.options.info) return;
@@ -249,7 +235,7 @@ class Log {
     
     /**
      * Envoie un message au console avec le niveau "WARN".
-     * @param {...unknown[]} args - Arguments à passer au console.log
+     * @param {...unknown[]} args - Arguments à passer au console.log.
      */
     public static warn(...args: unknown[]): void {
         if (!this.options.warn) return;
@@ -259,9 +245,9 @@ class Log {
 }
 
 /*
- * Options de l'affichage des tests
- *  - printSuccess: Afficher le message de succès
- *  - printFailure: Afficher le message d'échec
+ * Options de l'affichage des tests :
+ *  - printSuccess: Afficher le message de succès,
+ *  - printFailure: Afficher le message d'échec.
  */
 type AssertDDOptions = {
     printSuccess?: boolean;
@@ -269,7 +255,7 @@ type AssertDDOptions = {
 }
 
 /* 
- * Classe AssertDD contenant les options et les fonctions de tests Data-Driven
+ * Classe AssertDD contenant les options et les fonctions de tests Data-Driven.
  */
 class AssertDD {
 
@@ -287,11 +273,11 @@ class AssertDD {
     }
 
     /**
-     * Réalise le test et l'imprime avec un symbole de réussite (✔) ou d'échec (✘)
-     * @param {string} label - Nom du test
-     * @param {T} actual - Valeur actuelle obtenue
-     * @param {T} expected - Valeur attendue
-     * @param {AssertDDOptions} options - Options d'affichage des succès et des échecs
+     * Réalise le test et l'imprime avec un symbole de réussite (✔) ou d'échec (✘).
+     * @param {string} label - Nom du test.
+     * @param {T} actual - Valeur actuelle obtenue.
+     * @param {T} expected - Valeur attendue.
+     * @param {AssertDDOptions} options - Options d'affichage des succès et des échecs.
      */
     public check<T>(
         label: string,
@@ -325,8 +311,8 @@ class AssertDD {
 
     /**
      * Vérifie que la fonction fn lance une erreur.
-     * @param {string} desc - Nom du test
-     * @param {() => void} fn - Fonction à tester
+     * @param {string} desc - Nom du test.
+     * @param {() => void} fn - Fonction à tester.
      */
     public throws(desc: string, fn: () => void) {
         let thrown = false;
@@ -339,8 +325,8 @@ class AssertDD {
     }
 
     /**
-     * Imprime le resultat des tests
-     * @param {string} [title="Résultats des tests"] - Titre du test
+     * Imprime le resultat des tests.
+     * @param {string} [title="Résultats des tests"] - Titre du test.
      */
     public printSummary(title: string = "Résultats des tests", reset: boolean = true): void {
         CONSOLE.log(
@@ -351,7 +337,7 @@ class AssertDD {
     }
 
     /**
-     * Réinitialise le compteur de tests
+     * Réinitialise le compteur de tests.
      */
     public reset(): void {
         this.total = 0;
@@ -361,7 +347,7 @@ class AssertDD {
 }
 
 /*
- * Classe utilitaire de manipulation des feuilles de calcul Excel.
+ * Classe utilitaire WorkbookService de manipulation des feuilles de calcul Excel.
  */
 class WorkbookService {
 
@@ -373,7 +359,7 @@ class WorkbookService {
      * @param {string} sheetName - Nom de la feuille de calcul à chercher.
      * @param {{failOnError?: boolean, createIfMissing?: boolean}} options - Options
      *  pour la récupération de la feuille :
-     *   - createIfMissing : Si vrai, crée la feuille si elle n'existe pas (faux par défaut).
+     *   - createIfMissing : Si vrai, crée la feuille si elle n'existe pas (faux par défaut),
      *   - failOnError : Si vrai (par défaut), lance une exception si la feuille n'existe pas.
      * @returns {ExcelScript.Worksheet | null} - Feuille de calcul Excel correspondant au nom donné,
      *  ou null si elle n'existe pas.
@@ -406,6 +392,34 @@ class WorkbookService {
         }
     
         return sheet;
+    }
+    
+    /**
+     * Renvoie toutes les données non vides d'une feuille Excel.
+     * Utilise la plage "utilisée" (used range).
+     * @param {string} sheetName - Nom de la feuille.
+     * @param {boolean} [failOnError=true] - Si vrai, lance une erreur si la feuille est vide ou inexistante.
+     * @returns {(string | number | boolean)[][]} - Données de la feuille.
+     */
+    public static getDataFromSheet(
+        sheetName: string,
+        failOnError: boolean = true
+    ): (string | number | boolean)[][] {
+
+        const sheet = this.getSheet(sheetName, { failOnError });
+
+        if (!sheet) return [];
+
+        const usedRange = sheet.getUsedRange();
+
+        if (!usedRange) {
+            const msg = `La feuille "${sheetName}" est vide.`;
+            if (failOnError) throw new Error(msg);
+            Log.warn(msg);
+            return [];
+        }
+
+        return usedRange.getValues();
     }
 
     /**
@@ -461,8 +475,7 @@ class WorkbookService {
      * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de chaîne.
      * Si la valeur est null ou undefined, renvoie undefined.
      * Si la valeur est un nombre, le convertit en chaîne.
-     * Si la valeur est une chaîne, la renvoie telle quelle, en supprimant les espaces
-     *  inutiles.
+     * Si la valeur est une chaîne, la renvoie telle quelle, en supprimant les espaces inutiles.
      * @param {unknown[]} row - Ligne contenant la cellule.
      * @param {number} col - Colonne contenant la cellule.
      * @returns {string | undefined} - Valeur de la cellule sous forme de chaîne,
@@ -533,10 +546,10 @@ class WorkbookService {
      * @returns {string} - Adresse de cellule si elle est valide, une chaîne vide sinon.
      */
     public static checkCellName(cellName: string, failOnError: boolean = true): string {
-        // Convertit startCell en majuscules pour éviter les problèmes de casse
+        // Convertit startCell en majuscules pour éviter les problèmes de casse.
         cellName = cellName.toUpperCase();
 
-        // Vérifie si cellName est une adresse de cellule valide
+        // Vérifie si cellName est une adresse de cellule valide.
         if (!/^([A-Z]+)(\d+)$/.test(cellName)) {
             const msg = `L'adresse de départ ${cellName} n'est pas valide.`;
             if (failOnError) throw new Error(msg);
@@ -571,14 +584,14 @@ class WorkbookService {
         failOnError: boolean = true
     ): ExcelScript.Table | null {
 
-        // Combine les en-têtes et les données
+        // Combine les en-têtes et les données.
         if (headers[0].length !== data[0].length) {
             throw new Error("Les en-têtes et les données doivent avoir la même longueur.");
         }
         const tableData = headers.concat(data);
         // const tableData = headers.concat(data.map(row => row.map(cell => cell.toString())));
 
-        // Vérifie si les données sont non vides
+        // Vérifie si les données sont non vides.
         if (tableData.length === 0 || tableData[0].length === 0) {
             const msg = `Aucune donnée à insérer dans la table "${tableName}".`;
             if (failOnError) throw new Error(msg);
@@ -586,20 +599,20 @@ class WorkbookService {
             return;
         }
 
-        // Vérifie si un tableau avec le même nom existe déjà et le supprime si nécessaire
+        // Vérifie si un tableau avec le même nom existe déjà et le supprime si nécessaire.
         const sheet = this.getSheet(sheetName, { createIfMissing: true, failOnError: false });
         const existingTable = sheet.getTables().find(table => table.getName() === tableName);
         if (existingTable) existingTable.delete();
 
-        // Détermine la plage où écrire les données
+        // Détermine la plage où écrire les données.
         const startRange = sheet.getRange(this.checkCellName(startCell));
         const writeRange = startRange
             .getResizedRange(tableData.length - 1, tableData[0].length - 1);
 
-        // Efface le contenu de la plage
+        // Efface le contenu de la plage.
         writeRange.clear(ExcelScript.ClearApplyTo.contents);
 
-        // Écrit les données dans la plage
+        // Écrit les données dans la plage.
         writeRange.setValues(tableData);
 
         // Ajoute un nouveau tableau
@@ -614,7 +627,7 @@ class WorkbookService {
 }
 
 /*
- * Classe utilitaire contenant les paramètres globaux
+ * Classe utilitaire Params contenant les paramètres globaux.
  */
 class Params {
 
@@ -624,8 +637,8 @@ class Params {
     private static readonly ROW_MAX_CONNEXIONS_NUMBER = 1;  // Ligne contenant le nombre maximum de connexions
     private static readonly ROW_TURNAROUND_TIME = 2;        // Ligne contenant le temps de retournement (en minutes)
     private static readonly ROW_MAX_TRAIN_UNITS = 3;        // Ligne contenant le nombre maximal d'unités en UM
-    private static readonly ROW_TERMINUS_NAME = 5;          // Ligne contenant le nom du terminus
-
+    private static readonly ROW_STATIONS_SUFFIXES = 5;      // Ligne contenant les suffixes des gares par défaut
+                                                            //  à supprimer lors de la lecture
     // Indicateur de chargement
     private static loaded = false;
 
@@ -633,7 +646,7 @@ class Params {
     public static maxConnectionNumber: number;              // Nombre maximum de connexions
     public static turnaroundTime: DateTime;                 // Temps de retournement
     public static maxTrainUnits: number;                    // Nombre maximal d'unités en UM
-    public static terminusName: string;                     // Nom du terminus
+    public static stationsSuffixes: string[];               // Suffixes des gares par défaut
 
     /**
      * Charge les paramètres globaux.
@@ -642,16 +655,16 @@ class Params {
      */
     public static load(erase: boolean = false): void {
 
-        // Vérifie si la table à charger existe déjà
+        // Vérifie si la table à charger existe déjà.
         if (this.loaded && !erase) return;
 
-        // Chargement des paramètres des classes utilitaires
+        // Charge les paramètres des classes utilitaires.
         DateTime.load(erase);
         Days.load(erase);
         Parity.load(erase);
         TrainNumber.load(erase);
 
-        // Chargement des autres paramètres
+        // Charge les autres paramètres.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
 
         this.maxConnectionNumber = WorkbookService.getNumber(data[this.ROW_MAX_CONNEXIONS_NUMBER], 1) ?? 6;
@@ -659,26 +672,34 @@ class Params {
         this.turnaroundTime = DateTime.from(turnaroundTime / 24 / 60, true)!;
 
         this.maxTrainUnits = WorkbookService.getNumber(data[this.ROW_MAX_TRAIN_UNITS], 1) ?? 2;
-        this.terminusName = WorkbookService.getString(data[this.ROW_TERMINUS_NAME],1) ?? "Terminus";
+        const stationsSuffixesString = WorkbookService.getString(data[this.ROW_STATIONS_SUFFIXES],1) ?? "";
+        const separatorRegex = /[\s,.!?;:\-\n\r]+/; // Toute ponctuation est considérée comme un séparateur
+        this.stationsSuffixes = stationsSuffixesString
+            .split(separatorRegex)
+            .filter((t) => Boolean(t));;
 
         this.loaded = true;
     }
 }
 
 /*
- * Classe utilitaire immuable contenant les valeurs d'une date Excel
+ * Classe utilitaire immuable contenant les valeurs d'une date Excel.
  */
 class ExcelDate {
 
     // Constante de valeur initiale (epoch) des dates Excel
     public static readonly EXCEL_EPOCH = new Date(Date.UTC(1899, 11, 30));
+
+    // Cache des jours fériés par année
+    private static holidayCache = new Map<number, Set<number>>();
         
     // Propriétés de l'objet DateTime
     public readonly value: number;
     public readonly year: number;
     public readonly month: number;
     public readonly day: number;
-    public readonly dayOfWeek: Days | undefined;
+    public readonly dayOfWeek: Day;
+    public readonly isHoliday: boolean;
 
     /**
      * Constructeur de l'objet ExcelDate.
@@ -695,7 +716,14 @@ class ExcelDate {
         this.year = d.getUTCFullYear();
         this.month = d.getUTCMonth() + 1;
         this.day = d.getUTCDate();
-        this.dayOfWeek = Days.fromNumber(d.getUTCDays());
+        const jsDay = d.getUTCDay();
+        const dayNumber = jsDay === 0 ? 7 : jsDay;
+        const dayOfWeek = Day.from(dayNumber);
+        if (dayOfWeek === undefined) throw new Error(`Jour de semaine non trouvé : ${dayNumber}`);
+        this.dayOfWeek = dayOfWeek;
+
+        const holidays = ExcelDate.getHolidays(this.year);
+        this.isHoliday = holidays.has(this.month * 100 + this.day);
     }
 
     /**
@@ -707,7 +735,8 @@ class ExcelDate {
      */
     public static parseDate(value: string): number | undefined {
 
-        const parts = value.split("/");
+        const separatorRegex = /[/\-]/; // Séparateur : / ou -
+        const parts = value.split(separatorRegex);
         if (parts.length < 2 || parts.length > 3) return undefined;
     
         let day: number;
@@ -747,10 +776,73 @@ class ExcelDate {
         
         return (jsDate.getTime() - excelEpoch) / 86400000;
     }
+
+    /**
+     * Indique si une date est un jour férié.
+     * @param {string} value - Valeur Excel de la date.
+     * @returns {boolean} - Vrai si la date est un jour férié, faux sinon.
+     */
+    public static getHolidays(year: number): Set<number> {
+    
+        if (this.holidayCache.has(year)) {
+            return this.holidayCache.get(year)!;
+        }
+    
+        const set = new Set<number>();
+    
+        const add = (m: number, d: number) => set.add(m * 100 + d);
+    
+        // Donne les jours fériés fixes
+        add(1, 1);
+        add(5, 1);
+        add(5, 8);
+        add(7, 14);
+        add(8, 15);
+        add(11, 1);
+        add(11, 11);
+        add(12, 25);
+    
+        // Calcule le jour de Pâques
+        const a = year % 19;
+        const b = Math.floor(year / 100);
+        const c = year % 100;
+        const d = Math.floor(b / 4);
+        const e = b % 4;
+        const f = Math.floor((b + 8) / 25);
+        const g = Math.floor((b - f + 1) / 3);
+        const h = (19 * a + b - d - g + 15) % 30;
+        const i = Math.floor(c / 4);
+        const k = c % 4;
+        const l = (32 + 2 * e + 2 * i - h - k) % 7;
+        const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    
+        const easterMonth = Math.floor((h + l - 7 * m + 114) / 31);
+        const easterDay = ((h + l - 7 * m + 114) % 31) + 1;
+    
+        const addDays = (delta: number): [number, number] => {
+            const d = new Date(Date.UTC(year, easterMonth - 1, easterDay + delta));
+            return [d.getUTCMonth() + 1, d.getUTCDate()];
+        };
+    
+        // Calcule le Lundi de Pâques
+        let [mm, dd] = addDays(1);
+        add(mm, dd);
+    
+        // Calcule le jour de l'Ascension
+        [mm, dd] = addDays(39);
+        add(mm, dd);
+    
+        // Calcule le Lundi de Pentecôte
+        [mm, dd] = addDays(50);
+        add(mm, dd);
+    
+        this.holidayCache.set(year, set);
+        return set;
+    }
 }
 
 /*
- * Classe utilitaire immuable contenant les valeurs d'une heure Excel
+ * Classe utilitaire immuable ExcelTime contenant les valeurs d'une heure Excel.
  */
 class ExcelTime {
 
@@ -780,7 +872,9 @@ class ExcelTime {
      * @returns {number | undefined} - Valeur Excel correspondante, ou undefined si l'heure est incorrecte.
      */
     public static parseTime(value: string): number | undefined {
-        const parts = value.split(":");
+        const separatorRegex = /[^\d]/; // Toute caractère ou chaine de caractère non numérique
+                                        //  est considérée comme un séparateur (ex : 'h', 'min' ...)
+        const parts = value.split(separatorRegex).filter((t) => Boolean(t));
         if (parts.length < 2 || parts.length > 3) return undefined;
     
         const [hStr, mStr, sStr = "0"] = parts;
@@ -800,7 +894,7 @@ class ExcelTime {
 }
 
 /**
- * Classe utilitaire immutable pour la gestion des dates et horaires Excel.
+ * Classe utilitaire immuable DateTime pour la gestion des dates et horaires Excel.
  *  Si le temps est absolu et non daté, et que l'heure est inférieure à l'heure de changement de journée,
  *  elle est incrémentée de 1 pour rester comparable aux autres heures de la journée précédente.
  */
@@ -858,8 +952,8 @@ class DateTime {
     }
 
     /**
-     * Retourne une représentation textuelle simple et stable de l'objet.
-     * Utilisée implicitement dans les conversions string (ex: `${obj}`).
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
         return this.excelValue.toString();
@@ -871,7 +965,8 @@ class DateTime {
      * Sinon, un nouvel objet DateTime est créé avec la valeur fournie.
      * @param {DateTime | number | string | null | undefined} value Valeur du temps en nombre décimal
      *  ou en chaîne de caractères.
-     * @param {boolean} [isRelative=undefined] - Indique si le temps est relatif (différence entre 2 horaires).
+     * @param {boolean} [isRelative=undefined] - Indique si le temps est relatif
+     *  (différence entre 2 horaires).
      * @param {boolean} [adaptTime=true] - Indique si l'heure doit être adaptée ou non.
      *  Si la valeur est inférieure à l'heure de changement de journée et que l'horaire est absolu,
      *  elle est incrémentée de 1.
@@ -923,8 +1018,9 @@ class DateTime {
 
     /**
      * Retourne l'objet ExcelDate de la date, adaptée ou non.
-     * @param {boolean} adapted - Indique si l'on souhaite avoir l'objet ExcelDate adapté ou non
-     * @returns {ExcelDate | undefined} - L'objet ExcelDate correspondant au temps adapté ou non, ou undefined si le temps n'est pas défini
+     * @param {boolean} adapted - Indique si l'on souhaite avoir l'objet ExcelDate adapté ou non.
+     * @returns {ExcelDate | undefined} - L'objet ExcelDate correspondant au temps adapté ou non,
+     *  ou undefined si le temps n'est pas défini.
      */
     private getDateObj(adapted: boolean): ExcelDate | undefined {
         return (adapted && this._adaptedDate) ? this._adaptedDate : this._realDate;
@@ -932,8 +1028,9 @@ class DateTime {
 
     /**
      * Retourne la valeur Excel de la date, adaptée ou non.
-     * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir la valeur Excel de la date adaptée ou non
-     * @returns {number} - La valeur Excel de la date, adaptée ou non, ou 0 si le temps n'est pas défini
+     * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir la valeur Excel
+     *  de la date adaptée ou non.
+     * @returns {number} - La valeur Excel de la date, adaptée ou non, ou 0 si le temps n'est pas défini.
      */
     public getDate(adaptedValue: boolean = true): number {
         if (!this._computed) this.compute();
@@ -943,8 +1040,9 @@ class DateTime {
 
     /**
      * Retourne l'année de la date, adaptée ou non.
-     * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir l'année de la date adaptée ou non
-     * @returns {number} - L'année de la date, adaptée ou non, ou 0 si le temps n'est pas défini
+     * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir l'année
+     *  de la date adaptée ou non.
+     * @returns {number} - L'année de la date, adaptée ou non, ou 0 si le temps n'est pas défini.
      */
     public getYear(adaptedValue: boolean = true): number {
         if (!this._computed) this.compute();
@@ -954,8 +1052,9 @@ class DateTime {
 
     /**
      * Retourne le mois de la date, adapté ou non.
-     * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir le mois de la date adaptée ou non
-     * @returns {number} - Le mois de la date, adapté ou non, ou 0 si le temps n'est pas défini
+     * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir le mois
+     *  de la date adaptée ou non.
+     * @returns {number} - Le mois de la date, adapté ou non, ou 0 si le temps n'est pas défini.
      */
     public getMonth(adaptedValue: boolean = true): number {
         if (!this._computed) this.compute();
@@ -965,8 +1064,9 @@ class DateTime {
    
     /**
      * Retourne le jour du mois de la date, adapté ou non.
-     * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir le jour du mois de la date adaptée ou non
-     * @returns {number} - Le jour du mois de la date, adapté ou non, ou 0 si le temps n'est pas défini
+     * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir le jour du mois
+     *  de la date adaptée ou non.
+     * @returns {number} - Le jour du mois de la date, adapté ou non, ou 0 si le temps n'est pas défini.
      */
     public getDay(adaptedValue: boolean = true): number {
         if (!this._computed) this.compute();
@@ -976,20 +1076,23 @@ class DateTime {
     
     /**
      * Retourne le jour de la semaine correspondant à la date, adapté ou non.
-     * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir le jour de la semaine de la date adaptée ou non
-     * @returns {Days | undefined} - Le jour de la semaine correspondant à la date, adapté ou non, ou undefined si le temps n'est pas défini
+     * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir le jour de la semaine
+     *  de la date adaptée ou non.
+     * @param {boolean} [withHolidays=true] - Indique si l'on souhaite indiquer les jours fériés (jour 8).
+     * @returns {Day | undefined} - Le jour de la semaine correspondant à la date,
+     *  adapté ou non, ou undefined si le temps n'est pas défini.
      */
-    public getDayOfWeek(adaptedValue: boolean = true): Days | undefined {
+    public getDayOfWeek(adaptedValue: boolean = true, withHolidays: boolean = true): Day | undefined {
         if (!this._computed) this.compute();
         const dateObj = this.getDateObj(adaptedValue);
-        return dateObj?.dayOfWeek;
+        return dateObj?.isHoliday && withHolidays ? Day.HOLIDAY : dateObj?.dayOfWeek;
     }
 
     /**
      * Renvoie l'heure correspondant au temps, adaptée ou non.
      * Si le temps est relatif, renvoie l'heure relative.
      * Si le temps est absolu, renvoie la fraction d'une journée (tronquée modulo 1).
-     * Si le temps est adapté, il est incrémenté de 1 (ex : 25h00)
+     * Si le temps est adapté, il est incrémenté de 1 (ex : 25h00).
      * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir l'heure adaptée ou non.
      * @returns {number}- L'heure correspondant au temps, adaptée ou non, ou 0 si le temps n'est pas défini.
      */
@@ -1009,8 +1112,10 @@ class DateTime {
      * Si le temps est absolu et que adaptedValue est faux,
      *  renvoie le nombre d'heures de l'objet DateTime tronqué modulo 24.
      * Si le temps est adapté, l'heure est incrémentée de 24 (ex : 25h00). 
-     * @param {boolean} [adaptedValue=false] - Indique si l'on souhaite avoir le nombre d'heures adapté ou non.
-     * @returns {number} - Le nombre d'heures correspondant au temps, adapté ou non, ou 0 si le temps n'est pas défini.
+     * @param {boolean} [adaptedValue=false] - Indique si l'on souhaite avoir
+     *  le nombre d'heures adapté ou non.
+     * @returns {number} - Le nombre d'heures correspondant au temps, adapté ou non,
+     *  ou 0 si le temps n'est pas défini.
      */
     public getHours(adaptedValue: boolean = false): number {
         if (!this._computed) this.compute();
@@ -1043,10 +1148,21 @@ class DateTime {
     }
 
     /**
+     * Retourne si la date correspondant au temps est un jour férié.
+     * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir la date adaptée ou non.
+     * @returns {boolean} - Vrai si la date est un jour férié, faux sinon ou si la date n'est pas définie.
+     */
+    public isHoliday(adaptedValue: boolean = true): boolean {
+        if (!this._computed) this.compute();
+        return this.getDateObj(adaptedValue)?.isHoliday ?? false;
+    }
+
+    /**
      * Analyse une chaîne de caractères qui représente une date et un temps
      *  et renvoie la valeur Excel correspondante.
      * @param {string} value - Chaîne à parser.
-     * @param {boolean} [isRelative=undefined] - Indique si le temps est relatif (différence entre 2 horaires).
+     * @param {boolean} [isRelative=undefined] - Indique si le temps est relatif
+     *  (différence entre 2 horaires).
      * @param {boolean} [adaptTime=true] - Indique si l'heure doit être adaptée ou non.
      *  Si la valeur est inférieure à l'heure de changement de journée et que l'horaire est absolu,
      *  elle est incrémentée de 1.
@@ -1081,13 +1197,13 @@ class DateTime {
                 part = part.slice(1);
             }
     
-            if (part.includes('/')) {
+            if (part.includes('/') || part.split('-').length === 3) {
                 date = ExcelDate.parseDate(part);
                 if (date === undefined) return undefined;
     
                 signState = "invalid";
             }
-            else if (part.includes(':')) {
+            else if (part.includes(':') || part.toLowerCase().includes('h')) {
                 const parsedTime = ExcelTime.parseTime(part);
                 if (parsedTime === undefined) return undefined;
     
@@ -1118,10 +1234,10 @@ class DateTime {
     private compute(): void {
         if (this._computed) return;
 
-        // Récupère la valeur du temps, inchangé si le temps est relatif ou absolu non daté
+        // Récupère la valeur du temps, inchangé si le temps est relatif ou absolu non daté.
         let timeOfDays = this.excelValue;
 
-        // Calcul des éléments de la date (si temps absolu et daté)
+        // Calcule les éléments de la date (si temps absolu et daté).
         if (!this.isRelative && this.excelValue > DateTime.MIN_EXCEL_DATE) {
             this._realDate = new ExcelDate(this.excelValue);
             timeOfDays = this.excelValue % 1;
@@ -1131,11 +1247,11 @@ class DateTime {
             }
         }
 
-        // Calcul des éléments de l'heure de la journée
+        // Calcule les éléments de l'heure de la journée :
         //  - si le temps est relatif, l'heure correspond au temps total, positif ou négatif,
         //  - si le temps est absolu, l'heure est la fraction de la journée,
         //     adaptée si l'heure est inférieure à l'heure de changement de jour,
-        //     d'une valeur comprise entre 0 et 1, ou dépassant 1 si adaptée
+        //     d'une valeur comprise entre 0 et 1, ou dépassant 1 si adaptée.
         this._time = new ExcelTime(timeOfDays);
         
         this._computed = true;
@@ -1143,7 +1259,7 @@ class DateTime {
 
     /**
      * Renvoie un nouvel objet DateTime égal au temps courant
-     * résolu par rapport à une référence.
+     *  résolu par rapport à une référence.
      * Si le temps courant est relatif, il est ajouté à la référence.
      * Sinon, le temps courant est renvoyé tel quel.
      * @param {DateTime} reference - Référence à utiliser pour résoudre le temps courant.
@@ -1255,9 +1371,13 @@ class DateTime {
     /**
      * Formate la date ou l'heure en fonction du format fourni.
      * @param {string} format - Format de la date ou de l'heure.
+     * @param {boolean} adaptTime - Indique si la date ou l'heure doivent prendre en compte
+     *  l'adaptation avec l'heure de changement de jour.
+     * @param {boolean} withHolidays - Indique si le jour de la semaine doit prendre en compte
+     *  les jours fériés.
      * @returns {string} - Date ou heure formattée.
      */
-    public format(format: string, adaptTime: boolean = true): string {
+    public format(format: string, adaptTime: boolean = true, withHolidays: boolean = true): string {
         this.compute();
         let prefix = "";
         if (this.excelValue < 0) prefix = "-";
@@ -1274,8 +1394,8 @@ class DateTime {
         "dd": pad(this.getDay(adaptTime)),
         "d": this.getDay(adaptTime).toString(),
         // Jour de semaine
-        "dddd": this.getDayOfWeek(adaptTime)?.fullName ?? "",
-        "ddd": this.getDayOfWeek(adaptTime)?.abreviation ?? "",
+        "dddd": this.getDayOfWeek(adaptTime, withHolidays)?.fullName ?? "",
+        "ddd": this.getDayOfWeek(adaptTime, withHolidays)?.abreviation ?? "",
         // Heure
         "hh": pad(this.getHours(adaptTime)),
         "h": this.getHours().toString(),
@@ -1287,7 +1407,7 @@ class DateTime {
         "s": this.getSeconds().toString(),
         };
 
-        // Création des clés temporaires
+        // Crée les clés temporaires.
         const tempMap: Record<string, string> = {};
         let i = 0;
         let tempFormat = format.toLowerCase();
@@ -1302,7 +1422,7 @@ class DateTime {
                 i++;
             });
 
-        // Remplacer toutes les clés temporaires par les valeurs réelles
+        // Remplace toutes les clés temporaires par les valeurs réelles.
         Object.entries(tempMap).forEach(([key, val]) => {
             tempFormat = tempFormat.replace(new RegExp(key, "g"), val);
         });
@@ -1330,21 +1450,166 @@ class DateTime {
      */
     public static load(erase = false): void {
 
-        // Vérifie si la table à charger existe déjà
+        // Vérifie si la table à charger existe déjà.
         if (this.loaded && !erase) return;
 
-        // Charge la base de données
+        // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
 
-        // Extrait les valeurs
+        // Extrait les valeurs.
         this.rolloverHour = (WorkbookService.getNumber(data[this.ROW_ROLLOVER_HOUR], 1) ?? 0) % 1;
 
         this.loaded = true;
     }
 }
 
+class Day {    
+
+    // Indicateur de chargement
+    private static loaded = false;
+
+    // Liste des jours de la semaine identifiés par leur indice
+    private static list: Day[] = new Array(8);
+
+    // Propriétés de l'objet Day
+    public readonly mask: number;           // Masque de bits contenant les numéro du jour de la semaine
+                                            //  (identique à Days)
+                                            //  (de lundi > bit 0 à dimanche > bit 6, férié > bit 7)
+    public readonly code: string;           // Code chiffre du jour de la semaine
+    public readonly fullName: string;       // Nom du jour de la semaine
+    public readonly abreviation: string;    // Abréviation du jour de la semaine
+
+    /**
+     * Constructeur privé de la classe Day.
+     * @param {Days} days - Groupe du jour de la semaine en individuel
+     */
+    private constructor(
+        days: Days
+    ) {
+        this.mask = days.mask;
+        this.code = days.code;
+        this.fullName = days.fullName;
+        this.abreviation = days.abreviation;
+    }
+
+    /**
+     * Retourne l'indice du jour de la semaine.
+     * L'indice est un entier compris entre 0 et 7, égal au numéro du jour moins 1.
+     * @returns {number} - Indice du jour de la semaine.
+     */
+    public get index(): number {
+        return Day.maskToIndex(this.mask);
+    }
+    
+    /**
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
+     */
+    public toString(): string {
+        return this.fullName; 
+    }
+
+    /**
+     * Accesseurs des jours de la semaine
+     */
+    public static get MONDAY(): Day { return this.list[0]!; }
+    public static get TUESDAY(): Day { return this.list[1]!; }
+    public static get WEDNESDAY(): Day { return this.list[2]!; }
+    public static get THURSDAY(): Day { return this.list[3]!; }
+    public static get FRIDAY(): Day { return this.list[4]!; }
+    public static get SATURDAY(): Day { return this.list[5]!; }
+    public static get SUNDAY(): Day { return this.list[6]!; }
+    public static get HOLIDAY(): Day { return this.list[7]!; }
+
+    /**
+     * Renvoie un objet Day correspondant au numéro de jour fourni.
+     * Si le numéro de jour n'existe pas, renvoie undefined.
+     * @param {Day | number | string | null | undefined} value - Valeur à analyser
+     *  pour le jour correspondant.
+     * @returns {Days | undefined} - Instance de Day correspondante.
+     */
+    public static from(
+        value: Day | number | string | null | undefined): Day | undefined {
+        
+        if (value == null || value === '') return undefined;
+        if (value instanceof Day) return value;
+
+        const days = Days.get(String(value));
+    
+        if (!days || days.count !== 1) {
+            throw new Error(`Le jour de la semaine "${value}" n'existe pas.`);
+        }
+
+        const index = this.maskToIndex(days.mask);
+        return this.list[index];
+    }
+
+    /**
+     * Convertit le masque en l'indice du jour (0 à 7).
+     * @param {number} mask - Masque de jour.
+     * @returns {number} - Index du jour correspondant.
+     * @throws {Error} - Si le masque est invalide.
+     */
+    private static maskToIndex(mask: number): number {
+        const index = Math.log2(mask);
+    
+        if (!Number.isInteger(index) || index < 0 || index > 7) {
+            throw new Error(`Mask invalide pour Day: ${mask}`);
+        }
+    
+        return index;
+    }
+    
+    /**
+     * Retourne un itérateur sur les valeurs de la base de données des jours.
+     * @returns {IterableIterator<Day>} - Itérateur sur les valeurs de la base de données.
+     *  des jours.
+     */
+    public static *values(): IterableIterator<Day> {
+        for (const d of this.list) {
+            if (d) yield d;
+        }
+    }
+
+    /**
+     * Efface toutes les gares de la base de données.
+     * Cela permet de forcer le rechargement des gares si besoin.
+     */
+    public static clear(): void {
+        this.list = new Array(8);
+        this.loaded = false;
+    }
+
+    /**
+     * Charge les jours de la semaine.
+     * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
+     *  Si faux (par défaut), ne recharge pas si déjà chargé.
+     */
+    public static load(erase = false): void {
+
+        // Vérifie si la table à charger existe déjà.
+        if (this.loaded) {
+            if (!erase) return;
+            this.clear();
+        }
+
+        // Récupère les jours de la base de données de Days.
+        for (let i = 0; i < 8; i++) {
+            const days = Days.get(1 << i);
+            if (!days) throw new Error(`Day.load : jour ${i +1 } inexsistant dans Days`);
+
+            // Crée l'objet Day.
+            const day = new Day(days);
+            this.list[i] = day;
+        }
+
+        this.loaded = true;
+    }
+}
+
+
 /**
- * Classe utilitaire pour la gestion des jours de la semaine, individuels ou groupés. 
+ * Classe utilitaire Days pour la gestion des jours de la semaine, individuels ou groupés. 
  *  (JOB du lundi au vendredi, WE pour samedi et dimanche...).
  */
 class Days {
@@ -1357,15 +1622,28 @@ class Days {
     private static readonly COL_FULL_NAME = 2;      // Colonne contenant le nom complet du jour de la semaine
     private static readonly COL_ABBREVIATION = 3;   // Colonne contenant l'abréviation du jour de la semaine
 
+    // Valeur par défaut des jours de la semaine individuels
+    //  (si non renseignés dans le tableau des paramètres)
+    private static readonly WEEKDAYS = [
+        { number: 1, fullName: "Lundi", abreviation: "Lu" },
+        { number: 2, fullName: "Mardi", abreviation: "Ma" },
+        { number: 3, fullName: "Mercredi", abreviation: "Me" },
+        { number: 4, fullName: "Jeudi", abreviation: "Je" },
+        { number: 5, fullName: "Vendredi", abreviation: "Ve" },
+        { number: 6, fullName: "Samedi", abreviation: "Sa" },
+        { number: 7, fullName: "Dimanche", abreviation: "Di" },
+        { number: 8, fullName: "Férié", abreviation: "Fer", code: "F" }
+    ];
+
     // Indicateur de chargement
     private static loaded = false;
 
-    // Map des groupes de jours de la semaine identifiés par leurs numéros concaténés des jours de la semaine,
+    // Liste des groupes de jours de la semaine identifiés par leur masque de bits,
     //  en assurant l'unicité de chaque groupe de jours
-    private static mapByNumbers: Map<string, Days> = new Map<string, Days>();
-    // Map des groupes de jours de la semaine identifiés par un code alphanumérique les désignants
+    private static masksList: (Days | undefined)[] = new Array(256);
+    // Map des groupes de jours de la semaine identifiés par leur code, nom ou abréviation,
     //  (plusieurs codes possibles par groupe de jour, y compris ceux non optimisés)
-    private static mapByCode: Map<string, Days> = new Map<string, Days>();
+    private static mapByString: Map<string, Days> = new Map<string, Days>();
     
     // Liste des groupes de jours donnés en paramètre, y compris chaque jour de la semaine seul,
     //  triée par leur nombre de jours dans l'ordre décroissant.
@@ -1373,34 +1651,35 @@ class Days {
     //  pour optimiser le code d'un groupe de jours, les jours seuls sont ajoutés en dernier.
     private static compressionRules: Days[] = [];
     // Synthèse des chaines de caractères désignant les groupes de jours donnés en paramètre,
-    //  à partir de leur code, leur abbréviation ou leur nom complet.
+    //  à partir de leur code, leur abréviation ou leur nom complet.
     // Le tableau est trié par longueur de chaine décroissante
     //  (les chaines les plus longues sont recherchées en premier).
     private static extractionPatterns: {pattern: string, numbersString: string}[] = [];
 
-     
-
     // Propriétés de l'objet Days
-    numbers: number[];              // Numéro(s) du ou des jours de la semaine (de 1 : lundi à 7 : dimanche,
-                                    //  8 : férié)
-    code: string;                   // Code alphanumérique du groupe de jours de la semaine
-    fullName: string;               // Nom du jour ou du groupe de jours de la semaine
-    abreviation: string;            // Abréviation du jour ou du groupe de jours de la semaine
+    public readonly mask: number;           // Masque de bits contenant les numéro(s) du ou des jours
+                                            //  du groupe de jours de la semaine
+                                            //  (de 1 : lundi > bit 0 à 7 : dimanche > bit 6, 8 : férié > bit 7)
+    public readonly code: string;           // Code alphanumérique du groupe de jours de la semaine
+    public readonly fullName: string;       // Nom du jour ou du groupe de jours de la semaine
+    public readonly abreviation: string;    // Abréviation du jour ou du groupe de jours de la semaine
+    private _numberString: string = "";     // Chaîne de caractères contenant les numéros des jours du groupe de jours
+    private _count: number = -1;            // Nombre de jours contenus dans le groupe de jours (-1 si non calculé)
 
     /**
      * Constructeur privé de la classe Days.
-     * @param {number[]} numbers - Tableau contenant les numéros des jours de la semaine.
+     * @param {number} mask - Masque de bits des numéro(s) des jours du groupe de jours de la semaine. 
      * @param {string} code - Code alphanumérique du groupe de jours de la semaine.
      * @param {string} fullName - Nom complet du jour ou du groupe de jours de la semaine.
      * @param {string} abreviation - Abréviation du jour ou du groupe de jours de la semaine.
      */
     private constructor(
-        numbers: number[] = [],
+        mask: number,
         code: string,
         fullName: string = "",
         abreviation: string = ""
     ) {
-        this.numbers = numbers;
+        this.mask = mask;
         this.code = code;
         this.fullName = fullName;
         this.abreviation = abreviation;
@@ -1411,12 +1690,35 @@ class Days {
      * @returns {string} Chaîne de caractères contenant les numéros des jours de la semaine.
      */
     public get numbersString(): string {
-        return this.numbers.join('');
+        if (!this._numberString) {
+            this._numberString = Days.maskToNumbers(this.mask).join('');
+        }
+
+        return this._numberString;
     }
 
     /**
-     * Retourne une représentation textuelle simple et stable de l'objet.
-     * Utilisée implicitement dans les conversions string (ex: `${obj}`).
+     * Retourne le nombre de jours contenus dans le groupe de jours.
+     * @returns {number} - Nombre de jours contenus dans le groupe de jours.
+     */
+    public get count(): number {
+
+        if (this._count === -1) {
+            let count = 0;
+            let mask = this.mask;
+            while (mask) {
+                mask &= mask - 1;
+                count++;
+            }
+            this._count = count;
+        }
+
+        return this._count;
+    }
+
+    /**
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  tilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
         return this.fullName; 
@@ -1445,7 +1747,7 @@ class Days {
     public static from(
         value: Days | number | string | null | undefined): Days | undefined {
         
-        if (value == null || !value) return undefined;
+        if (value == null || value === '') return undefined;
         if (value instanceof Days) return value;
 
         const code = String(value);
@@ -1453,38 +1755,79 @@ class Days {
             return this.get(code);
         }
 
-        // Analyse de la chaine de caractères pour trouver le ou les jours correspondants
+        // Analyse de la chaine de caractères pour trouver le ou les jours correspondants.
         const numbers = this.extractFromString(code);
         if (numbers.length === 0) {
             return undefined;
         }
+        const mask = this.numbersToMask(numbers);
 
-        // Recherche ou création du groupe de jours
-        const days = this.get(numbers.join('')) ?? this.create(numbers);
+        // Recherche ou création du groupe de jours.
+        const days = this.get(mask) ?? this.create(numbers);
 
         // Ajout du code fourni en entrée pour éviter une nouvelle analyse,
-        //  y compris si ce code n'est pas optimisé (code optimisé calculé dans create())
-        this.mapByNumbers.set(code, days);
+        //  y compris si ce code n'est pas optimisé (code optimisé calculé dans create()).
+        this.mapByString.set(code, days);
 
         return days;
     }
 
     /**
-     * Vérifie si le groupe de jours contient le jour donné.
-     * @param {number} day - Jour de la semaine (1 : lundi, 2 : mardi, ..., 7 : dimanche, 8 : férie)
-     * @returns {boolean} - True si le groupe de jours contient le jour, false sinon.
+     * Renvoie un objet Days correspondant au masque de bits fourni.
+     * Crée le groupe de jours si celui-ci n'existe pas encore.
+     * @param {number} value - Masque de bits correspondant au groupe de jours.
+     * @returns {Days | undefined} - Instance de Days correspondante.
      */
-    public contains(day: number): boolean {
-        return this.numbers.includes(day);
+    public static fromMask(mask: number): Days | undefined{
+        if (mask <= 0 || mask >= 256) return undefined
+        return this.masksList[mask] ?? this.create(this.maskToNumbers(mask));
+    }
+    
+    /**
+     * Transforme un tableau de numéros de jours en un masque de bits.
+     * Chaque numéro correspond à un bit dans le masque, allant de 1 (lundi) à 7 (dimanche), et 8 (férié).
+     * @param {number[]} numbers - Tableau de numéros de jours.
+     * @returns {number} - Masque de bits correspondant aux numéros de jours.
+     */
+    private static numbersToMask(numbers: number[]): number {
+        return numbers.reduce((mask, n) => mask | (1 << (n - 1)), 0);
     }
 
     /**
-     * Retourne true si le groupe de jours contient au moins un jour commun avec le groupe de jours fourni en paramètre.
+     * Retourne un tableau de numéros de jours à partir d'un masque de bits.
+     * Chaque bit dans le masque correspond à un numéro de jour,
+     *  allant de 1 (lundi) à 7 (dimanche), et 8 (férié).
+     * @param {number} mask - Masque de bits correspondant aux numéros de jours.
+     * @returns {number[]} - Tableau de numéros de jours correspondant au masque de bits.
+     */
+    private static maskToNumbers(mask: number): number[] {
+        const result: number[] = [];
+        for (let i = 0; i < 8; i++) {
+            if (mask & (1 << i)) {
+                result.push(i + 1);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Vérifie si le groupe de jours contient le jour donné.
+     * @param {Day | number | string} day - Jour de la semaine (1 : lundi, 2 : mardi, ..., 7 : dimanche, 8 : férie)
+     * @returns {boolean} - Vrai si le groupe de jours contient le jour, faux sinon.
+     */
+    public contains(day: Day | number | string): boolean {
+        const dayObj = Day.from(day);
+        return (this.mask & dayObj!.mask) !== 0;
+    }
+
+    /**
+     * Retourne true si le groupe de jours contient au moins un jour commun
+     *  avec le groupe de jours fourni en paramètre.
      * @param {Days} other - Autre groupe de jours.
-     * @returns {boolean} - True si le groupe de jours contient au moins un jour commun, false sinon.
+     * @returns {boolean} - Vrai si le groupe de jours contient au moins un jour commun, faux sinon.
      */
     public intersects(other: Days): boolean {
-        return this.numbers.some(n => other.numbers.includes(n));
+        return (this.mask & other.mask) !== 0;
     }
 
     /**
@@ -1499,12 +1842,13 @@ class Days {
         days1: Days | undefined,
         days2: Days | undefined
     ): Days | undefined {
-    
-        if (!days1 || !days2) return undefined;
-    
-        const result = days1.numbers.filter(n => days2.numbers.includes(n));
 
-        return result.length ? this.from(result.join('')) : undefined;
+        if (!days1 || !days2) return undefined;
+
+        const mask = days1.mask & days2.mask;
+        if (mask === 0) return undefined;
+    
+        return Days.fromMask(mask);
     }
 
     /**
@@ -1513,16 +1857,34 @@ class Days {
      * Si les deux groupes sont undefined, undefined est retourné.
      * @param {Days | undefined} days1 - Premier groupe de jours.
      * @param {Days | undefined} days2 - Deuxième groupe de jours.
-     * @returns {Days | undefined} - Union des deux groupes de jours, ou undefined si les deux groupes sont undefined.
+     * @returns {Days | undefined} - Union des deux groupes de jours,
+     *  ou undefined si les deux groupes sont undefined.
      */
     public static union(
         days1: Days | undefined,
         days2: Days | undefined
     ): Days | undefined {
-        return this.from(
-            (days1?.numbersString ?? '') +
-            (days2?.numbersString ?? '')
-        );
+
+        if (!days1 && !days2) return undefined;
+
+        const mask = (days1?.mask ?? 0) | (days2?.mask ?? 0);
+        return Days.fromMask(mask);
+    }
+
+    /**
+     * Retourne la différence entre deux groupes de jours.
+     * La différence est le groupe de jours qui contient les jours de a mais pas ceux de b.
+     * Si a est undefined, b est retourné.
+     * Si b est undefined, a est retourné.
+     * Si les deux groupes sont undefined, undefined est retourné.
+     * @param {Days | undefined} days1 - Premier groupe de jours.
+     * @param {Days | undefined} days2 - Deuxième groupe de jours.
+     * @returns {Days | undefined} - Différence entre les deux groupes de jours,
+     *  ou undefined si les deux groupes sont undefined.
+     */
+    public static difference(days1: Days, days2: Days): Days | undefined {
+        const mask = days1.mask & ~days2.mask;
+        return Days.fromMask(mask);
     }
 
     /**
@@ -1547,20 +1909,20 @@ class Days {
      * Utilise un cache pour éviter de recalculer les résultats pour les mêmes combinaisons.
      * Si deux chaînes sont fournies, retourne l'intersection des jours correspondants.
      * @param {string} value - Chaîne contenant des noms, numéros ou abréviations de jours
-     *  séparés ou non par de la ponctuation  (ex : "lundi;me7")
+     *  séparés ou non par de la ponctuation  (ex : "lundi;me7").
      * @returns {number[]} - Tableau trié de numéros de jours (sans doublons), ex : [1, 3].
      */
-    private static extractFromString(value: string): number[] {
+    public static extractFromString(value: string): number[] {
 
         let processed = String(value).toUpperCase();
 
-        // Reconnaissance Regex des chaines servant pour l'extraction
+        // Analyse avec Regex des chaines servant pour l'extraction.
         this.extractionPatterns.forEach(s => {
                 const regex = new RegExp(s.pattern, 'g');
                 processed = processed.replace(regex, s.numbersString);
             });
 
-        // Tri et nettoyage des numéros
+        // Trie et nettoie les numéros.
         const result = this.cleanAndSortNumbers(processed);
 
         return result;
@@ -1568,55 +1930,66 @@ class Days {
 
     /**
      * Optimise un code de groupe de jours en trouvant les groupes de jours définis en paramètres.
-     * @param {string} numbersString - Chaîne contenant les numéros de jours.
-     * @returns {string} - Liste des groupes de jours correspondants, triée par leur premier numéro de jour.
+     * @param {string} mask - Masque de bits du groupe de jours.
+     * @returns {string} - Liste des groupes de jours correspondants,
+     *  triée par leur premier numéro de jour.
      */
-    private static optimiseCode(numbersString: string): Days[] {
-        let remaining = numbersString;
+    private static optimiseMask(mask: number): Days[] {
+
+        let remaining = mask;
         let result: Days[] = [];
 
         for (const d of this.compressionRules) {
-            if (d.numbers.every(n => remaining.includes(String(n)))) {
+            if ((remaining & d.mask) === d.mask) {
                 result.push(d);
-                d.numbers.forEach(n => {
-                    remaining = remaining.replace(String(n), '');
-                });
+                remaining &= ~d.mask; // Supprime les bits.
             }
         }
         
-        return result.sort((a, b) => a.numbers[0] - b.numbers[0]);
+        result.sort((a, b) => {
+            const aFirst = a.mask & -a.mask;
+            const bFirst = b.mask & -b.mask;
+            return aFirst - bFirst;
+        });
+
+        return result;
     }
 
     /**
      * Vérifie si un groupe de jours est présent dans la base de données.
-     * @param {string} value - Code alphanumérique ou numéros concaténés du groupe de jours
-     * @returns {boolean} - Vrai si le group de jours est présent, faux sinon.
+     * @param {string | number} value - Masque, nom ou code alphanumérique du groupe de jours.
+     * @returns {boolean} - Vrai si le groupe de jours est présent, faux sinon.
      */
-    public static has(value: string): boolean {
-        return this.mapByNumbers.has(value) || this.mapByCode.has(value);
-    }
+    public static has(value: string | number): boolean {
+        return (typeof value === 'number')
+            ? value >= 0 && value < this.masksList.length && !!this.masksList[value]
+            : this.mapByString.has(value);
+    }   
 
     /**
      * Retourne le groupe de jours correspondant au code alphanumérique ou aux numéros concaténés fourni.
      * Si le groupe de jours n'existe pas, renvoie undefined.
-     * @param {string} value - Code alphanumérique ou numéros concaténés du groupe de jours
-     * @returns {Days | undefined} - Instance de Days correspondante, ou undefined si le groupe de jours n'existe pas.
+     * @param {string | number} value - Masque, nom ou code alphanumérique du groupe de jours.
+     * @returns {Days | undefined} - Instance de Days correspondante,
+     *  ou undefined si le groupe de jours n'existe pas.
      */
-    public static get(value: string): Days | undefined {
-        return this.mapByNumbers.get(value) ?? this.mapByCode.get(value);
-    }
+    public static get(value: string | number): Days | undefined {
+        return (typeof value === 'number')
+            ? this.masksList[value]
+            : this.mapByString.get(value);
+    }   
 
     /**
      * Crée un nouveau groupe de jours et l'ajoute à la base de données.
      * La gare est référencée par son code alphanumérique, son nom complet, son abréviation et ses numéros.
      * Si un groupe de jours avec le même code, nom complet, abréviation ou numéros existe déjà,
      *  une erreur est levée.
-     * @param {number[]} numbers - Tableau contenant les numéros des jours du groupe de jours
-     * @param {string} code - Code alphanumérique du groupe de jours
-     * @param {string} fullName - Nom complet du groupe de jours
-     * @param {string} abreviation - Abréviation du groupe de jours
-     * @returns {Days} - Nouveau groupe de jours créé
-     * @throws {Error} - Si le groupe de jours est déjà présent dans la base de données
+     * @param {number[]} numbers - Tableau contenant les numéros des jours du groupe de jours.
+     * @param {string} code - Code alphanumérique du groupe de jours.
+     * @param {string} fullName - Nom complet du groupe de jours.
+     * @param {string} abreviation - Abréviation du groupe de jours.
+     * @returns {Days} - Nouveau groupe de jours créé.
+     * @throws {Error} - Si le groupe de jours est déjà présent dans la base de données.
      */
     private static create(
         numbers: number[],
@@ -1629,52 +2002,55 @@ class Days {
             throw new Error(`Le groupe de jours ${code} ne contient pas de jours.`);
         }
     
-        // Vérifie que le groupe de jour n'existe pas déjà
-        const numbersString = numbers.join('');
-        if (this.has(numbersString)) {
-            return this.get(numbersString)!;
+        // Vérifie que le groupe de jour n'existe pas déjà.
+        const mask = this.numbersToMask(numbers);
+        if (this.has(mask)) {
+            return this.get(mask)!;
         }
 
         // Si toutes les valeurs sont fournies (chargement depuis les paramètres),
-        //  récupère toutes les valeurs
+        //  récupère toutes les valeurs.
         let finalCode = code;
         let finalFullName = fullName;
         let finalAbbreviation = abreviation;
 
         // Si seul les numéros de jours sont fournis,
         //  un code optimisé est calculé par assemblage de groupes de jours connus.
-        //  Cet assemblage définit également un nom complet et une abbréviation par concaténation
+        //  Cet assemblage définit également un nom complet et une abréviation par concaténation.
         if (!code) {
-            const sumOfDays = this.optimiseCode(numbersString);
-            finalCode = sumOfDays.map(d => d.code).join('');
-            finalFullName = sumOfDays.map(d => d.fullName).join(' + ');
-            finalAbbreviation = sumOfDays.map(d => d.abreviation).join('');
+            const parts = this.optimiseMask(mask);
+            finalCode = parts.map(d => d.code).join('');
+            finalFullName = parts.map(d => d.fullName).join(' + ');
+            finalAbbreviation = parts.map(d => d.abreviation).join('');
         }
 
-        // Instancie le nouveau groupe de jours
+        // Instancie le nouveau groupe de jours.
         const days = new Days(
-            numbers,
+            mask,
             finalCode,
             finalFullName,
             finalAbbreviation
         );
 
-        // Ajoute le groupe de jour à la base de données
-        this.mapByNumbers.set(numbersString, days);
-        this.mapByCode.set(finalCode, days);
-        this.mapByCode.set(finalFullName, days);
-        this.mapByCode.set(finalAbbreviation, days);
+        // Ajoute le groupe de jour à la base de données.
+        this.masksList[mask] = days;
+        this.mapByString.set(days.numbersString, days);
+        this.mapByString.set(finalCode, days);
+        this.mapByString.set(finalFullName, days);
+        this.mapByString.set(finalAbbreviation, days);
 
         return days;
     }
 
     /**
      * Retourne un itérateur sur les valeurs de la base de données des groupes de jours.
-     * @returns {IterableIterator<Station>} - Itérateur sur les valeurs de la base de données
+     * @returns {IterableIterator<Days>} - Itérateur sur les valeurs de la base de données.
      *  des groupes de jours.
      */
-    public static values(): IterableIterator<Days> {
-        return this.mapByNumbers.values();
+    public static *values(): IterableIterator<Days> {
+        for (const d of this.masksList) {
+            if (d) yield d;
+        }
     }
 
     /**
@@ -1682,10 +2058,11 @@ class Days {
      * Cela permet de forcer le rechargement des gares si besoin.
      */
     public static clear(): void {
-        this.mapByNumbers = new Map();
-        this.mapByCode = new Map();
+        this.masksList = [];
+        this.mapByString = new Map();
         this.compressionRules = [];
         this.extractionPatterns = [];
+        this.loaded = false;
     }
 
     /**
@@ -1695,13 +2072,13 @@ class Days {
      */
     public static load(erase = false): void {
 
-        // Vérifie si la table à charger existe déjà
+        // Vérifie si la table à charger existe déjà.
         if (this.loaded) {
             if (!erase) return;
             this.clear();
         }
 
-        // Charge la base de données
+        // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
 
         let excelRow: number = 0;
@@ -1709,16 +2086,17 @@ class Days {
 
             for (const [rowIndex, row] of data.slice(1).entries()) {
 
-                // Vérifie si la ligne est vide (toutes les valeurs nulles ou vides)
+                // Vérifie si la ligne est vide (toutes les valeurs nulles ou vides).
                 if (row.every((cell: unknown) => !cell)) continue;
 
-                // Calcule le numéro de ligne Excel
+                // Calcule le numéro de ligne Excel.
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
 
-                // Extrait les valeurs
+                // Extrait les valeurs.
                 const fullName = WorkbookService.getString(row, this.COL_FULL_NAME) ?? "";
                 if (!fullName) {
-                    throw new Error(`Nom complet du groupe de jours non renseigné dans le tableau des jours.`);
+                    throw new Error(`Nom complet du groupe de jours`
+                        + ` non renseigné dans le tableau des jours.`);
                 }
                 if (this.has(fullName)) {
                     throw new Error(`Nom complet ${fullName} déjà utilisé.`);
@@ -1726,7 +2104,7 @@ class Days {
                 const abreviation = WorkbookService.getString(row, this.COL_ABBREVIATION) ?? ""; 
                 if (!abreviation) {
                     throw new Error(`Groupe de jours du ${fullName} :`
-                        + ` abbréviation non renseignée dans le tableau des jours.`);
+                        + ` abréviation non renseignée dans le tableau des jours.`);
                 }
                 if (this.has(abreviation)) {
                     throw new Error(`Groupe de jours du ${fullName} :`
@@ -1742,7 +2120,7 @@ class Days {
                 const codeLetter = (WorkbookService.getString(row, this.COL_CODE_LETTER) ?? "")
                         .toUpperCase()
                         .replace(/[^A-Z]/g, '');
-                // Si groupe de jours, une seule lettre attendue
+                // Si groupe de jours, une seule lettre attendue.
                 if (!codeLetter && numbers.length > 1) {
                     throw new Error(`Groupe de jours du ${fullName} :`
                         + ` Lettre de code non renseignée ou invalide dans le tableau des jours.`);
@@ -1751,7 +2129,7 @@ class Days {
                     ? numbersString
                     : codeLetter;
 
-                // Crée l'objet Days
+                // Crée l'objet Days.
                 const days = this.create(
                     numbers,
                     code,
@@ -1764,18 +2142,8 @@ class Days {
             throw new Error(`Days.load (ligne ${excelRow}) : ${e}`);
         } 
 
-        // Si non renseignés dans le tableau, charge les jours individuels par défaut
-        const weekDays = [
-            { number: 1, fullName: "Lundi", abreviation: "Lu" },
-            { number: 2, fullName: "Mardi", abreviation: "Ma" },
-            { number: 3, fullName: "Mercredi", abreviation: "Me" },
-            { number: 4, fullName: "Jeudi", abreviation: "Je" },
-            { number: 5, fullName: "Vendredi", abreviation: "Ve" },
-            { number: 6, fullName: "Samedi", abreviation: "Sa" },
-            { number: 7, fullName: "Dimanche", abreviation: "Di" },
-            { number: 8, fullName: "Férié", abbreviation: "Fer", code: "F" }
-        ];
-        weekDays.forEach(d => {
+        // Si non renseignés dans le tableau, charge les jours individuels par défaut.
+        this.WEEKDAYS.forEach(d => {
             const numbersString = String(d.number);
             if (!this.has(numbersString)) {
                 this.create([d.number], d.code ?? numbersString, d.fullName, d.abreviation);
@@ -1783,31 +2151,247 @@ class Days {
         });
 
         // Constitue le tableau d'analyse des codes avec :
-        //  - la lettre code (si existante)
-        //  - le nom complet du groupe de jours
-        //  - l'abbréviation du groupe de jours
+        //  - la lettre code (si existante),
+        //  - le nom complet du groupe de jours,
+        //  - l'abréviation du groupe de jours.
         // Pour les groupes de jours, constitue également le tableau des règles de compression du code
-        //  avec les codes lettres des groupes de jours
+        //  avec les codes lettres des groupes de jours.
         for (const days of this.values()) {
             this.compressionRules.push(days);
-            this.extractionPatterns.push({pattern: days.code, numbersString: days.numbersString});
-            this.extractionPatterns.push({pattern: days.fullName.toUpperCase(), numbersString: days.numbersString});
-            this.extractionPatterns.push({pattern: days.abreviation.toUpperCase(), numbersString: days.numbersString});
+            this.extractionPatterns.push({
+                pattern: days.code,
+                numbersString: days.numbersString
+            });
+            this.extractionPatterns.push({
+                pattern: days.fullName.toUpperCase(),
+                numbersString: days.numbersString
+            });
+            this.extractionPatterns.push({
+                pattern: days.abreviation.toUpperCase(),
+                numbersString: days.numbersString
+            });
+        }
+
+        // Algorithme de Brian Kernighan pour compter le nombre de bits (donc de jours dans le groupe).
+        const popcount = function (mask: number): number {
+            let count = 0;
+            while (mask) {
+                mask &= mask - 1;
+                count++;
+            }
+            return count;
         }
 
         // Tri de la liste des groupes de jours donnés en paramètre,
-        //  par leur nombre de jours dans l'ordre décroissant
-        this.compressionRules.sort((a, b) => b.numbers.length - a.numbers.length);
+        //  par leur nombre de jours dans l'ordre décroissant.
+        this.compressionRules.sort(
+            (a, b) => b.count - a.count
+        );
     
-        // Tri du tableau d'analyse des codes, de la plus grande chaine à la plus petite
+        // Tri du tableau d'analyse des codes, de la plus grande chaine à la plus petite.
         this.extractionPatterns.sort((a, b) => b.pattern.length - a.pattern.length)
 
         this.loaded = true;
+
+        // Charge les jours individuels.
+        Day.load();
     }
 }
 
 /*
- * Classe utilitaire immutable qui permet de manipuler la parité
+ * Classe utilitaire DaysValues pour la gestion des valeurs associées aux jours.
+ */
+class DaysValues {
+
+    // Propriétés de l'objet Days
+    
+    public readonly days: Days;                             // Groupe de jours total concerné
+    private entries: { days: Days, value: string }[] = [];  // Liste de règles (Days → valeur)
+
+    /**
+     * Constructeur de la classe DaysValues.
+     * @param {Days} days - Groupe de jours total concerné.
+     */
+    constructor(days: Days) {
+        this.days = days;
+    }
+
+    /**
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
+     * La méthode renvoie une chaine vide si l'objet n'a pas de valeurs associées.
+     * Sinon, elle renvoie une chaine au format "jour1: valeur1, jour2: valeur2, ..."
+     *  où chaque jour est représenté par un ensemble de numéros de jours
+     *  (ex: "1-2,4,6" pour les jours lundi, mardi, jeudi et samedi).
+     * @returns {string} - La représentation textuelle de l'objet.
+     */
+    public toString(): string {
+
+        if (this.entries.length === 0) return "";
+
+        // Cas uniforme
+        if (this.entries.length === 1 &&
+            this.entries[0].days.mask === this.days.mask) {
+            return this.entries[0].value;
+        }
+
+        return this.entries
+            .map(e => `${e.days.numbersString}: ${e.value}`)
+            .join(", ");
+    }
+
+    /**
+     * Crée un objet DaysValues à partir d'un groupe de jours et d'une chaîne de valeurs.
+     * La chaîne de valeurs peut contenir des valeurs uniques ou multiples, séparées par des virgules.
+     * Si la chaîne de valeurs contient une seule valeur, le groupe de jours est considéré comme un seul jour.
+     * Si la chaîne de valeurs contient plusieurs valeurs, chaque valeur est associée à un groupe de jours.
+     * @param {Days} days - Groupe de jours total concerné.
+     * @param {string} input - Chaîne de valeurs.
+     * @returns {DaysValues} - L'objet DaysValues créé.
+     */ 
+    public static from(days: Days, input: string): DaysValues {
+
+        const dv = new DaysValues(days);
+
+        if (!input || input.trim() === "") return dv;
+
+        const parts = input.split(/[,;]+/);;
+
+        for (const part of parts) {
+
+            const [daysPart, valuePart] = part.split(":");
+
+            if (!valuePart) continue;
+
+            const subDays = Days.from(daysPart.trim());
+            const value = valuePart.trim();
+
+            if (subDays) {
+                dv.set(subDays, value);
+            }
+        }
+
+        return dv;
+    }
+
+    /**
+     * Renvoie la valeur associée au jour de la semaine donné.
+     * Si le jour n'est pas couvert par une règle, renvoie une chaîne vide.
+     * @param {Day} day - Jour de la semaine.
+     * @returns {string} - Valeur associée.
+     */
+    public get(day: Day): string {
+
+        for (const entry of this.entries) {
+            if (entry.days.contains(day)) {
+                return entry.value;
+            }
+        }
+
+        return "";
+    }
+
+    /**
+     * Modifie la valeur associée à un groupe de jours.
+     * Supprime les parties déjà couvertes dans les autres sous-groupes de jours
+     *  et ajoute la nouvelle valeur.
+     * @param {Days} days - Groupe de jours total concerné.
+     * @param {string} value - Valeur associée.
+     */
+    public set(days: Days, value: string): void {
+
+        // Restreint le groupe de jours à affecter au périmètre autorisé
+        const validDays = Days.intersection(days, this.days);
+        if (!validDays || validDays.mask === 0) return;
+
+        // Supprime les parties déjà couvertes dans les autres sous-groupes de jours (valeur modifiée)
+        this.entries = this.entries
+            .map(e => {
+                const remaining = Days.difference(e.days, validDays);
+                return remaining ? { days: remaining, value: e.value } : null;
+            })
+            .filter(e => e !== null)
+
+        // Ajoute la nouvelle valeur
+        this.entries.push({ days: validDays, value });
+
+        this.merge();
+    }
+
+    /**
+     * Fusionne les valeurs associées aux groupes de jours.
+     * Regroupe par valeur, puis reconstruit les entrées avec les valeurs fusionnées.
+     */
+    private merge(): void {
+
+        const map = new Map<string, number>();
+
+        // Regroupe par valeur
+        for (const e of this.entries) {
+            const prev = map.get(e.value) ?? 0;
+            map.set(e.value, prev | e.days.mask);
+        }
+
+        // Reconstruit entries
+        this.entries = [];
+        for (const [value, mask] of map.entries()) {
+            this.entries.push({
+                days: Days.get(mask)!,
+                value
+            });
+        }
+        this.entries.sort((a, b) => 
+            a.days.numbersString.localeCompare(b.days.numbersString));
+    }
+
+    /**
+     * Vérifie si toutes les parties du groupe de jours sont couvertes.
+     * @returns {boolean} - Vrai si toutes les parties sont couvertes, faux sinon.
+     */
+    public isComplete(): boolean {
+
+        let mask = 0;
+        for (const e of this.entries) {
+            mask |= e.days.mask;
+        }
+
+        return mask === this.days.mask;
+    }
+
+    /**
+     * Ajoute les valeurs manquantes dans le groupe de jours.
+     * Pour chaque jour non couvert par une règle, ajoute une entrée avec la valeur par défaut.
+     * @param {string} defaultValue - Valeur associée aux jours non couverts.
+     */
+    public fillGaps(defaultValue: string): void {
+
+        let covered = 0;
+        for (const e of this.entries) covered |= e.days.mask;
+        const missingMask = this.days.mask & ~covered;
+
+        if (missingMask) {
+            this.entries.push({
+                days: Days.fromMask(missingMask)!,
+                value: defaultValue
+            });
+            this.merge();
+        }
+    }
+
+    /**
+     * Vérifie si les deux objets DaysValues sont égaux.
+     * La comparaison est faite en fonction de la représentation textuelle des objets.
+     * @param {DaysValues} other - L'objet DaysValues à comparer.
+     * @returns {boolean} - Vrai si les deux objets sont égaux, faux sinon.
+     */
+    public equals(other: DaysValues): boolean {
+
+        return this.toString() === other.toString();
+    }
+}
+
+/*
+ * Classe utilitaire Parity immuable qui permet de manipuler la parité
  *  d'un train, d'un parcours ou d'un arrêt.
  */
 class Parity {
@@ -1859,8 +2443,8 @@ class Parity {
     }
     
     /**
-     * Retourne une représentation textuelle simple et stable de l'objet.
-     * Utilisée implicitement dans les conversions string (ex: `${obj}`).
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
         return this.value.toString();
@@ -1889,11 +2473,11 @@ class Parity {
 
     /**
      * Retourne une instance de Parity à partir d'une valeur qui peut être :
-     *  - une lettre de parité (ou la concaténation des deux lettres sans ordre si double parité)
-     *  - un chiffre de parité (format chaîne ou nombre)
-     *  - un numéro de train (pair, impair ou double s'il contient un '/')
-     *  - une instance de Parity (retourne la même instance)
-     *  - null ou undefined (retourne une instance de Parity avec valeur this.UNDEFINED)
+     *  - une lettre de parité (ou la concaténation des deux lettres sans ordre si double parité),
+     *  - un chiffre de parité (format chaîne ou nombre),
+     *  - un numéro de train (pair, impair ou double s'il contient un '/'),
+     *  - une instance de Parity (retourne la même instance),
+     *  - null ou undefined (retourne une instance de Parity avec valeur this.UNDEFINED).
      * @param {Parity | string | number | null | undefined} value - Valeur à analyser pour la parité.
      * @returns {Parity} - Instance de Parity correspondante.
      */
@@ -1912,9 +2496,9 @@ class Parity {
 
     /**
      * Normalise en une valeur de parité une valeur, qui peut être :
-     *  - la lettre de parité (ou la concaténation des deux lettres sans ordre si double parité)
-     *  - le chiffre de parité (format chaîne ou nombre)
-     *  - un numéro de train (pair, impair ou double s'il contient un '/')
+     *  - la lettre de parité (ou la concaténation des deux lettres sans ordre si double parité),
+     *  - le chiffre de parité (format chaîne ou nombre),
+     *  - un numéro de train (pair, impair ou double s'il contient un '/').
      * @param {string | number | null | undefined} value - Valeur à normaliser.
      * @param {boolean} doubleParityAllowed - Si vrai, la double parité est autorisée.
      * @returns {number} - Valeur de parité normalisée.
@@ -1924,10 +2508,10 @@ class Parity {
         doubleParityAllowed: boolean
     ): number {
     
-        // 1️⃣ La valeur est nulle ou undefined
+        // La valeur est nulle ou undefined
         if (value == null) return this.UNDEFINED;
     
-        // 2️⃣ La valeur est un nombre
+        // La valeur est un nombre
         if (typeof value === 'number') {
             if (
                 // Valeurs de Parity explicites
@@ -1948,7 +2532,7 @@ class Parity {
             return value % 2 === 0 ? this.EVEN : this.ODD;
         }
     
-        // 3️⃣ La valeur est une chaine
+        // La valeur est une chaine
         const str = value.trim().toUpperCase();
     
         if (str === '' || str === '0') return this.UNDEFINED;
@@ -2071,7 +2655,7 @@ class Parity {
             return false;
         }
     
-        // Parité double inclut toutes les parités définies
+        // La parité double inclut toutes les parités définies
         if (this.value === Parity.DOUBLE) {
             return requested.value !== Parity.UNDEFINED;
         }
@@ -2203,14 +2787,14 @@ class Parity {
      */
     public static load(erase = false): void {
 
-        // Vérifie si la table à charger existe déjà
+        // Vérifie si la table à charger existe déjà.
         if (this.loaded) {
             if (!erase) return;
             this.letters.clear();
             this.digits.clear();
         }
 
-        // Charge la base de données
+        // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
 
         const getParityLetter = (
@@ -2241,7 +2825,7 @@ class Parity {
 /**
  * Classe TrainNumber définissant un numéro de train.
  * Il est alphanumérique, sans ponctuation et sans espaces, avec un chiffre pour dernier caractère.
- * La double parité est marquée par ######/#
+ * La double parité est marquée par ######/#.
  */
 class TrainNumber {
 
@@ -2285,15 +2869,15 @@ class TrainNumber {
             return;
         }
 
-        // Force l'éventuelle double parité
+        // Force l'éventuelle double parité.
         this.value = applyDoubleParity
             ? TrainNumber.applyParity(normalized, Parity.DOUBLE)
             : normalized;
     }
      
     /**
-     * Retourne une représentation textuelle simple et stable de l'objet.
-     * Utilisée implicitement dans les conversions string (ex: `${obj}`).
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
         return this.value.toString();
@@ -2302,7 +2886,7 @@ class TrainNumber {
     /**
      * Crée une instance de TrainNumber à partir d'un numéro de train ou d'un nombre.
      * La méthode normalise le numéro de train en supprimant les caractères non-alphanumériques
-     * et en ne gardant que la partie précédent un "/".
+     *  et en ne gardant que la partie précédent un "/".
      * La double parité est marquée par ######/#.
      * @param {string | number | null | undefined} value - Numéro de train (nombre ou chaine de caractères).
      * @param {boolean} doubleParity - Si vrai, force la double parité. Si faux (par défaut),
@@ -2321,7 +2905,7 @@ class TrainNumber {
 
     /**
      * Normalise un numéro de train en supprimant les caractères non-alphanumériques
-     * et en ne gardant que la partie précédent un "/".
+     *  et en ne gardant que la partie précédent un "/".
      * @param {string} value - Numéro de train à normaliser.
      * @returns {string} - Numéro de train normalisé.
      */
@@ -2346,9 +2930,8 @@ class TrainNumber {
     /**
      * Abrège le numéro de train à 4 chiffres si possible.
      * La méthode teste si le numéro de train correspond à une expression régulière
-     * définie dans la classe TrainNumber.
-     * Si le numéro de train correspond, il est abrégé en supprimant les 2 premiers
-     * chiffres.
+     *  définie dans la classe TrainNumber.
+     * Si le numéro de train correspond, il est abrégé en supprimant les 2 premiers chiffres.
      * Si le numéro de train ne correspond pas, il est renvoyé inchangé.
      * @returns {string} - Numéro de train abrégé de 6 à 4 chiffres s'il est abrégeable.
      */
@@ -2400,7 +2983,7 @@ class TrainNumber {
      * @param {number} parityValue - Parité demandée (paire, impaire, double).
      * @param {boolean} abbreviateTo4Digits - Si vrai, le numéro du train est abrégé à 4 chiffres.
      *  Si faux, le numéro du train n'est pas abrégé.
-     * @returns {string} - Numéro du train adapté
+     * @returns {string} - Numéro du train adapté.
      */
     public adaptWithParity(parityValue: number, abbreviateTo4Digits: boolean = false): string {
 
@@ -2412,7 +2995,7 @@ class TrainNumber {
 
     /**
      * Retourne le numéro du train en fonction des paramètres :
-     *  - si abbreviateTo4Digits est vrai, le numéro du train est abrégé à 4 chiffres.
+     *  - si abbreviateTo4Digits est vrai, le numéro du train est abrégé à 4 chiffres,
      *  - si withoutDoubleParity est vrai, le numéro du train est renommé sans double parité.
      * @param {boolean} [abbreviateTo4Digits=false] - Si vrai, le numéro du train est abrégé
      *  de 6 à 4 chiffres pour les trains commerciaux. Si faux (par défaut), le numéro n'est pas abrégé.
@@ -2455,7 +3038,7 @@ class TrainNumber {
      */
     public static load(erase = false): void {
 
-        // Vérifie si les tables à charger existent déjà
+        // Vérifie si les tables à charger existent déjà.
         if (this.loaded && !erase) return;
 
         this.loadWRegex();
@@ -2472,7 +3055,7 @@ class TrainNumber {
     private static loadWRegex(): void {
         const data = WorkbookService.getDataFromTable(this.W_SHEET, this.W_TABLE);
     
-        // Transforme chaque motif en regex partielle
+        // Transforme chaque motif en regex partielle.
         const regexParts: string[] = data
             .slice(1)
             .flat()
@@ -2481,7 +3064,7 @@ class TrainNumber {
                 return '^' + pattern.trim().replace(/#/g, '\\d') + '$';
             });
 
-        // Crée une regex globale combinée
+        // Crée une regex globale combinée.
         this.wRegex = new RegExp(regexParts.join('|'));
     }
 
@@ -2494,7 +3077,7 @@ class TrainNumber {
         const data = WorkbookService.getDataFromTable(this.TRAINS_4DIGIT_SHEET,
             this.TRAINS_4DIGIT_TABLE);
     
-        // Transforme chaque motif en regex partielle
+        // Transforme chaque motif en regex partielle.
         const regexParts: string[] = data
             .slice(1)
             .flat()
@@ -2503,13 +3086,13 @@ class TrainNumber {
                 return '^' + pattern.trim().replace(/#/g, '\\d') + '$';
             });
 
-        // Crée une regex globale combinée
+        // Crée une regex globale combinée.
         this.abbreviate4Regex = new RegExp(regexParts.join('|'));
     }
 }
 
 /* 
- * Classe Station définissant une gare
+ * Classe Station définissant une gare.
  */
 class Station {
 
@@ -2525,13 +3108,13 @@ class Station {
 
     /**
      * Constructeur d'une gare.
-     * @param {number} id - Id de la gare
-     * @param {string} abbreviation - Abréviation de la gare
-     * @param {string} name - Nom de la gare
-     * @param {Station} referenceStation - Gare de rattachement
+     * @param {number} id - Id de la gare.
+     * @param {string} abbreviation - Abréviation de la gare.
+     * @param {string} name - Nom de la gare.
+     * @param {Station} referenceStation - Gare de rattachement.
      * @param {Parity} turnaround - Parité d'un rebroussement possible
-     *  (la parité est celle du train avant rebroussement)
-     * @param {boolean} reverseLineDirection - Parité de la ligne inversée sur cette gare
+     *  (la parité est celle du train avant rebroussement).
+     * @param {boolean} reverseLineDirection - Parité de la ligne inversée sur cette gare.
      */
     constructor(
         id: number,
@@ -2557,8 +3140,8 @@ class Station {
     }
     
     /**
-     * Retourne une représentation textuelle simple et stable de l'objet.
-     * Utilisée implicitement dans les conversions string (ex: `${obj}`).
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
         return this.abbreviation;
@@ -2566,7 +3149,7 @@ class Station {
 }
 
 /**
- * Classe Stations contenant la liste des gares
+ * Classe Stations contenant la liste des gares.
  */
 class Stations {
 
@@ -2604,7 +3187,7 @@ class Stations {
 
     /**
      * Vérifie si une gare est présente dans la base de données.
-     * @param {string} value - Abréviation ou nom de la gare
+     * @param {string} value - Abréviation ou nom de la gare.
      * @returns {boolean} - Vrai si la gare est présente, faux sinon.
      */
     public static has(value: string): boolean {
@@ -2613,7 +3196,7 @@ class Stations {
 
     /**
      * Renvoie la gare correspondant à l'ID donné.
-     * @param {number} id - ID de la gare
+     * @param {number} id - ID de la gare.
      * @returns {Station} - Gare correspondante.
      */
     public static getById(id: number): Station {
@@ -2624,24 +3207,34 @@ class Stations {
 
     /**
      * Renvoie une gare correspondant à l'abréviation ou au nom donné.
-     * @param {string} value - Abréviation ou nom de la gare
+     * @param {string} value - Abréviation ou nom de la gare.
      * @returns {Station | undefined} - Gare correspondante, ou undefined si non trouvée.
      */
     public static get(value: string): Station | undefined {
-        return this.abbrMap[value] ?? this.nameMap[value];
+
+        let adaptedValue = value;
+
+        for (const suffix of Params.stationsSuffixes) {
+            if (adaptedValue.endsWith(`-${suffix}`)) {
+                adaptedValue = adaptedValue.slice(0, -suffix.length - 1);
+                break; // S'arrête au premier match.
+            }
+        }
+
+        return this.abbrMap[adaptedValue] ?? this.nameMap[adaptedValue];
     }
 
     /**
      * Crée une nouvelle gare et l'ajoute à la base de données, 
      *  référencée par son ID, sa clé et son nom.
      * Si une gare avec la même clé ou le même nom existe déjà, une erreur est levée.
-     * @param {string} abbreviation - Abréviation de la gare
-     * @param {string} name - Nom de la gare
+     * @param {string} abbreviation - Abréviation de la gare.
+     * @param {string} name - Nom de la gare.
      * @param {Parity | string | number} turnaround - Parité d'un rebroussement possible
-     *  (la parité est celle du train avant rebroussement)
-     * @param {boolean} reverseLineDirection - Parité de la ligne inversée sur cette gare
-     * @returns {Station} - La nouvelle gare créée
-     * @throws {Error} - Si une gare avec la même clé ou le même nom existe déjà
+     *  (la parité est celle du train avant rebroussement).
+     * @param {boolean} reverseLineDirection - Parité de la ligne inversée sur cette gare.
+     * @returns {Station} - La nouvelle gare créée.
+     * @throws {Error} - Si une gare avec la même clé ou le même nom existe déjà.
      */
     private static create(
         abbreviation: string,
@@ -2650,17 +3243,17 @@ class Stations {
         reverseLineDirection: boolean,
     ): Station {
 
-        // Vérifie que la gare n'existe pas déjà
+        // Vérifie que la gare n'existe pas déjà.
         for (const value of [abbreviation, name]) {
             if (this.has(value)) {
                 throw new Error(`La gare ${value} est déjà présente dans la base de données.`);
             }
         }
 
-        // Calcul l'ID
+        // Calcule l'ID.
         const id = this.list.length;
 
-        // Instancie la nouvelle gare
+        // Instancie la nouvelle gare.
         const station = new Station(
             id,
             abbreviation,
@@ -2670,7 +3263,7 @@ class Stations {
             reverseLineDirection
         );
 
-        // Ajoute la gare à la base de données
+        // Ajoute la gare à la base de données.
         this.list.push(station);
         this.abbrMap[station.abbreviation] = station;
         this.nameMap[station.name] = station;
@@ -2680,7 +3273,8 @@ class Stations {
 
     /**
      * Retourne un itérateur sur les valeurs de la base de données des gares.
-     * @returns {IterableIterator<Station>} - Itérateur sur les valeurs de la base de données des gares.
+     * @returns {IterableIterator<Station>} - Itérateur sur les valeurs
+     *  de la base de données des gares.
      */
     public static values(): IterableIterator<Station> {
         return this.list.values();
@@ -2703,13 +3297,13 @@ class Stations {
      */
     public static load(erase: boolean = false): void {
 
-        // Vérifie si la table à charger existe déjà
+        // Vérifie si la table à charger existe déjà.
         if (this.size > 0) {
             if (!erase) return;
             this.clear();
         }
 
-        // Charge la base de données
+        // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
         if (!data || data.length <= 1) {
             Log.warn(`this.load : aucune donnée trouvée dans la table.`);
@@ -2720,23 +3314,23 @@ class Stations {
         const referenceStationPairs: [Station, string][] = [];
         try {
 
-            // Parcourt les lignes (hors en-tête)
+            // Parcourt les lignes (hors en-tête).
             for (const [rowIndex, row] of data.slice(1).entries()) {
 
-                // Vérifie si la ligne est vide
+                // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
 
-                // Calcule le numéro de ligne Excel
+                // Calcule le numéro de ligne Excel.
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
 
-                // Récupère les champs
+                // Récupère les champs.
                 const abbreviation = WorkbookService.getString(row, this.COL_ABBR)?.toUpperCase() ?? "";
                 const name = WorkbookService.getString(row, this.COL_NAME) ?? "";
                 const referenceStationAbbv = WorkbookService.getString(row, this.COL_REFERENCE_STATION) ?? "";
                 const turnaroundLetters = WorkbookService.getString(row, this.COL_TURNAROUND) ?? "";
                 const reverseLineDirection = !!WorkbookService.getBoolean(row, this.COL_REVERSE_LINE_PARITY);
 
-                // Crée l'objet Station et l'insère dans la base de données
+                // Crée l'objet Station et l'insère dans la base de données.
                 const station = this.create(
                     abbreviation,
                     name,
@@ -2744,7 +3338,7 @@ class Stations {
                     reverseLineDirection
                 );
 
-                // Mémorise les paires gare/gare de rattachement
+                // Mémorise les paires gare/gare de rattachement.
                 if (referenceStationAbbv) {
                     referenceStationPairs.push([station, referenceStationAbbv]);
                 }
@@ -2754,7 +3348,7 @@ class Stations {
             throw new Error(`Stations.load (ligne ${excelRow}) : ${e}`);
         } 
 
-        // Parcourt les paires pour ajouter les objets des gares de réference à chaque gare
+        // Parcourt les paires pour ajouter les objets des gares de réference à chaque gare.
         for (const [station, referenceStationAbbv] of referenceStationPairs) {
             const referenceStation = this.get(referenceStationAbbv);
 
@@ -2777,7 +3371,7 @@ class Stations {
         startCell: string = "A1"
     ): void {
 
-        // Convertit la base de données en un tableau de données
+        // Convertit la base de données en un tableau de données.
         const data: (string | number)[][] = Array
             .from(this.values())
             .map(station => [
@@ -2788,7 +3382,7 @@ class Stations {
                 station.reverseLineDirection ? 1 : 0
             ]);
 
-        // Imprime le tableau
+        // Imprime le tableau.
         WorkbookService.printTable(
             this.HEADERS, 
             data,
@@ -2800,7 +3394,7 @@ class Stations {
 }
 
 /**
- * Classe StationWithParity immutable définissant une gare d'arrêt ou de passage d'un train
+ * Classe StationWithParity immuable définissant une gare d'arrêt ou de passage d'un train
  *  et sa parité associée.
  */
 class StationWithParity {
@@ -2817,10 +3411,10 @@ class StationWithParity {
     private _expandedCache?: StationWithParity[];   // Cache des gares avec parité rattachées
 
     /**
-     * Constructeur d'une gare avec parité
-     * @param {number} id - Identifiant unique
-     * @param {Station} station - Gare (objet Station)
-     * @param {Parity} parity - Parité associée à la gare
+     * Constructeur d'une gare avec parité.
+     * @param {number} id - Identifiant unique.
+     * @param {Station} station - Gare (objet Station).
+     * @param {Parity} parity - Parité associée à la gare.
      */
     constructor(id: number, station: Station, parity: Parity) {
         this.id = id;
@@ -2841,7 +3435,7 @@ class StationWithParity {
      *  - si l'identifiant est impair, la parité est impair,
      *  - si l'identifiant est pair, la parité est pair,
      *  - si l'identifiant est nul, la parité est undefined.
-     * @returns {Parity} - Parité associée à cet objet StationWithParity
+     * @returns {Parity} - Parité associée à cet objet StationWithParity.
      */
     public get parity(): Parity {
         const p = this.id % 3;
@@ -2851,8 +3445,8 @@ class StationWithParity {
     }
 
     /**
-     * Retourne une représentation textuelle simple et stable de l'objet.
-     * Utilisée implicitement dans les conversions string (ex: `${obj}`).
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
         return this.key;
@@ -2863,12 +3457,12 @@ class StationWithParity {
      *  - une instance de StationWithParity,
      *  - une instance de Station,
      *  - un nom de gare ou une clé d'arrêt (avec ou sans suffixe parité),
-     *  - null ou undefined (lève une erreur)
+     *  - null ou undefined (lève une erreur).
      * La parité associée est celle trouvée dans la valeur, sauf si elle est imposée en argument.
      * @param {StationWithParity | Station | string | null | undefined} value - Valeur à analyser
-     *  pour la gare
+     *  pour la gare.
      * @param {Parity | string | number} [parity] - Parité optionnelle imposée,
-     *  qui remplace celle potentiellement présente dans value
+     *  qui remplace celle potentiellement présente dans value.
      * @returns {StationWithParity | undefined} - Instance de StationWithParity correspondante.
      * @throws {Error} - Si la valeur est null ou undefined.
      */
@@ -2882,7 +3476,7 @@ class StationWithParity {
         const parityObj = Parity.from(parity, false);
 
         // La valeur est une instance de StationWithParity :
-        //  retourne la valeur sauf si la parité est imposée en argument
+        //  retourne la valeur sauf si la parité est imposée en argument.
         if (value instanceof StationWithParity) {
             if (!parityObj.isDefined()) return value;
             return StationsWithParity.getFromStationAndParity(
@@ -2892,7 +3486,7 @@ class StationWithParity {
         } 
 
         // La valeur est une instance de Station :
-        //  la gare est récupérée et la parité sera celle donnée en argument
+        //  la gare est récupérée et la parité sera celle donnée en argument.
         if (value instanceof Station) {
             return StationsWithParity.getFromStationAndParity(
                 value,
@@ -2901,13 +3495,13 @@ class StationWithParity {
         }
         
         // La valeur est une chaîne qui correspond à la clé d'une gare avec parité :
-        //  retourne l'instance de StationWithParity correspondante
+        //  retourne l'instance de StationWithParity correspondante.
         if (!parityObj.isDefined() && StationsWithParity.hasKey(value)) {
             return StationsWithParity.getByKey(value)!;
         }
 
         // La valeur est une chaîne qui ne correspond pas à la clé d'une gare avec parité :
-        //  la gare et la parité sont extraites de la chaîne
+        //  la gare et la parité sont extraites de la chaîne.
         const { station, parity: parsedParity } = this.parseStationAndParity(value);
         const finalParity = parityObj.isDefined() ? parityObj : parsedParity;
 
@@ -2918,12 +3512,12 @@ class StationWithParity {
     }
 
     /**
-     * Renvoie la valeur unique de la parité pour le calcul de l'ID, qui est
+     * Renvoie la valeur unique de la parité pour le calcul de l'ID, qui est :
      *  - this.ODD si la parité est impaire,
-     *  - this.EVEN si la parité est paire et
+     *  - this.EVEN si la parité est paire,
      *  - this.UNDEFINED sinon.
      * @param {Parity} parity - La parité à transformer.
-     * @returns {number} - Valeur unique de la parité. pour le calcul
+     * @returns {number} - Valeur unique de la parité. pour le calcul.
      */
     public static parityValue(parity: Parity): number {
         switch (parity.value) {
@@ -2981,15 +3575,17 @@ class StationWithParity {
     public stationAfterTurnaround(): StationWithParity | undefined {
     
         // La gare de rebroussement est donnée par l'inversion de parité si définie,
-        //  ou sans changement sinon
+        //  ou sans changement sinon.
         const reversedParity = this.parity.invert();
         const stationAfterTurnaround = StationsWithParity.getFromStationAndParity(
             this.station,
             reversedParity
         );
 
-        // Si parité définie, rebroussement possible si parité incluse dans la propriété Station.turnaround
-        // Si parité non définie, rebroussement considéré comme possible si autorisé depuis au moins un sens
+        // Si parité définie, rebroussement possible
+        //  si parité incluse dans la propriété Station.turnaround.
+        // Si parité non définie, rebroussement considéré comme possible
+        //  si autorisé depuis au moins un sens.
         const canTurnAround = this.parity.isDefined()
             ? this.station.turnaround.includes(this.parity)
             : this.station.turnaround.isDefined();
@@ -3031,9 +3627,9 @@ class StationWithParity {
      * Renvoie une chaîne représentant l'objet StationWithParity sous la forme
      *  GARE_PARITE, où GARE est le nom de la gare sans suffixe _PARITE et
      *  PARITE est la parité sous forme de chiffre.
-     * @param {Station} station - Gare
-     * @param {Parity} parity - Parité
-     * @returns {string} - Chaîne représentant l'objet StationWithParity
+     * @param {Station} station - Gare.
+     * @param {Parity} parity - Parité.
+     * @returns {string} - Chaîne représentant l'objet StationWithParity.
      */
     private static keyOf(station: Station, parity: Parity): string {
         return parity.isDefined() 
@@ -3043,8 +3639,8 @@ class StationWithParity {
 
     /**
      * Renvoie un tableau de toutes les gares avec parités rattachées en renvoyant : 
-     *  - les 3 parités si elle n'est pas définie
-     *  - les gares filles
+     *  - les 3 parités si elle n'est pas définie,
+     *  - les gares filles.
      * La méthode prend en paramètre un ensemble de gares déjà visitées pour éviter les boucles infinies.
      * @param {Set<number>} [visited=new Set<number>()] - Ensemble des gares déjà visitées.
      * @returns {StationWithParity[]} - Tableau contenant toutes les gares visitées.
@@ -3056,7 +3652,7 @@ class StationWithParity {
         const results: StationWithParity[] = [];
         const added = new Set<number>();
 
-        // Vérifie que la gare à inclure n'est pas déjà présente dans le résultat
+        // Vérifie que la gare à inclure n'est pas déjà présente dans le résultat.
         const add = (swp: StationWithParity) => {
             if (!added.has(swp.id)) {
                 added.add(swp.id);
@@ -3064,11 +3660,11 @@ class StationWithParity {
             }
         };
 
-        // Anti-boucle
+        // Evite une boucle infinie.
         if (visited.has(this.id)) return [];
         visited.add(this.id);
     
-        // Expansion de la parité
+        // Génère l'expansion de la parité.
         if (!this.hasDefinedParity()) {
             const base = Math.floor(this.id / 3) * 3;
             add(StationsWithParity.list[base + StationWithParity.UNDEFINED]);
@@ -3078,12 +3674,12 @@ class StationWithParity {
             add(this);
         }
 
-        // Expansion avec les gares filles
+        // Génère l'expansion avec les gares filles.
         for (const child of this.station.childStations) {
             const childSwp = StationsWithParity.getFromStationAndParity(child, this.parity);
             if (!childSwp) continue;
 
-            // Clonage de la liste des éléments déjà visités
+            // Duplique la liste des éléments déjà visités.
             const childVisited = new Set(visited);
             const expandedChildren = childSwp.expandWithChildren(childVisited);
 
@@ -3092,7 +3688,7 @@ class StationWithParity {
             }
         }
 
-        // Sauvegarde des gares rattachées dans le cache
+        // Sauvegarde les gares rattachées dans le cache.
         this._expandedCache = results;
 
         return results;
@@ -3100,7 +3696,7 @@ class StationWithParity {
 }
 
 /**
- * Classe StationsWithParity contenant la liste des gares avec parité
+ * Classe StationsWithParity contenant la liste des gares avec parité.
  * Pour chaque gare, 3 parités : UNDEFINED, ODD et EVEN.
  */
 class StationsWithParity {
@@ -3120,8 +3716,8 @@ class StationsWithParity {
 
     /**
      * Vérifie si une gare avec parité est présente dans la base de données.
-     * @param {string} key - Clé de la gare avec parité
-     * @returns {boolean} - Vrai si la gare est présente, False sinon
+     * @param {string} key - Clé de la gare avec parité.
+     * @returns {boolean} - Vrai si la gare est présente, faux sinon.
      */
     public static hasKey(key: string): boolean {
         return key in this.keyMap;
@@ -3167,7 +3763,7 @@ class StationsWithParity {
      * Crée une gare avec parité et l'ajoute à la base de données,
      *  référencée par son ID ou sa clé.
      * Si la gare avec parité est déjà présente, une erreur est levée.
-     * @param {Station} station - Gare
+     * @param {Station} station - Gare.
      * @param {Parity | string | number} parity - Parité à trouver.
      * @throws {Error} - Si la gare avec parité est déjà présente dans la base de données.
      */
@@ -3188,7 +3784,8 @@ class StationsWithParity {
     
     /**
      * Retourne un itérateur sur les valeurs de la base de données des gares avec parité.
-     * @returns {IterableIterator<StationWithParity>} - Itérateur sur les valeurs de la base de données des gares avec parité.
+     * @returns {IterableIterator<StationWithParity>} - Itérateur sur les valeurs
+     *  de la base de données des gares avec parité.
      */
     public static values(): IterableIterator<StationWithParity> {
         return this.list.values();
@@ -3210,34 +3807,33 @@ class StationsWithParity {
     */
     public static load(erase: boolean = false): void {
 
-        // Vérifie si la table à charger existe déjà
+        // Vérifie si la table à charger existe déjà.
         if (this.size > 0) {
             if (!erase) return;
             this.clear();
         }
 
-        // Charge les gares si elles n'ont pas encore été chargées
+        // Charge les gares si elles n'ont pas encore été chargées.
         Stations.load(); 
 
-        // Liste les parités à prendre en compte
+        // Liste les parités à prendre en compte.
         const parities = [
             Parity.undefined(),
             Parity.odd(),
             Parity.even()
         ];
 
-        // Génère les gares avec parité à partir de la base de données des gares
+        // Génère les gares avec parité à partir de la base de données des gares.
         for (const station of Stations.list) {
             for (const parity of parities) {
                 this.create(station, parity);
             }
         }
-        
     }
 }
 
 /**
- * Classe Connection définissant une connexion orientée entre deux gares
+ * Classe Connection définissant une connexion orientée entre deux gares.
  */
 class Connection {
 
@@ -3260,9 +3856,10 @@ class Connection {
      * Constructeur d'une connexion.
      * @param {StationWithParity} from - Gare de départ
      * @param {StationWithParity} to - Gare d'arrivée
-     * @param {DateTime | number | string} [time] - Temps de trajet (si 0 ou non renseigné : durée par défaut)
-     * @param {boolean} [withMovement=false] - Indique si la connexion est sous régime de l'évolution
-     * @param {boolean} [changeParity=false] - Indique si la connexion implique un changement de parité
+     * @param {DateTime | number | string} [time] - Temps de trajet
+     *  (si 0 ou non renseigné : durée par défaut).
+     * @param {boolean} [withMovement=false] - Indique si la connexion est sous régime de l'évolution.
+     * @param {boolean} [changeParity=false] - Indique si la connexion implique un changement de parité.
      */
     constructor(
         from: StationWithParity,
@@ -3273,7 +3870,8 @@ class Connection {
     ) {
         if (from.equalsTo(to)) {
             throw new Error(
-                `Une connexion ne peut pas relier ${from} à elle-même sans changement de gare ou de parité.`
+                `Une connexion ne peut pas relier ${from} à elle-même`
+                + ` sans changement de gare ou de parité.`
             );
         }
         this.from = from;
@@ -3330,8 +3928,8 @@ class Connection {
     }
 
     /**
-     * Retourne une représentation textuelle simple et stable de l'objet.
-     * Utilisée implicitement dans les conversions string (ex: `${obj}`).
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
         return `${this.from} -> ${this.to}`;
@@ -3339,7 +3937,7 @@ class Connection {
 }
 
 /**
- * Classe Connections contenant la liste des connexions
+ * Classe Connections contenant la liste des connexions.
  */
 class Connections {
 
@@ -3367,8 +3965,8 @@ class Connections {
     private static list: Connection[][] = [];
 
     /**
-     * Retourne le nombre de connexions enregistrées dans la base de données
-     * @returns {number} - Nombre de connexions enregistrées
+     * Retourne le nombre de connexions enregistrées dans la base de données.
+     * @returns {number} - Nombre de connexions enregistrées.
      */
     public static get size(): number {
         let count = 0;
@@ -3381,8 +3979,8 @@ class Connections {
     /**
      * Résoud le tableau des gares avec parité définie rattachées à une gare ou à une gare avec parité.
      * Seules les gares avec parité définie sont retournées.
-     * @param {Station | StationWithParity} input - Gare ou gare avec parité
-     * @returns {number[]} - Tableau des identifiants des gares
+     * @param {Station | StationWithParity} input - Gare ou gare avec parité.
+     * @returns {number[]} - Tableau des identifiants des gares.
      */
     private static resolveIds(
         input: Station | StationWithParity
@@ -3399,8 +3997,8 @@ class Connections {
 
     /**
      * Vérifie si une connexion est présente dans la base de données.
-     * @param {Station | StationWithParity} from - Gare de départ
-     * @param {Station | StationWithParity} to - Gare d'arrivée
+     * @param {Station | StationWithParity} from - Gare de départ.
+     * @param {Station | StationWithParity} to - Gare d'arrivée.
      * @returns {boolean} - Vrai si le parcours est présent, faux sinon.
      */
     public static has(
@@ -3427,8 +4025,8 @@ class Connections {
 
     /**
      * Renvoie la connexion correspondant aux gares de départ et d'arrivée données.
-     * @param {Station | StationWithParity} from - Gare de départ
-     * @param {Station | StationWithParity} to - Gare d'arrivée
+     * @param {Station | StationWithParity} from - Gare de départ.
+     * @param {Station | StationWithParity} to - Gare d'arrivée.
      * @returns {Connection | undefined} - Gare correspondante, ou undefined si non trouvée.
      */
     public static get(
@@ -3454,7 +4052,9 @@ class Connections {
     }
 
     /**
-     * Récupère les voisins d’une station
+     * Récupère les voisins d’une station.
+     * @param {number} id - Identifiant de la station.
+     * @returns {Connection[]} - Voisins de la station.
      */
     public static getNeighbors(id: number): Connection[] {
         return this.list[id] ?? [];
@@ -3464,10 +4064,10 @@ class Connections {
      * Crée une nouvelle connexion et l'ajoute à la base de données,
      *  référencée par ses gares de départ et d'arrivée.
      * Si la connexion est déjà présente dans la base de données, une erreur est levée.
-     * @param {string} from - Gare de départ
-     * @param {string} to - Gare d'arrivée
-     * @param {Connection} connection - La connexion à ajouter
-     * @returns {Connection} - La connexion ajoutée
+     * @param {string} from - Gare de départ.
+     * @param {string} to - Gare d'arrivée.
+     * @param {Connection} time - Durée de la connexion.
+     * @returns {Connection} - La connexion ajoutée.
      * @throws {Error} - Si la connexion est déjà présente dans la base de données.
      */
     private static create(
@@ -3508,7 +4108,8 @@ class Connections {
 
     /**
      * Retourne un itérateur sur les valeurs de la base de données des connexions.
-     * @returns {IterableIterator<StationWithParity>} - Itérateur sur les valeurs de la base de données des connexions.
+     * @returns {IterableIterator<Connection>} - Itérateur sur les valeurs
+     *  de la base de données des connexions.
      */
     public static *values(): IterableIterator<Connection> {
         for (const arr of this.list) {
@@ -3534,16 +4135,16 @@ class Connections {
      */
     public static load(erase: boolean = false): void {
 
-        // Vérifie si la table à charger existe déjà
+        // Vérifie si la table à charger existe déjà.
         if (this.size > 0) {
             if (!erase) return;
             this.clear();
         }
 
-        // Charge les gares si elles n'ont pas encore été chargées
+        // Charge les gares si elles n'ont pas encore été chargées.
         StationsWithParity.load(); 
 
-        // Charge la base de données
+        // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
         if (!data || data.length <= 1) {
             Log.warn(`Connections.load : aucune donnée trouvée dans la table.`);
@@ -3553,16 +4154,16 @@ class Connections {
         let excelRow: number = 0;
         try {
             
-            // Parcourt les lignes (hors en-tête)
+            // Parcourt les lignes (hors en-tête).
             for (const [rowIndex, row] of data.slice(1).entries()) {
 
-                // Vérifie si la ligne est vide
+                // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
 
-                // Calcule le numéro de ligne Excel
+                // Calcule le numéro de ligne Excel.
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
 
-                // Récupère les champs
+                // Récupère les champs.
                 const from = WorkbookService.getString(row, this.COL_FROM)?.toUpperCase();
                 const to = WorkbookService.getString(row, this.COL_TO)?.toUpperCase();
                 if (!from || !to) continue;
@@ -3570,12 +4171,12 @@ class Connections {
                 const withMovement = !!WorkbookService.getBoolean(row, this.COL_MOVEMENT);
                 const changeParity = !!WorkbookService.getBoolean(row, this.COL_CHANGE_PARITY);
 
-                // Instancie les propriétés objets (si 0 ou non renseignée : valeur par défaut)
+                // Instancie les propriétés objets (si 0 ou non renseignée : valeur par défaut).
                 const excelTime = timeInMinutes
                     ? timeInMinutes / 24 / 60
                     : Connection.DEFAULT_CONNECTION_TIME;
                 
-                // Crée l'objet Connection et l'insère dans la base de données
+                // Crée l'objet Connection et l'insère dans la base de données.
                 const connection = this.create(
                     from,
                     to,
@@ -3602,7 +4203,7 @@ class Connections {
         startCell: string = "A1"
     ): void {
 
-        // Convertit la base de données en un tableau de données
+        // Convertit la base de données en un tableau de données.
         const data: (string | number)[][] = Array
             .from(this.values())
             .map(connection => [
@@ -3614,7 +4215,7 @@ class Connections {
                 connection.changeParity ? 1 : 0
             ]);
 
-        // Imprime le tableau
+        // Imprime le tableau.
         const table = WorkbookService.printTable(
             this.HEADERS,
             data,
@@ -3623,7 +4224,7 @@ class Connections {
             startCell
         );
 
-        // Met les durées de parcours au format "hh:mm:ss"
+        // Met les durées de parcours au format "hh:mm:ss".
         table.getRange()
             .getColumn(this.COL_TIME)
             .setNumberFormat("hh:mm:ss");
@@ -3647,7 +4248,7 @@ class Connections {
         const queue: State[] = [];
         const visited = new Map<number, number>();
     
-        // Expansion de la route avec toutes les parités possibles
+        // Expand la route avec toutes les parités possibles.
         const expandedRouteStations: number[][][] =
         routeStations.map(group =>
             group.map(station =>
@@ -3655,7 +4256,7 @@ class Connections {
             )
         );
 
-        // Initialisation de la file avec la gare de départ
+        // Initialise la file avec la gare de départ.
         const firstGroup = expandedRouteStations[0];
         for (const variantGroup of firstGroup) {
             for (const stationId of variantGroup) {
@@ -3677,8 +4278,8 @@ class Connections {
 
     /**
      * Exécute l'algorithme de Dijkstra pour trouver le chemin le plus court
-     * entre le départ et l'arrivée d'un trajet, en prenant en compte les gares
-     * intermédiaires qui peuvent être empruntées avec des parités différentes.
+     *  entre le départ et l'arrivée d'un trajet, en prenant en compte les gares
+     *  intermédiaires qui peuvent être empruntées avec des parités différentes.
      * @param {State[]} queue - File d'attente contenant les états à visiter.
      * @param {Map<number, number>} visited - Carte des états déjà visités.
      * @param {number[][][]} routeStations - Trajet avec les gares intermédiaires
@@ -3722,8 +4323,7 @@ class Connections {
 
     /**
      * Donne les états suivants d'un état donné,
-     * en prenant en compte les gares intermédiaires
-     * et les parités possibles.
+     *  en prenant en compte les gares intermédiaires et les parités possibles.
      * @param {State} state - État actuel.
      * @param {number[][][]} routeStations - Trajet avec les gares intermédiaires
      *  et les parités possibles.
@@ -3736,16 +4336,15 @@ class Connections {
     
         const result: State[] = [];
     
-        // Donne les gares voisines
+        // Donne les gares voisines.
         const neighbors = this.getNeighbors(state.stationId);
     
         for (const connection of neighbors) {
 
-            // Donne l'id de la gare voisine
+            // Donne l'id de la gare voisine.
             const nextStationId = connection.to.id;
     
-            // Ajoute le coût de la connection :
-            //  temps de parcours, ou temps de retournement
+            // Ajoute le coût de la connection : temps de parcours, ou temps de retournement.
             const nextCost = state.cost
                 + (connection.withTurnaround
                     ? Params.turnaroundTime.excelValue
@@ -3758,7 +4357,7 @@ class Connections {
     
             const currentGroup = routeStations[nextGroup];
     
-            // Cherche le groupe de la gare voisine
+            // Cherche le groupe de la gare voisine.
             let matched = false;
             for (let i = 0; i < currentGroup.length; i++) {
                 const variantGroup = currentGroup[i];
@@ -3775,7 +4374,7 @@ class Connections {
                 }
             }
     
-            // Ajoute le nouvel état
+            // Ajoute le nouvel état.
             result.push(new State(
                 nextStationId,
                 nextCost,
@@ -3831,12 +4430,12 @@ class State {
 
     /**
      * Constructeur de l'état de recherche de l'algorithme Dijkstra.
-     * @param {number} stationId - Identifiant de la gare
-     * @param {number} cost - Coût du chemin
-     * @param {number} groupIndex - Index du groupe de gares
-     * @param {number} visitedMask - Masque des gares visitées
-     * @param {State} prev - Etat précédent
-     * @param {Connection} via - Connection ajoutée
+     * @param {number} stationId - Identifiant de la gare.
+     * @param {number} cost - Coût du chemin.
+     * @param {number} groupIndex - Index du groupe de gares.
+     * @param {number} visitedMask - Masque des gares visitées.
+     * @param {State} prev - Etat précédent.
+     * @param {Connection} via - Connection ajoutée.
      */
     public constructor(
         stationId: number,
@@ -3856,7 +4455,7 @@ class State {
 
     /**
      * Renvoie une clé unique pour l'état de recherche, composée de l'identifiant de la gare,
-     * de l'index du groupe de gares et du masque des gares visitées.
+     *  de l'index du groupe de gares et du masque des gares visitées.
      * @returns {number} - Clé unique de l'état.
      */
     public get key(): number {
@@ -3888,7 +4487,7 @@ class State {
 }
 
 /*
- * Classe Stop définissant l'arrêt ou le passage d'un train dans une gare
+ * Classe Stop définissant l'arrêt ou le passage d'un train dans une gare.
  */
 class Stop {
 
@@ -3919,24 +4518,24 @@ class Stop {
         areRelativeTimes?: boolean,
         tracks: string[] | string = [],
     ) {
-        // Détermination de la gare d'arrêt
+        // Détermine la gare d'arrêt
         const stationObj = StationWithParity.from(station)
         if (!stationObj) throw new Error(`La gare ${station} est inconnue.`);
         this.station = stationObj;
 
-        // Détermination du rebroussement
+        // Détermine le rebroussement
         this._withTurnaround = this.canTurnaroundTo(stationAfterTurnaround);
 
-        // Détermination des horaires de l'arrêt
+        // Détermine les horaires de l'arrêt
         this.setTimes(arrivalTime, departureTime, passageTime, areRelativeTimes);
 
-        // Détermination des voies de l'arrêt
+        // Détermine les voies de l'arrêt
         this._tracks = tracks instanceof Array ? tracks : Stop.getTracksFromString(tracks);
     }
 
     /**
      * Renvoie une clé unique pour l'arrêt, composée du nom de la gare et de la parité (si connue).
-     * @returns {string} - Clé unique
+     * @returns {string} - Clé unique.
      */
     public get key(): string {
         return this.station.key;
@@ -4020,17 +4619,23 @@ class Stop {
      * Modifie la gare de rebroussement si possible.
      * Un rebroussement est possible si la gare après rebroussement donnée correspond à la gare calculée.
      * Si l'arrêt présente une heure de passage, elle est transformée en heure d'arrivée,
-     * le départ se fait arès le temps de retournement.
+     *  le départ se fait arès le temps de retournement.
      * @param {StationWithParity | string | undefined} value - Gare après rebroussement.
      */
     public set stationAfterTurnaround(value: StationWithParity | string | undefined) {
         this._withTurnaround = this.canTurnaroundTo(value);
-        if (!!this._passageTime) this.setTimes(this.passageTime, Params.turnaroundTime.resolveAgainst(this.passageTime!), undefined);
+        if (!!this._passageTime) {
+            this.setTimes(
+                this.arrivalTime,
+                Params.turnaroundTime.resolveAgainst(this.arrivalTime!),
+                undefined
+            );
+        }
     }
 
     /**
-     * Retourne une représentation textuelle simple et stable de l'objet.
-     * Utilisée implicitement dans les conversions string (ex: `${obj}`).
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
         return this.key;
@@ -4039,17 +4644,16 @@ class Stop {
     /**
      * Vérifie si un rebroussement est possible avec stationAfterTurnaround comme gare après rebroussement.
      * Un rebroussement est possible si la gare après rebroussement correspond à la gare calculée.
-     *  
      * @param {StationWithParity | string} - stationAfterTurnaround Gare après rebroussement.
      * @returns {boolean} - Vrai si le rebroussement est possible, faux sinon.
      */
     private canTurnaroundTo(stationAfterTurnaround : StationWithParity | string | undefined): boolean {
 
-        // Vérifie si la gare après rebroussement demandée est connue
+        // Vérifie si la gare après rebroussement demandée est connue.
         const stationAfterTurnaroundObj = StationWithParity.from(stationAfterTurnaround);
         if (!stationAfterTurnaroundObj) return false;
 
-        // Calcule la gare théorique après rebroussement si celui-ci est possible
+        // Calcule la gare théorique après rebroussement si celui-ci est possible.
         const calculated = this.station.stationAfterTurnaround();
         if (!calculated) {
             Log.warn(`Un rebroussement n'est pas autorisé à la gare de ${this.station}.`
@@ -4057,10 +4661,11 @@ class Stop {
             return false;
         }
 
-        // Comparaison des gares théoriques et demandées
+        // Compare les gares théoriques et demandées.
         if (!stationAfterTurnaroundObj.equalsTo(calculated)) {
             Log.warn(`Le rebroussement à la gare de ${this.station} ne sera pas pris en compte,`
-                + ` car la gare après rebroussement demandée ${stationAfterTurnaroundObj} ne correspond pas.`);
+                + ` car la gare après rebroussement demandée ${stationAfterTurnaroundObj}`
+                + ` ne correspond pas.`);
             return false
         }
 
@@ -4069,10 +4674,10 @@ class Stop {
 
     /**
      * Modifie les heures d'arrivée, de départ et de passage de l'arrêt, et vérifie leur cohérence.
-     * @param {DateTime | number | string} [arrivalTime] - Heure d'arrivée à l'arrêt
-     * @param {DateTime | number | string} [departureTime] - Heure de départ à l'arrêt
-     * @param {DateTime | number | string} [passageTime] - Heure de passage à l'arrêt
-     * @param {boolean} [areRelativeTimes=undefined] - Vrai si les heures sont relatives, faux sinon
+     * @param {DateTime | number | string} [arrivalTime] - Heure d'arrivée à l'arrêt.
+     * @param {DateTime | number | string} [departureTime] - Heure de départ à l'arrêt.
+     * @param {DateTime | number | string} [passageTime] - Heure de passage à l'arrêt.
+     * @param {boolean} [areRelativeTimes=undefined] - Vrai si les heures sont relatives, faux sinon.
      */
     public setTimes(
         arrivalTime?: DateTime | number | string,
@@ -4152,7 +4757,7 @@ class Stop {
 
     /**
      * Indique si l'arrêt est un arrêt intermédiaire,
-     * avec une heure d'arrivée et une heure de départ, ou une heure de passage.
+     *  avec une heure d'arrivée et une heure de départ, ou une heure de passage.
      * @returns {boolean} - Vrai si l'arrêt est un arrêt intermédiaire, faux sinon.
      */
     public isIntermediateStop(): boolean {
@@ -4169,8 +4774,8 @@ class Stop {
      */
     public convertToRelativeTime(reference: DateTime, throwErrorIfAlreadyRelative: boolean = false): void {
         
-        // Temps de référence déjà relatif : pas de conversion possible
-        // Vérifie simplement que les temps soient déjà relatifs
+        // Temps de référence déjà relatif : pas de conversion possible.
+        // Vérifie simplement que les temps soient déjà relatifs.
         if (reference.isRelative){
             const arrivalTimeIsAbsolute = this._arrivalTime && !this._arrivalTime.isRelative;
             const departureTimeIsAbsolute = this._departureTime && !this._departureTime.isRelative;
@@ -4187,8 +4792,8 @@ class Stop {
             return;
         }
 
-        // Temps de référence absolu : conversion possible
-        // Vérifie si les temps sont bien absolus avant de les convertir
+        // Temps de référence absolu : conversion possible.
+        // Vérifie si les temps sont bien absolus avant de les convertir.
         if (this._arrivalTime) {
             if (this._arrivalTime.isRelative) {
                 Log.warn(`L'heure d'arrivée à l'arrêt ${this}`
@@ -4251,7 +4856,7 @@ class Stop {
 }
 
 /**
- * Classe Stops contenant la liste des arrêts
+ * Classe Stops contenant la liste des arrêts.
  */
 class Stops {
         
@@ -4292,7 +4897,7 @@ class Stops {
         "Passage",
         "Voie"
     ]];                                            
-    private static readonly COL_IMPORT_TRAIN_NUMBER = 0;        // Colonne du numéro de train
+    private static readonly COL_IMPORT_NUMBER = 0;        // Colonne du numéro de train
     private static readonly COL_IMPORT_DATE = 1;                // Colonne de la date
     private static readonly COL_IMPORT_SERVICE = 2;             // Colonne du service
     private static readonly COL_IMPORT_DAYS = 3;                // Colonne des jours de circulation
@@ -4309,7 +4914,7 @@ class Stops {
      */
     public static load(): void {
 
-        // Charge la base de données
+        // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
         if (!data || data.length <= 1) {
             Log.warn(`Stops.load : aucune donnée trouvée dans la table.`);
@@ -4319,18 +4924,24 @@ class Stops {
         let excelRow: number = 0;
         try {
 
-            // Parcourt les lignes (hors en-tête)
+            // Parcourt les lignes (hors en-tête).
             for (const [rowIndex, row] of data.slice(1).entries()) {
 
-                // Vérifie si la ligne est vide
+                // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
 
-                // Calcule le numéro de ligne Excel
+                // Calcule le numéro de ligne Excel.
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
 
-                // Récupère les champs
+                // Récupère le parcours correspondant.
                 const pathKey = WorkbookService.getString(row, this.COL_PATH_KEY);
                 if (!pathKey) throw new Error(`pathKey manquant.`);
+                const path = Paths.get(pathKey);
+                if (!path) {
+                    throw new Error(`Parcours "${pathKey}" inexistant.`);
+                }
+
+                // Récupère les champs.
                 const station = WorkbookService.getString(row, this.COL_STATION) || "";
                 const stationAfterTurnaround =
                     WorkbookService.getString(row, this.COL_STATION_AFTER_TURNAROUND);
@@ -4342,7 +4953,7 @@ class Stops {
                     WorkbookService.getNumber(row, this.COL_PASSAGE_TIME);
                 const tracks = WorkbookService.getString(row, this.COL_TRACK);
 
-                // Instancie l'objet Stop
+                // Instancie l'objet Stop.
                 const stop = new Stop(
                     station,
                     stationAfterTurnaround,
@@ -4353,11 +4964,7 @@ class Stops {
                     tracks
                 );
 
-                // Ajoute l'arrêt au parcours
-                const path = Paths.get(pathKey);
-                if (!path) {
-                    throw new Error(`Parcours "${pathKey}" inexistant.`);
-                }
+                // Ajoute l'arrêt au parcours.
                 path.stops.push(stop);
             }
 
@@ -4378,7 +4985,7 @@ class Stops {
         startCell: string = "A1"
     ): void {
 
-        // Crée le tableau final avec les données de chaque arrêt pour chaque train
+        // Crée le tableau final avec les données de chaque arrêt pour chaque train.
         const data: (string | number)[][] = [];
     
         for (const path of Paths.values()) {
@@ -4396,7 +5003,7 @@ class Stops {
             }
         }
 
-        // Imprime le tableau
+        // Imprime le tableau.
         const table = WorkbookService.printTable(
             this.HEADERS,
             data,
@@ -4405,7 +5012,7 @@ class Stops {
             startCell
         );
     
-        // Met les horaires au format "hh:mm:ss"
+        // Met les horaires au format "hh:mm:ss".
         const timeColumns = [
             this.COL_ARRIVAL_TIME,
             this.COL_DEPARTURE_TIME,
@@ -4426,7 +5033,7 @@ class Stops {
      */
     public static import(): void {
 
-        // Charge la base de données
+        // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.IMPORT_SHEET, this.IMPORT_TABLE);
         if (!data || data.length <= 1) {
             Log.warn(`Stops.load : aucune donnée trouvée dans la table.`);
@@ -4436,17 +5043,17 @@ class Stops {
         let excelRow: number = 0;
         try {
 
-            // Parcourt les lignes (hors en-tête)
+            // Parcourt les lignes (hors en-tête).
             for (const [rowIndex, row] of data.slice(1).entries()) {
 
-                // Vérifie si la ligne est vide
+                // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
 
-                // Calcule le numéro de ligne Excel
+                // Calcule le numéro de ligne Excel.
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
 
-                // Récupère les champs
-                const trainNumber = WorkbookService.getString(row, this.COL_IMPORT_TRAIN_NUMBER) || "";
+                // Récupère les champs.
+                const trainNumber = WorkbookService.getString(row, this.COL_IMPORT_NUMBER) || "";
                 const date = WorkbookService.getNumber(row, this.COL_IMPORT_DATE) || 0;
                 const service = WorkbookService.getString(row, this.COL_IMPORT_SERVICE) || "";
                 const days = WorkbookService.getString(row, this.COL_IMPORT_DAYS) || "";
@@ -4461,7 +5068,7 @@ class Stops {
                     WorkbookService.getNumber(row, this.COL_IMPORT_PASSAGE_TIME);
                 const tracks = WorkbookService.getString(row, this.COL_IMPORT_TRACK);
 
-                // Instancie l'objet Stop
+                // Instancie l'objet Stop.
                 const stop = new Stop(
                     station,
                     stationAfterTurnaround,
@@ -4481,7 +5088,7 @@ class Stops {
 
 /**
  * Classe Path définissant le parcours d'un train, avec ses gares et temps de passage
- *  par rapport à la gare origine
+ *  par rapport à la gare origine.
  */
 class Path {
 
@@ -4507,7 +5114,7 @@ class Path {
                                                     // du parcours définis dans la signature                                            
     public stops: Stop[] = [];                      // Gares d'arrêt ou gares de passage du parcours
     private _stopsIndex: Map<string, Stop> = new Map();   // Dictionnaire des arrêts référencés
-                                                    //  par leur clé (abbréviation_parité)
+                                                    //  par leur clé (abréviation_parité)
     private _stopPosition: Map<string, number> = new Map();    // Dictionnaire de la position des arrêts
                                                     //  dans le parcours (référencés par leur clé)
     public stopsChecked: number = Path.UNCHECKED;   // Résultat de la vérification du parcours
@@ -4515,13 +5122,14 @@ class Path {
 
     /**
      * Constructeur d'un parcours.
-     * @param {string} [key=""] - Clé du parcours
-     * @param {Parity|string/number} [parityValue=Parity.UNDEFINED] - Parité du parcours
-     * @param {Parity|string/number} [lineDirection=Parity.UNDEFINED] - Direction du parcours sur la ligne
-     * @param {string} [missionCode=""] - Code de mission des trains du parcours
-     * @param {string} [name=""] - Nom du parcours
-     * @param {string} [signature=""] - Signature du parcours : gares définissant le parcours
-     * @param {number} [stopsChecked=Path.UNCHECKED] - Résultat de la vérification du parcours
+     * @param {string} [key=""] - Clé du parcours.
+     * @param {Parity|string/number} [parityValue=Parity.UNDEFINED] - Parité du parcours.
+     * @param {Parity|string/number} [lineDirection=Parity.UNDEFINED] - Direction du parcours sur la ligne.
+     * @param {string} [missionCode=""] - Code de mission des trains du parcours.
+     * @param {string} [name=""] - Nom du parcours.
+     * @param {string} [signature=""] - Signature du parcours : gares définissant le parcours.
+     * @param {Stop[]} [stops=[]] - Gares d'arrêts ou gares de passage du parcours.
+     * @param {number} [stopsChecked=Path.UNCHECKED] - Résultat de la vérification du parcours.
      */
     constructor(
         key: string = "",
@@ -4530,6 +5138,7 @@ class Path {
         missionCode: string = "",
         name: string = "",
         signature: string = "",
+        stops: Stop[] = [],
         stopsChecked: number = Path.UNCHECKED
     ) {
         this.key = key;
@@ -4538,6 +5147,7 @@ class Path {
         this.missionCode = missionCode;
         this.name = name;
         this._signature = signature;
+        this.stops = stops;
         this.stopsChecked = stopsChecked;
     }
 
@@ -4551,7 +5161,8 @@ class Path {
 
     /**
      * Renvoie l'arrêt de destination du parcours.
-     * @returns {Stop | undefined} - L'arrêt de destination, ou undefined si le parcours n'a pas d'arrêt de destination.
+     * @returns {Stop | undefined} - L'arrêt de destination,
+     *  ou undefined si le parcours n'a pas d'arrêt de destination.
      */
     public get destination(): Stop | undefined {
         return this.stops.at(-1);
@@ -4561,7 +5172,7 @@ class Path {
      * Renvoie la signature du parcours, qui est la concaténation
      *  des noms des gares d'arrêt du parcours, précédés de "@"
      *  si l'ordre de passage n'est pas imposé.
-     * @returns {string} - Signature du parcours
+     * @returns {string} - Signature du parcours.
      */
     public get signature(): string {
         return this._signature;
@@ -4572,8 +5183,8 @@ class Path {
      * Le tableau est construit à partir de la signature du parcours.
      * Chaque élément du tableau est ordonné et correspond à une gare d'arrêt du parcours,
      *  ou à un groupe de gares à parcourir dans un ordre indifférent, séparées par un ";".
-     *  Chaque gare ou ensemble de gares est parcouru dans l'ordre du tableau, et séparé par un ">".
-     * @returns {string[][]} - Tableau des gares d'arrêt du parcours
+     * Chaque gare ou ensemble de gares est parcouru dans l'ordre du tableau, et séparé par un ">".
+     * @returns {string[][]} - Tableau des gares d'arrêt du parcours.
      */
     public get routeStations(): StationWithParity[][] {
 
@@ -4589,15 +5200,14 @@ class Path {
                         .map(station => StationWithParity.from(station))
                         .filter((s): s is StationWithParity => s !== undefined)
                 );
-    
         }
     
         return this._routeStations ?? [];
     }
 
     /**
-     * Retourne une représentation textuelle simple et stable de l'objet.
-     * Utilisée implicitement dans les conversions string (ex: `${obj}`).
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
         return this.key;
@@ -4608,8 +5218,9 @@ class Path {
      * Si path est déjà un objet Path, il est retourné tel quel.
      * Si path est un string, il est considéré comme le clé du parcours et
      *  l'objet Path correspondant est retourné s'il existe, sinon undefined est retourné.
-     * @param {Path | string | null | undefined} value - Parcours à retourner, sous forme d'objet Path ou de clé string
-     * @returns {Path | undefined} - Parcours Path correspondant, ou undefined si le clé n'existe pas
+     * @param {Path | string | null | undefined} value - Parcours à retourner,
+     *  sous forme d'objet Path ou de clé string.
+     * @returns {Path | undefined} - Parcours Path correspondant, ou undefined si le clé n'existe pas.
      */
     public static from(
         value: Path | string | null | undefined
@@ -4622,26 +5233,27 @@ class Path {
     /**
      * Crée un parcours Path à partir des gares d'origine et de destination,
      *  ainsi que de leur heures de départ et d'arrivée.
-     * @param {StationWithParity | Station | string} from - Nom de la gare d'origine
-     * @param {DateTime | number | string} departureTime - Heure de départ à la gare d'origine
-     * @param {StationWithParity | Station | string} to - Nom de la gare de destination
-     * @param {DateTime | number | string} arrivalTime - Heure d'arrivée à la gare de destination
-     * @param {string} [missionCode=""] - Code de mission des trains du parcours (facultatif)
-     * @param {string} [name=""] - Nom du parcours (facultatif)
-     * @param {string} [signature=""] - Signature du parcours (facultatif)
-     * @param {boolean} [areRelativeTimes=undefined] - Si vrai, les heures de départ et d'arrivée
-     *  sont considérées comme relatives
-     * @returns {Path} - Un objet Path représentant le parcours
+     * @param {StationWithParity | Station | string} from - Nom de la gare d'origine.
+     * @param {DateTime | number | string} departureTime - Heure de départ à la gare d'origine.
+     * @param {StationWithParity | Station | string} to - Nom de la gare de destination.
+     * @param {DateTime | number | string} arrivalTime - Heure d'arrivée à la gare de destination.
+     * @param {boolean} [areRelativeTimes=false] - Si vrai, les heures de départ et d'arrivée
+     *  sont considérées comme relatives.
+     * @param {string} [missionCode=""] - Code de mission des trains du parcours (facultatif).
+     * @param {string} [name=""] - Nom du parcours (facultatif).
+     * @param {string} [signature=""] - Signature du parcours (facultatif).
+     * @returns {Path} - Un objet Path représentant le parcours.
      */
     public static fromTerminals(
         from: StationWithParity | Station | string,
         departureTime: DateTime | number | string,
         to: StationWithParity | Station | string,
         arrivalTime: DateTime | number | string,
+        areRelativeTimes: boolean = false,
+        findPath: boolean = false,
         missionCode?: string,
         name?: string,
-        signature?: string,
-        areRelativeTimes?: boolean
+        signature?: string
     ): Path {
 
         const fromObj = StationWithParity.from(from);
@@ -4655,24 +5267,37 @@ class Path {
 
         const s1 = new Stop(fromObj, undefined, undefined, departureTimeObj, undefined, areRelativeTimes);  
         const s2 = new Stop(toObj, undefined, arrivalTimeObj, undefined, undefined, areRelativeTimes);
+        const stops = [s1, s2];
+        
+        const path = Paths.create(
+            "",
+            undefined,
+            undefined,
+            missionCode,
+            name,
+            signature,
+            stops
+        );
+        path.convertStopsToRelative();
 
-        const path = new Path("", undefined, undefined, missionCode, name, signature);
-
-        path.stops = [s1, s2];
         if (!signature) path.buildSignatureFromStops();
         path.rebuildStopIndex();
         path.rebuildStopPosition();
 
-        path.stopsChecked = Path.ONLY_FROM_AND_TO;
-        path.check();
-    
+        if (findPath) {
+            path.findPath();
+        } else {
+            path.stopsChecked = Path.ONLY_FROM_AND_TO;
+            path.check();
+        }
+
         return path;
     }
 
     /**
      * Renvoie le radical de la clé du parcours constitué de
-     *  origine_destination_codeMission_nomDuParcours (si ces valeurs existent)
-     * @returns {string} - Radical de la clé du parcours
+     *  origine_destination_codeMission_nomDuParcours (si ces valeurs existent).
+     * @returns {string} - Radical de la clé du parcours.
      */
     public buildRadical(): string {
         const origin = this.origin?.stationAbbreviation ?? "";
@@ -4690,20 +5315,20 @@ class Path {
      * Ajoute un arrêt au parcours.
      * Si les trains du parcours sont déjà passés par l'arrêt et que erase est faux,
      *  lance une erreur.
-     * @param {Stop} stop - Arrêt à ajouter
-     * @param {boolean} [orderStops=true] - Si vrai, ordonne les arrêts du parcours
+     * @param {Stop} stop - Arrêt à ajouter.
+     * @param {boolean} [orderStops=true] - Si vrai, ordonne les arrêts du parcours.
      * @param {boolean} [erase=false] - Si vrai, remplace l'arrêt s'il existe déjà. Si faux
      *  (par défaut), le nouvel arrêt n'est pas pris en compte.
-     * @returns {Stop | null} - L'arrêt ajouté, ou null si une erreur a été levée
+     * @returns {Stop | null} - L'arrêt ajouté, ou null si une erreur a été levée.
      * @throws {Error} - Si les trains du parcours sont déjà passé par l'arrêt
-     *  et que erase est faux
+     *  et que erase est faux.
      */
     public addStop(stop: Stop, orderStops: boolean = true, erase: boolean = false): void {
 
         const hasDefinedParity = stop.station.parity.isDefined();
         const stationAfterTurnaround = stop.stationAfterTurnaround;
 
-        // Le parcours a été calculé => contient des arrêts avec parité
+        // Le parcours a été calculé => contient des arrêts avec parité.
         if (this.stopsChecked === Path.FULL_PATH) {
             if (!hasDefinedParity) {
                 Log.warn(`Le parcours calculé ${this} ne doit comporter`
@@ -4721,7 +5346,7 @@ class Path {
                 }
                 this.stops.splice(this.stops.indexOf(this._stopsIndex.get(stop.key)!), 1);
             }
-            // Mise à jour des parités (parité sur l'ensemble du parcours et parité de ligne)
+            // Met à jour les parités (parité sur l'ensemble du parcours et parité de ligne).
             this.parity = this.parity.combineWith(stop.station.parity);
             this.lineDirection = this.lineDirection.combineWith(
                 stop.station.station.reverseLineDirection
@@ -4729,16 +5354,16 @@ class Path {
                     : stop.station.parity
             );
 
-        // Le parcours n'a pas été calculé => ne contient pas d'arrêts avec parité
+        // Le parcours n'a pas été calculé : il ne contient pas d'arrêts avec parité.
         } else {
-            // Erreur si ajout d'un arrêt avec parité
+            // Lève une erreur si ajout d'un arrêt avec parité.
             if (hasDefinedParity) {
                 Log.warn(`Le parcours ${this} n'a pas été calculé.`
                     + ` Il ne peut donc pas contenir d'arrêts avec parité.`
                     + ` L'arrêt ${stop} ne sera donc pas pris en compte.`);
                 return; 
             }
-            // Suppression de l'arrêt si il existe déjà
+            // Supprime l'arrêt s'il existe déjà.
             if (this._stopsIndex.has(stop.key)) {
                 if (!erase) {
                     Log.warn(`L'arrêt "${stop}" est déjà associé aux trains`
@@ -4751,7 +5376,7 @@ class Path {
                 this._stopsIndex.delete(stop.key);
             }
             // Si l'arrêt n'est pas présent dans la signature, suppression de la signature
-            //  qui sera générée à nouveau pour tenir compte du nouvel arrêt
+            //  qui sera générée à nouveau pour tenir compte du nouvel arrêt.
             const foundInSignature = this.routeStations.some(group =>
                 group.some(station =>
                     stop.station.includes(station)
@@ -4760,14 +5385,14 @@ class Path {
             if (!foundInSignature) this._signature = "";
         }
 
-        // Ajout dans le tableau des arrêts
+        // Ajoute l'arrêt dans le tableau des arrêts.
         this.stops.push(stop);
         this._stopsIndex.set(stop.key, stop);
         if (!!stationAfterTurnaround && hasDefinedParity) {
             this._stopsIndex.set(stationAfterTurnaround.key, stop);
         }
 
-        // Tri des arrêts du parcours, reconstruction de l'index et de la signature
+        // Trie les arrêts du parcours, reconstruit l'index et la signature.
         if (orderStops) {
             this.orderStops();
             this.rebuildStopPosition();
@@ -4797,17 +5422,17 @@ class Path {
      * Si les deux arrêts sont trouvés, renvoie le premier arrêt chronologique.
      * Sinon, renvoie l'arrêt trouvé, ou undefined si aucun arrêt n'est trouvé.
      * @param {StationWithParity | Station | string} station - La gare à chercher
-     * @returns {Stop | undefined} - L'arrêt trouvé, ou undefined si aucun arrêt n'est trouvé
+     * @returns {Stop | undefined} - L'arrêt trouvé, ou undefined si aucun arrêt n'est trouvé.
      */
     public getStop(station: StationWithParity | Station | string): Stop | undefined {
 
         const stationObj = StationWithParity.from(station);
         if (!stationObj) throw new Error(`La gare ${station} est inconnue.`);
     
-        // Fonction interne : logique existante appliquée à UNE gare
+        // Fonction interne : logique existante appliquée à UNE gare.
         const findDirect = (swp: StationWithParity): Stop | undefined => {
 
-            // Le parcours a été calculé => contient des arrêts avec parité
+            // Le parcours a été calculé : il contient des arrêts avec parité.
             if (this.stopsChecked === Path.FULL_PATH) {
 
                 if (swp.parity.isDefined()) {
@@ -4821,7 +5446,9 @@ class Path {
                 const evenStop = this._stopsIndex.get(even.key);
 
                 if (oddStop && evenStop) {
-                    const firstStop = oddStop.getTime()!.compareTo(evenStop.getTime()!) < 0 ? oddStop : evenStop;
+                    const firstStop = oddStop.getTime()!.compareTo(evenStop.getTime()!) < 0
+                        ? oddStop
+                        : evenStop;
                     Log.warn(`Le parcours ${this} a un arrêt dans chaque sens dans la gare ${swp}.`
                         + ` C'est le premier arrêt ${firstStop} qui est renvoyé.`);
                     return firstStop;
@@ -4830,15 +5457,15 @@ class Path {
                 return oddStop ?? evenStop ?? undefined;
             }
 
-            // Le parcours n'a pas été calculé => ne contient pas d'arrêts avec parité
+            // Le parcours n'a pas été calculé : il ne contient pas d'arrêts avec parité.
             return this._stopsIndex.get(swp.station.abbreviation) ?? undefined;
         };
 
-        // Recherche directe
+        // Fait une recherche directe.
         const direct = findDirect(stationObj);
         if (direct) return direct;
 
-        // Recherche sur les parents (gare de référence + filles)
+        // Fait une recherche sur les parents (gare de référence + filles).
         const referenceStation = stationObj.station.referenceStation;
         const childStations: Station[] = stationObj.station.childStations;
         const parentStations = [referenceStation, ...childStations]
@@ -4851,15 +5478,15 @@ class Path {
             if (found) return found;
         }
 
-        // Si rien trouvé
+        // Retourne undefined si rien n'est trouvé.
         return undefined;
     }
 
     /**
-     * Retourne l'arrêt suivant de la gare spécifiée.
+     * Retourne l'arrêt suivant la gare spécifiée.
      * Si la gare spécifiée est la dernière de la liste, renvoie undefined.
-     * @param {Stop | StationWithParity | Station | string} stop - L'arrêt ou la gare à chercher
-     * @returns {Stop | undefined} - L'arrêt suivant, ou undefined si la gare est la dernière
+     * @param {Stop | StationWithParity | Station | string} stop - L'arrêt ou la gare à chercher.
+     * @returns {Stop | undefined} - L'arrêt suivant, ou undefined si la gare est la dernière.
      */
     public nextStop(
         stop: Stop | StationWithParity | Station | string
@@ -4877,10 +5504,10 @@ class Path {
     }
 
     /**
-     * Retourne l'arrêt précédent de la gare spécifiée.
+     * Retourne l'arrêt précédent la gare spécifiée.
      * Si la gare spécifiée est la première de la liste, renvoie undefined.
-     * @param {Stop | StationWithParity | Station | string} stop - L'arrêt ou la gare à chercher
-     * @returns {Stop | undefined} - L'arrêt précédent, ou undefined si la gare est la première
+     * @param {Stop | StationWithParity | Station | string} stop - L'arrêt ou la gare à chercher.
+     * @returns {Stop | undefined} - L'arrêt précédent, ou undefined si la gare est la première.
      */
     public previousStop(
         stop: Stop | StationWithParity | Station | string
@@ -4902,6 +5529,7 @@ class Path {
      * Supprime également les valeurs de firstStop et lastStop.
      */
     public eraseStops() {
+
         this.stops = [];
         this.stopsChecked = 0;
         this._stopsIndex.clear();
@@ -4915,26 +5543,30 @@ class Path {
      * @returns {boolean} - Vrai si les deux parcours ont les mêmes arrêts, faux sinon.
      */
     public equalsStops(other: Path): boolean {
+
         if (this.stops.length !== other.stops.length) return false;
 
         for (let i = 0; i < this.stops.length; i++) {
             if (!this.stops[i].equalsTo(other.getStop(this.stops[i].station))) return false;
         }
+
         return true;
     }
 
     /**
      * Convertit les heures d'arrivée, de départ et de passage des arrêts
      *  en temps relatifs par rapport à l'heure de départ du premier arrêt.
-     *  Si un arrêt a déjà un horaire relatif, une erreur est levée.
+     * Si un arrêt a déjà un horaire relatif, une erreur est levée.
      */
     public convertStopsToRelative(): void {
-        if (this.stops.length === 0) return;
 
+        if (this.stops.length === 0) return;
         const t0 = this.stops[0].departureTime;
+
         if (!t0) throw new Error(`Le premier arrêt du parcours ${this}`
             + ` n'a pas d'heure de départ. Les horaires ne peuvent donc pas`
             + ` être convertis en horaires relatifs.`);
+
         for (const stop of this.stops) {
             stop.convertToRelativeTime(t0);
         }
@@ -4946,7 +5578,9 @@ class Path {
      * L'index est mis à jour automatiquement lorsque la liste des arrêts change.
      */
     private rebuildStopIndex(): void {
+
         this._stopsIndex.clear();
+
         for (const stop of this.stops) {
             this._stopsIndex.set(stop.key, stop);
             if (!!stop.stationAfterTurnaround && stop.station.parity.isDefined()) {
@@ -4961,7 +5595,9 @@ class Path {
      * L'index est mis à jour automatiquement lorsque la liste des arrêts change.
      */
     private rebuildStopPosition(): void {
+
         this._stopPosition.clear();
+
         for (let i = 0; i < this.stops.length; i++) {
             const stop = this.stops[i];
             this._stopPosition.set(stop.key, i);
@@ -4974,10 +5610,11 @@ class Path {
     /**
      * Construit la signature du parcours en fonction de la liste des arrêts.
      * La signature est une chaîne de caractères qui identifie de manière unique
-     * le parcours. Elle est utilisée pour chercher les connexions entre les
-     * différents parcours.
+     *  le parcours. Elle est utilisée pour chercher les connexions entre les
+     *  différents parcours.
      */
     public buildSignatureFromStops(): void {
+
         this._signature = this.stops
             .map(s => s.key).join(">");
         this._routeStations = [];
@@ -4985,12 +5622,12 @@ class Path {
 
     /**
      * Construit la signature du parcours en fonction de la liste des groupes de gares.
-     * La signature est une chaîne de caractères qui identifie de manière unique
-     * le parcours. Elle est utilisée pour chercher les connexions entre les
-     * différents parcours.
+     * La signature est une chaîne de caractères qui identifie de manière unique le parcours.
+     * Elle est utilisée pour chercher les connexions entre les différents parcours.
      * @returns {string} - Signature du parcours.
      */
     public buildSignatureFromRouteStations(): string {
+        
         return this.routeStations
             .map(group =>
                 group
@@ -5001,12 +5638,12 @@ class Path {
     }
 
     /**
-     * Vérifie que le parcours est correct
-     * @throws {Error} - Si une erreur est détectée
+     * Vérifie que le parcours est correct.
+     * @throws {Error} - Si une erreur est détectée.
      */
     public check(): void {
   
-        // Pas de vérification si le parcours a une erreur
+        // Ne fait pas de vérification si le parcours a une erreur
         switch (this.stopsChecked) {
             case Path.ERROR_WITH_STOPS:
             case Path.UNCHECKED:
@@ -5018,14 +5655,14 @@ class Path {
             this.checkTerminals();
             this.checkSignature();
 
-            // Test valide si parcours avec gares origine et destination uniquement
+            // Valide le test si le parcours est avec gares origine et destination uniquement.
             if (this.stopsChecked === Path.ONLY_FROM_AND_TO) {
                 return;
             }
 
             this.checkTimes();
 
-            // Test valide si parcours avec gares intermédiaires non calculé
+            // Valide le test si le parcours est avec gares intermédiaires non calculé.
             if (this.stopsChecked === Path.WITH_VIA_STOPS) {
                 return;
             }
@@ -5041,58 +5678,58 @@ class Path {
 
     /**
      * Vérifie les gares et horaires de départ et d'arrivée.
-     * @throws {Error} - Si une erreur est détectée
+     * @throws {Error} - Si une erreur est détectée.
      */
     private checkTerminals(): void {
         
-        // Vérifie l'existence d'une gare de départ
+        // Vérifie l'existence d'une gare de départ.
         const firstStop = this.stops[0];
         if (!firstStop) {
             throw new Error(`Il n'y a pas de gare de départ.`);
         }
-        // Vérifie l'existence d'une gare d'arrivée
+        // Vérifie l'existence d'une gare d'arrivée.
         const lastStop = this.stops[this.stops.length - 1];
         if (!lastStop) {
             throw new Error(`Il n'y a pas de gare d'arrivée.`);
         }
-        // Vérifie l'existence d'une heure de départ
+        // Vérifie l'existence d'une heure de départ.
         const departureTime = this.stops[0].departureTime;
         if (!departureTime) {
             throw new Error(`Le premier arrêt n'a pas d'heure de départ.`);
         }
-        // Vérifie l'existence d'une heure d'arrivée
+        // Vérifie l'existence d'une heure d'arrivée.
         const arrivalTime = this.stops[this.stops.length - 1].arrivalTime;
         if (!arrivalTime) {
             throw new Error(`Le dernier arrêt n'a pas d'heure d'arrivée.`);
         }
-        // Vérifie l'absence d'heure d'arrivée dans le premier arrêt
+        // Vérifie l'absence d'heure d'arrivée dans le premier arrêt.
         if (firstStop.isIntermediateStop()) {
             throw new Error(`Le premier arrêt ne peut pas contenir d'heure d'arrivée`
                 + ` mais uniquement une heure de départ.`);
         }
-        // Vérifie l'absence d'heure de départ dans le dernier arrêt
+        // Vérifie l'absence d'heure de départ dans le dernier arrêt.
         if (lastStop.isIntermediateStop()) {
             throw new Error(`Le dernier arrêt ne peut pas contenir d'heure de départ`
                 + ` mais uniquement une heure d'arrivée.`);
         }
         // Vérifie la concordance entre les heures de départ et d'arrivée
-        //  (toutes deux absolues ou relatives)
+        //  (toutes deux absolues ou relatives).
         if (arrivalTime.isRelative !== departureTime.isRelative) {
             throw new Error(`Les deux heures de départ et d'arrivée`
                 + ` doivent être toutes deux absolues ou relatives.`);
         }
         // Vérifie que l'heure de départ est nulle si relative
-        //  (l'heure de départ est une référence pour la suite du parcours)
+        //  (l'heure de départ est une référence pour la suite du parcours).
         if (departureTime.isRelative && departureTime.excelValue !== 0) {
             throw new Error(`Une heure de départ relative doit avoir pour valeur 0.`);
         }
-        // Vérifie que l'heure d'arrivée est postérieure à l'heure de départ
+        // Vérifie que l'heure d'arrivée est postérieure à l'heure de départ.
         if (arrivalTime.compareTo(departureTime) <= 0) {
             throw new Error(`L'heure d'arrivée ${arrivalTime.format(DateTime.TIME_FORMAT_WITH_SECONDS)}`
                 + ` doit être supérieure`
                 + ` à l'heure de départ ${departureTime.format(DateTime.TIME_FORMAT_WITH_SECONDS)}.`);
         }
-        // Vérifie que le départ ne contient pas d'arrêt après retournement
+        // Vérifie que le départ ne contient pas d'arrêt après retournement.
         if (!!firstStop.stationAfterTurnaround) {
             throw new Error(`L'heure de départ ${departureTime.format(DateTime.TIME_FORMAT_WITH_SECONDS)}`
                 + ` ne doit pas contenir d'arrêt aprés retournement.`);
@@ -5101,12 +5738,12 @@ class Path {
 
     /**
      * Vérifie la signature, et la présence des gares de départ et d'arrivée.
-     * @throws {Error} - Si une erreur est détectée
+     * @throws {Error} - Si une erreur est détectée.
      */
     private checkSignature() {
         
         // Vérifie l'existance de la signature, ou la constitue si inexistante
-        //  dans le cas où le parcours n'a pas été calculé
+        //  dans le cas où le parcours n'a pas été calculé.
         let sigStations = this.routeStations;
         if (!sigStations || sigStations.length === 0) {
             switch (this.stopsChecked) {
@@ -5119,18 +5756,22 @@ class Path {
             }
         }
 
-        // Reglè de comparaison des arrêts de la signature avec ceux du parcours
-        //  - si le parcours est calculé, la gare de la signature doit inclure l'arrêt du parcours (avec parité définie)
-        //  - si le parcours n'est pas calculé, l'arrêt du parcours (sans parité) doit inclure la gare de la signature
+        // Reglè de comparaison des arrêts de la signature avec ceux du parcours :
+        //  - si le parcours est calculé, la gare de la signature doit inclure l'arrêt du parcours
+        //     (avec parité définie),
+        //  - si le parcours n'est pas calculé,
+        //     l'arrêt du parcours (sans parité) doit inclure la gare de la signature.
         const areSameStations = (sigStation: StationWithParity, stop: Stop): boolean => {
             return this.stopsChecked === Path.FULL_PATH
                 ? sigStation.includes(stop.station)
                 : stop.station.includes(sigStation);
         };
 
-        // Vérifie que la première gare de la signature est isolée (ne peut pas être dans un ordre quelconque avec d'autres gares)
-        //  et correspond à la gare de départ
+        // Vérifie que la première gare de la signature est isolée
+        //  (ne peut pas être dans un ordre quelconque avec d'autres gares)
+        //  et correspond à la gare de départ.
         const firstStop = this.stops[0];
+        
         if (sigStations.length === 0
             || sigStations[0].length !== 1
             || !areSameStations(sigStations[0][0], firstStop)
@@ -5139,8 +5780,9 @@ class Path {
             Log.info(`La gare de départ ${firstStop} a été ajoutée au début de la signature.`);
         }
 
-        // Vérifie que la dernière gare de la signature est isolée (ne peut pas быть dans un ordre quelconque avec d'autres gares)
-        //  et correspond à la gare d'arrivée
+        // Vérifie que la dernière gare de la signature est isolée
+        //  (ne peut pas être dans un ordre quelconque avec d'autres gares)
+        //  et correspond à la gare d'arrivée.
         const lastStop = this.stops[this.stops.length - 1];
         const lastIndex = sigStations.length - 1;
         if ((sigStations[lastIndex].length !== 1)
@@ -5154,13 +5796,14 @@ class Path {
         // Décompte du nombre d'arrêt trouvés dans la signature
         let foundStops: number = 0;
 
-        // Vérifie pour chaque arrêt
+        // Vérifie pour chaque arrêt :
         //  - que les gares origine et destination ne sont pas reprises
-        //     comme gares intermédiaires dans la signature
-        //  - que les gares intermédiaires de la signature coïncident aux gares intermédiaires du parcours
+        //     comme gares intermédiaires dans la signature,
+        //  - que les gares intermédiaires de la signature coïncident
+        //     aux gares intermédiaires du parcours.
         for (let i = 0; i < sigStations.length; i++) {
 
-            // On garde toujours la première et dernière gare de la signature
+            // Garde toujours la première et dernière gare de la signature;
             if (i === 0 || i === sigStations.length - 1) {
                 cleaned.push(sigStations[i]);
                 continue;
@@ -5169,14 +5812,14 @@ class Path {
             const group = sigStations[i];
             const filtered = group.filter(station => {
 
-                // Vérifie que la gare intermédiaire de la signature ne soit pas la gare de départ
+                // Vérifie que la gare intermédiaire de la signature ne soit pas la gare de départ;
                 const isFirstStop = areSameStations(station, firstStop);
                 if (isFirstStop) {
                     Log.info(`Suppression de la gare de départ ${station}`
                         + ` dans les gares intermédiaires de la signature.`);
                 }
 
-                // Vérifie que la gare intermédiaire de la signature ne soit pas la gare d'arrivée
+                // Vérifie que la gare intermédiaire de la signature ne soit pas la gare d'arrivée;
                 const isLastStop = areSameStations(station, lastStop);
                 if (isLastStop) {
                     Log.info(`Suppression de la gare d'arrivée ${station}`
@@ -5184,7 +5827,7 @@ class Path {
                 }
 
                 // Vérifie que la gare intermédiaire de la signature
-                //  soit bien reprise dans la liste des arrêts (parcours calculé uniquement)
+                //  soit bien reprise dans la liste des arrêts (parcours calculé uniquement);
                 const stop = this.getStop(station);
                 if (stop) foundStops++;
                 const isIntermediateStop = (this.stopsChecked !== Path.FULL_PATH) || stop;
@@ -5203,7 +5846,7 @@ class Path {
         }
 
         // Parcours non calculé avec gares intermédiaires : s'il manque de gares intermédiaires
-        //  dans la signature, génère à nouveau la signature
+        //  dans la signature, génère à nouveau la signature.
         if (this.stopsChecked === Path.WITH_VIA_STOPS && foundStops !== this.stops.length - 2) {
             this.buildSignatureFromStops();
             Log.info(`Il manque des gares intermédiaires dans la signature ${this._signature}.`
@@ -5216,16 +5859,17 @@ class Path {
 
         const normalizedSignature = this.buildSignatureFromRouteStations();
         if (this._signature !== normalizedSignature) {
-            Log.info(`La signature du parcours ${this.signature} est normalisée en ${normalizedSignature}.`);
+            Log.info(`La signature du parcours ${this.signature}`
+                + ` est normalisée en ${normalizedSignature}.`);
             this._signature = normalizedSignature;
         }
     }
     
     /**
      * Vérifie que tous les arrêts intermédiaires sont corrects, en vérifiant
-     * que les heures de passage sont concordantes et que les gares intermédiaires
-     * correspondent aux gares de la signature.
-     * @throws {Error} - Si une erreur est détectée
+     *  que les heures de passage sont concordantes et que les gares intermédiaires
+     *  correspondent aux gares de la signature.
+     * @throws {Error} - Si une erreur est détectée;
      */
     private checkTimes() {
 
@@ -5250,9 +5894,9 @@ class Path {
 
                     // Cherche l'arrêt dans la liste des arrêts de la signature. Parcourt la signature
                     //  en sautant les groupes d'arrêts (séparés par ';')
-                    //  et les arrêts de la signature qui ne correspondent pas à l'arrêt à chercher
+                    //  et les arrêts de la signature qui ne correspondent pas à l'arrêt à chercher.
                     // Si tous les arrêts de la signature sont parcourus, lève une erreur
-                    //  car l'arrêt à chercher n'a pas été trouvé
+                    //  car l'arrêt à chercher n'a pas été trouvé.
                     while (sigStations[j].length !== 1
                         || !this.stops[i].station.includes(sigStations[j][0])) {
                         j++;
@@ -5266,40 +5910,40 @@ class Path {
                     // Parcours calculé : tous les arrêts de la signature doivent être présents
                     //  dans la liste des arrêts du parcours. Chaque arrêt ou ensemble d'arrêts
                     //  non ordonnés (séparées par ';') sont ajoutés dans un cache stopFromSigToFind,
-                    //  dont tous les arrêts doivent être trouvés avant de passer au (groupe) suivant  
+                    //  dont tous les arrêts doivent être trouvés avant de passer au (groupe) suivant. 
                     
-                    // Constitution de la liste des arrêts de la signature à trouver
+                    // Constitue la liste des arrêts de la signature à trouver.
                     if (stopFromSigToFind.size === 0) {
                         sigStations[j].reduce((map, value) => {
                             map.set(value.key, value);
                             return map;
                         }, stopFromSigToFind);
                     }
-                    // Suppression de la liste de l'arrêt de la signature trouvé
+                    // Supprime de la liste l'arrêt de la signature trouvé.
                     if (stopFromSigToFind.has(this.stops[i].key)) {
                         stopFromSigToFind.delete(this.stops[i].key);
                         if (stopFromSigToFind.size === 0) j++;
                     }
                     break;
             }
-            // Vérifie si l'arrêt comporte des horaires (arrivée, départ ou passage)
+            // Vérifie si l'arrêt comporte des horaires (arrivée, départ ou passage).
             const stopTime = this.stops[i].getTime();
             if (!stopTime) {
                 throw new Error(`L'heure de passage à la gare de ${this.stops[i]}`
                     + ` n'est pas renseignée.`);
             }
-            // Vérifie la concordance des horaires (tous absolus ou relatives)
+            // Vérifie la concordance des horaires (tous absolus ou relatives).
             if (stopTime.isRelative !== areTimesRelative) {
                 throw new Error(`L'heure de passage à la gare de ${this.stops[i]}`
                     + ` doit être ${areTimesRelative ? "relative" : "absolue"}`
                     + ` comme la gare origine.`);
             }
-            // Vérifie que l'arrêt est une gare intermédiaire
+            // Vérifie que l'arrêt est une gare intermédiaire.
             if ((i < this.stops.length - 1) && !this.stops[i].isIntermediateStop()) {
                 throw new Error(`L'arrêt à la gare de ${this.stops[i]} doit comporter`
                     + ` une heure d'arrivée et une heure de départ, ou une heure de passage.`);
             }
-            // Vérifie que l'heure de passage est postérieure au passage précedent
+            // Vérifie que l'heure de passage est postérieure au passage précedent.
             if (this.stops[i].getTime()!.compareTo(this.stops[i - 1].getTime(true)!) <= 0) {
                 throw new Error(`L'heure d'arrivée ou de passage`
                     + ` ${this.stops[i].getTime()!.format(DateTime.TIME_FORMAT_WITH_SECONDS)}`
@@ -5313,14 +5957,14 @@ class Path {
     }
 
     /**
-     * Vérifie si une connexion existe entre chaque gare de la liste des arrêts
-     * @throws {Error} - Si une connexion est inexistante
+     * Vérifie si une connexion existe entre chaque gare de la liste des arrêts.
+     * @throws {Error} - Si une connexion est inexistante.
      */
     private checkConnections() {
 
         for (let i = 1; i < this.stops.length; i++) {
 
-            // Vérifie si une connexion existe entre la gare précédente et la gare actuelle
+            // Vérifie si une connexion existe entre la gare précédente et la gare actuelle.
             if (this.stopsChecked === Path.FULL_PATH) {
                 const lastStop = this.stops[i - 1].stationAfterTurnaround ?? this.stops[i - 1].station;
                 if (!Connections.has(lastStop!, this.stops[i].station)) {
@@ -5343,8 +5987,8 @@ class Path {
         }
 
         let connections: Connection[];
-        const ref = Paths.signatureIndex.get(this.signature);
-
+        const refList = Paths.signatureIndex.get(this.signature);
+        const ref = refList ? refList[0] : null;
         try {
             if (ref && ref.stopsChecked !== Path.FULL_PATH) {
                 throw new Error(`Le parcours de référence ${ref}`
@@ -5360,12 +6004,22 @@ class Path {
         }
 
         this.check();
-        if (!ref) Paths.signatureIndex.set(this.signature, this);
+        // Ajoute le parcours au cache des signatures.
+        if (ref){
+            // Un autre parcours avec la même signature existe déjà :
+            //  le parcours nouvellement calculé est ajouté à la liste
+            Paths.signatureIndex.get(this.signature)?.push(this);
+        } else {
+            // Aucun parcours n'a cette signature :
+            //  le parcours nouvellement calculé est ajouté avec une nouvelle liste
+            Paths.signatureIndex.set(this.signature, [this]);
+        }
+            
     }
 
     /**
      * Cherche le chemin le plus court entre le départ et l'arrivée du sillon
-     * en utilisant les groupes de gares.
+     *  en utilisant les groupes de gares.
      * @returns {Connection[]} - Chemin le plus court si il existe, sinon undefined.
      * @throws {Error} - Si la liste des gares est invalide ou si le chemin n'existe pas.
      */
@@ -5423,7 +6077,7 @@ class Path {
     /**
      * Reconstruit la liste des arrêts d'un parcours à partir de la liste des connexions.
      * La liste des arrêts est construite en prenant en compte les temps de retournement
-     * et les horaires d'arrivée et de départ des arrêts.
+     *  et les horaires d'arrivée et de départ des arrêts.
      * @param {Connection[]} connections - Liste des connexions entre les arrêts.
      */
     public buildStopsFromConnections(connections: Connection[]): void {
@@ -5435,10 +6089,10 @@ class Path {
             return;
         }
 
-        // Cache des connexions depuis le dernier arrêt connu
+        // Initialise le cache des connexions depuis le dernier arrêt connu.
         let buffer: Connection[] = [];
     
-        // Reconstruit le premier arrêt à partir des stops existants
+        // Reconstruit le premier arrêt à partir des stops existants.
         const firstConnection = connections[0];
     
         const firstExisting = this.stops[0];
@@ -5458,14 +6112,14 @@ class Path {
         newStops.push(firstStop);
         let lastStop = firstStop;
 
-        // Parcours des connexions
+        // Parcourt les connexions.
         for (const c of connections) {
     
-            // Connexion de retournement
+            // Vérifie si la connexion implique un retournement.
             if (c.withTurnaround && buffer.length === 0) {
                 // Si le buffer est vide, pas besoin de prendre en compte la connexion
                 //  de retournement pour la suite du parcours car le temps de retournement
-                //  est déjà pris en compte dans le dernier arrêt
+                //  est déjà pris en compte dans le dernier arrêt.
                 lastStop.stationAfterTurnaround = c.to;
                 continue;
             }
@@ -5474,29 +6128,29 @@ class Path {
             const stop =
                 this.getStop(c.to);
 
-            // Si on trouve un arrêt avec horaire connu
+            // Arrêt avec horaire connu.
             if (stop) {
 
-                // Récupération des horaires aux deux arrêts connus
+                // Récupère les horaires aux deux arrêts connus.
                 const startStop = newStops[newStops.length - 1];
-                const startTime = startStop.getTime(true)?.excelValue;
+                const startTime = startStop.getTime(true);
                 if (!startTime) throw new Error(`L'arrêt ${startStop} n'a pas d'heure de départ.`);
-                const endTime = stop.getTime(false)?.excelValue;
+                const endTime = stop.getTime(false);
                 if (!endTime) throw new Error(`L'arrêt ${stop} n'a pas d'heure d'arrivée.`);
-                if (endTime <= startTime) {
-                    // Arrêt trouvé déjà parcouru (dans le cas d'un deuxième passage dans l'autre sens)
+                if (endTime.excelValue <= startTime.excelValue) {
+                    // Arrêt trouvé déjà parcouru (dans le cas d'un deuxième passage dans l'autre sens).
                     continue;
                 }
 
-                // Décompte des temps de retournement
+                // Retranche le temps de retournement.
                 const totalTurnaroundTime =
                     buffer.reduce((sum, x) =>
                         sum + (x.withTurnaround ? Params.turnaroundTime.excelValue : 0), 0);
 
-                // Calcul du temps de parcours entre les deux arrêts connus à proratiser
-                const interpolatedTime = endTime - startTime - totalTurnaroundTime;               
+                // Calcule le temps de parcours entre les deux arrêts connus à proratiser.
+                const interpolatedTime = endTime.excelValue - startTime.excelValue - totalTurnaroundTime;               
     
-                // Calcul de la somme des temps de parcours
+                // Calcule la somme des temps de parcours.
                 const totalTime =
                 buffer.reduce((sum, x) =>
                     sum + x.time.excelValue, 0);
@@ -5504,22 +6158,22 @@ class Path {
     
                 let elapsed = 0;
 
-                // Parcours des connexions du buffer pour créer les arrêts
+                // Parcourt les connexions du buffer pour créer les arrêts.
                 for (let i = 0; i < buffer.length; i++) {
                     const bc = buffer[i];
 
                     if (bc.withTurnaround) {
                         // Si le buffer est vide, pas besoin de prendre en compte la connexion
                         //  de retournement pour la suite du parcours car le temps de retournement
-                        //  est déjà pris en compte dans le dernier arrêt
+                        //  est déjà pris en compte dans le dernier arrêt.
                         lastStop.stationAfterTurnaround = c.to;
                         continue;
                     }
     
                     elapsed += bc.time.excelValue;
     
-                    // Calcul de l'heure de passage
-                    const interpolated = startTime + elapsed * ratio;
+                    // Calcule l'heure de passage.
+                    const interpolated = startTime.excelValue + elapsed * ratio;
                     lastStop = new Stop(
                         bc.to,
                         undefined,
@@ -5530,9 +6184,9 @@ class Path {
                     newStops.push(lastStop);
                 }
 
-                // Modification du dernier arrêt avec les horaires d'arrivée et de départ, et les voies
+                // Modifie le dernier arrêt avec les horaires d'arrivée et de départ, et les voies.
                 if (stop.arrivalTime) {
-                    lastStop.setTimes(stop.arrivalTime.excelValue, stop.departureTime?.excelValue);
+                    lastStop.setTimes(stop.arrivalTime.excelValue, stop.departureTime?.excelValue, undefined, areRelativeTimes);
                 }
                 lastStop.tracks = stop.tracks;
     
@@ -5541,14 +6195,15 @@ class Path {
     
         }
 
-        // Si buffer restant (fin du trajet) : erreur.
-        //  Il est nécessaire d'aboutir à un arrêt connu (au maximum le dernier arrêt)
+        // Lève une erreur s'il reste du buffer (fin du trajet).
+        // Il est nécessaire d'aboutir à un arrêt connu (au maximum le dernier arrêt).
         if (buffer.length) {
-            throw new Error(`Echec dans la construction des arrêts du parcours à partir des connexions trouvées :`
-                + ` Le dernier arrêt ${lastStop} du parcours calculé n'existait pas dans le parcours initial.`);    
+            throw new Error(`Echec dans la construction des arrêts du parcours`
+                + `à partir des connexions trouvées : Le dernier arrêt ${lastStop} du parcours calculé`
+                + ` n'existait pas dans le parcours initial.`);    
         }
     
-        // Mise à jour du parcours avec ajout de chaque nouvel arrêt calculé
+        // Met à jour le parcours en ajoutant chaque nouvel arrêt calculé.
         this.eraseStops();
         this.stopsChecked = Path.FULL_PATH;
         for (const stop of newStops) {
@@ -5592,7 +6247,7 @@ class Paths {
         Map<string, Map<string, Map<number, Path>>> = new Map();
 
     // Map des parcours indexés par signature pour optimiser le calcul Dijkstra
-    public static readonly signatureIndex: Map<string, Path> = new Map();
+    public static readonly signatureIndex: Map<string, Path[]> = new Map();
 
     /**
      * Retourne le nombre de parcours enregistrés dans la base de données
@@ -5636,7 +6291,8 @@ class Paths {
     
     /**
      * Retourne un itérateur sur les valeurs de la base de données des parcours.
-     * @returns {IterableIterator<Path>} - Itérateur sur les valeurs de la base de données des parcours.
+     * @returns {IterableIterator<Path>} - Itérateur sur les valeurs.
+     *  de la base de données des parcours.
      */
     public static values(): IterableIterator<Path> {
         return this.map.values();
@@ -5654,18 +6310,99 @@ class Paths {
     }
 
     /**
-     * Insère un nouveau parcours dans la base de données, avec génération de la clé.
+     * Crée un objet Path et l'ajoute dans la base de données.
+     * Si la clé est vide, génère une clé unique pour le parcours,
+     *  ou renvoie le parcours concerné si déjà existant.
+     * Si un parcours avec la même clé est déjà présent dans la base de données, une erreur est levée.
+     * @param {string} [key=""] - Clé du parcours.
+     * @param {Parity|string/number} [parityValue=Parity.UNDEFINED] - Parité du parcours.
+     * @param {Parity|string/number} [lineDirection=Parity.UNDEFINED] - Direction du parcours sur la ligne.
+     * @param {string} [missionCode=""] - Code de mission des trains du parcours.
+     * @param {string} [name=""] - Nom du parcours.
+     * @param {string} [signature=""] - Signature du parcours : gares définissant le parcours.
+     * @param {Stop[]} [stops=[]] - Gares du parcours.
+     * @param {number} [stopsChecked=Path.UNCHECKED] - Résultat de la vérification du parcours.
+     * @returns {Path} - Parcours créé.
+     */
+    public static create(
+        key: string = "",
+        parityValue: Parity | string | number = Parity.UNDEFINED,
+        lineDirection: Parity | string | number = Parity.UNDEFINED,
+        missionCode: string = "",
+        name: string = "",
+        signature: string = "",
+        stops: Stop[] = [],
+        stopsChecked: number = Path.UNCHECKED
+    ): Path {
+
+        // Instancie l'objet Path.
+        const path = new Path(
+            key,
+            parityValue,
+            lineDirection,
+            missionCode,
+            name,
+            signature,
+            stops,
+            stopsChecked
+        );
+
+        // Insère le parcours dans la base de données, en générant si besoin la clé
+        return this.insert(path);
+    }
+
+    /**
+     * Insère un parcours dans la base de données,
+     *  avec mise à jour de la structure des parcours si la clé existe déjà (parcours en chargement),
+     *  ou avec génération de la clé si inexistante (nouveau parcours).
+     * Si la connexion est déjà présente dans la base de données, une erreur est levée.
+     * Si la clé est vide, génère une clé unique pour le parcours,
+     *  ou renvoie le parcours concerné si déjà existant.
+     * Si la clé est déjà définie, met à jour de la structure des parcours,
+     *  ou lève une erreur si un parcours est déjà présent avec la même clé dans la base de données
      * @param {Path} path - Parcours à insérer.
      * @returns {Path} - Parcours inséré avec sa clé.
      */
-    public static insert(path: Path): Path {
+    private static insert(path: Path): Path {
+
+        // Clé existante : met à jour la structure des parcours.
+        // Si un parcours avec la même clé est déjà présent dans la base de données, une erreur est levée.
+        if(path.key) {
+
+            // Ajoute l'objet Path dans la base de données, indexé par sa clé.
+            this.set(path);
+
+            // Ajoute l'objet Path dans l'index par signature, si pas encore présent
+            //  (parcours calculé uniquement).
+            if (path.stopsChecked === Path.FULL_PATH && !this.signatureIndex.has(path.signature)) {
+                this.signatureIndex.set(path.signature, path);
+            }
+    
+            // Ajoute l'objet Path dans la structure des radicaux et suffixes.
+            const radical = this.extractRadical(path.key);
+            if (!this.structure.has(radical)) {
+                this.structure.set(radical, new Map());
+            }
+            const letter = this.extractLetter(path.key);
+            if (!this.structure.get(radical)!.has(letter)) {
+                this.structure.get(radical)!.set(letter, new Map());
+            }
+            const number = this.extractNumber(path.key);
+            if (!this.structure.get(radical)!.get(letter)!.has(number)) {
+                this.structure.get(radical)!.get(letter)!.set(number, path);
+            }
+
+            return path;
+        }
+
+        // Clé non existante : génère une nouvelle clé.
 
         const radical = path.buildRadical();
         const signature = path.signature;
     
         let radicalMap = this.structure.get(radical);
     
-        // Nouveau radical
+        // Nouveau radical : ajoute le radical et le parcours dans la structure.
         if (!radicalMap) {
             radicalMap = new Map();
             this.structure.set(radical, radicalMap);
@@ -5674,7 +6411,7 @@ class Paths {
             numberMap.set(0, path);
     
             // Par convention, le premier parcours d'un radical différent
-            //  n'a pas de suffixe lettre => représenté par ""
+            //  n'a pas de suffixe lettre => représenté par "".
             radicalMap.set("", numberMap);
     
             path.key = radical;
@@ -5683,10 +6420,10 @@ class Paths {
             return path;
         }
     
-        // Radical existant : recherche de l'existance de la signature
+        // Radical existant : recherche l'existance de la signature.
         let letterKey = this.findLetterBySignature(radicalMap, signature);
     
-        // Nouvelle signature
+        // Nouvelle signature : ajoute la signature et le parcours dans la structure.
         if (letterKey === null) {
             letterKey = this.nextLetter(radicalMap);
     
@@ -5701,7 +6438,8 @@ class Paths {
             return path;
         }
     
-        // Signature existante : recherche de l'existance d'un parcours identique (mêmes horaires)
+        // Signature existante : recherche l'existance d'un parcours identique (mêmes horaires)
+        //  et le renvoie si trouvé.
         const numberMap = radicalMap.get(letterKey)!;
     
         for (const existing of numberMap.values()) {
@@ -5710,7 +6448,7 @@ class Paths {
             }
         }
     
-        // Nouveau parcours
+        // Pas de parcours trouvé : le nouveau parcours est bien unique : génère la cléi.
         const number = this.nextNumber(numberMap);
     
         numberMap.set(number, path);
@@ -5728,6 +6466,13 @@ class Paths {
      */
     public static delete(path: Path): void {
 
+        // Supprime l'objet Path de la base de données, indexé par sa clé.
+        this.map.delete(path.key);
+
+        // Supprime les arrêts de l'objet Path de l'index par signature.
+
+
+        // Détermine les composantes de la clé
         const radical = path.buildRadical();
         const letter = this.extractLetter(path.key);
         const number = this.extractNumber(path.key);
@@ -5739,16 +6484,29 @@ class Paths {
         if (!numberMap) return;
     
         numberMap.delete(number);
-        this.map.delete(path.key);
     
-        // nettoyer étage nombre
+        // Nettoie l'étage nombre.
         if (numberMap.size === 0) {
             radicalMap.delete(letter);
         }
     
-        // nettoyer étage lettre
+        // Nettoie l'étage lettre.
         if (radicalMap.size === 0) {
             this.structure.delete(radical);
+        }
+
+        // Suppression du parcours de la base des signatures.
+        if (path.stopsChecked === Path.FULL_PATH) {
+            const list = this.signatureIndex.get(path.signature);
+            if (list) {
+                const index = list.findIndex(p => p.key === path.key);
+                if (index !== -1) {
+                    list.splice(index, 1);
+                }
+                if (list.length === 0) {
+                    this.signatureIndex.delete(path.signature);
+                }
+            }
         }
     }
     
@@ -5766,7 +6524,7 @@ class Paths {
     ): string {
     
         // Si un seul élément existe déjà (donc sans suffixe), donne à cet élément le suffixe "A"
-        // et au nouvel élément le suffixe "B"
+        //  et au nouvel élément le suffixe "B".
         if (radicalMap.size === 1 && radicalMap.has("")) {
     
             const numberMap = radicalMap.get("")!;
@@ -5786,7 +6544,7 @@ class Paths {
         }
     
         // Si plusieurs éléments existent déjà (donc avec suffixes),
-        //  cherche le premier suffixe lettre non utilisé
+        //  cherche le premier suffixe lettre non utilisé.
         const used = new Set(radicalMap.keys());
     
         let index = 0;
@@ -5832,7 +6590,7 @@ class Paths {
     ): number {
     
         // Si un seul élément existe déjà (donc sans suffixe), donne à cet élément le suffixe "1"
-        // et au nouvel élément le suffixe "2"
+        //  et au nouvel élément le suffixe "2".
         if (numberMap.size === 1 && numberMap.has(0)) {
     
             const firstPath = numberMap.get(0)!;
@@ -5848,7 +6606,7 @@ class Paths {
         }
     
         // Si plusieurs éléments existent déjà (donc avec suffixes),
-        // cherche le premier suffixe numérique non utilisé
+        //  cherche le premier suffixe numérique non utilisé.
         let n = 1;
         while (numberMap.has(n)) n++;
     
@@ -5876,7 +6634,8 @@ class Paths {
     }
     
     /**
-     * Extrait le numéro de la clé d'un parcours (chaîne de la forme "#X" où est le numéro du suffixe numérique).
+     * Extrait le numéro de la clé d'un parcours
+     *  (chaîne de la forme "#X" où est le numéro du suffixe numérique).
      * @param {string} key - Clé du parcours.
      * @returns {number} - Numéro du suffixe numérique (ou 0 si la clé n'a pas de suffixe numérique).
      */
@@ -5886,7 +6645,8 @@ class Paths {
     }
 
     /**
-     * Construit une clé de parcours à partir d'un radical, d'une lettre de suffixe et d'un numéro de suffixe.
+     * Construit une clé de parcours à partir d'un radical,
+     *  d'une lettre de suffixe et d'un numéro de suffixe.
      * La clé est composée de la forme "radical~lettre#nombre" avec
      *  un suffixe lettre optionnel précédé de "~"
      *  et un suffixe numérique optionnel précédé de "#".
@@ -5910,9 +6670,8 @@ class Paths {
     }
 
     /**
-     * Cherche si un parcours existe déjà avec un même radical et une même signature
-     *  Si oui donne le suffixe lettre de ce parcours.
-     *  Sinon renvoie null.
+     * Cherche si un parcours existe déjà avec un même radical et une même signature.
+     * Si oui donne le suffixe lettre de ce parcours, sinon renvoie null.
      * @param {Map<string, Map<number, Path>>} radicalMap - Map des parcours ayant le même radical
      *  que celui du parcours pour lequel la recherche est faite.
      * @param {string} signature - Signature du parcours à chercher.
@@ -5926,7 +6685,7 @@ class Paths {
     
         for (const [letter, numberMap] of radicalMap.entries()) {
     
-            // récupérer un seul Path (le premier)
+            // Récupère un seul Path (le premier)
             const firstPath = numberMap.values().next().value as Path;
     
             if (firstPath.signature === signature) {
@@ -5944,16 +6703,16 @@ class Paths {
      */
     public static load(erase: boolean = false) {
 
-        // Vérifie si la table à charger existe déjà
+        // Vérifie si la table à charger existe déjà.
         if (this.size > 0) {
             if (!erase) return;
             this.clear();
         }
 
-        // Charge les connexions si elles ne sont pas encore chargées
+        // Charge les connexions si elles ne sont pas encore chargées.
         Connections.load();
 
-        // Charge la base de données
+        // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
         if (!data || data.length <= 1) {
             Log.warn(`this.load : aucune donnée trouvée dans la table.`);
@@ -5963,68 +6722,45 @@ class Paths {
         let excelRow: number = 0;
         try {
 
-            // Parcourt les lignes (hors en-tête)
+            // Parcourt les lignes (hors en-tête).
             for (const [rowIndex, row] of data.slice(1).entries()) {
 
-                // Vérifie si la ligne est vide
+                // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
 
-                // Calcule le numéro de ligne Excel
+                // Calcule le numéro de ligne Excel.
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
                 
-                // Récupère les champs
+                // Récupère les champs.
                 const key = WorkbookService.getString(row, this.COL_KEY) ?? "";
                 const parityLetter = WorkbookService.getString(row, this.COL_PARITY) ?? "";
                 const lineDirectionLetter = WorkbookService.getString(row, this.COL_LINE_PARITY) ?? "";
                 const missionCode = WorkbookService.getString(row, this.COL_MISSION_CODE) ?? "";
                 const name = WorkbookService.getString(row, this.COL_NAME) ?? "";
                 const signature = WorkbookService.getString(row, this.COL_SIGNATURE) ?? "";
-                const stopChecked = WorkbookService.getNumber(row, this.COL_STOP_CHECKED) ?? 0;
+                const stopsChecked = WorkbookService.getNumber(row, this.COL_STOP_CHECKED) ?? 0;
 
-                // Instancie l'objet Station
-                const path = new Path(
+                // Crée l'objet Path et l'insère dans la base de données.
+                const path = this.create(
                     key,
                     parityLetter,
                     lineDirectionLetter,
                     missionCode,
                     name,
                     signature,
-                    stopChecked
+                    [],
+                    stopsChecked
                 );
-
-                // Ajoute l'objet Path dans la base de données, indexé par sa clé
-                this.set(path);
-
-                // Ajoute l'objet Path dans l'index par signature, si pas encore présent
-                //  (parcours calculé uniquement)
-                if (path.stopsChecked === Path.FULL_PATH && !this.signatureIndex.has(signature)) {
-                    this.signatureIndex.set(signature, path);
-                } 
-
-                // Ajoute l'objet Path dans la structure des radicaux et suffixes
-                const radical = this.extractRadical(key);
-                if (!this.structure.has(radical)) {
-                    this.structure.set(radical, new Map());
-                }
-                const letter = this.extractLetter(key);
-                if (!this.structure.get(radical)!.has(letter)) {
-                    this.structure.get(radical)!.set(letter, new Map());
-                }
-                const number = this.extractNumber(key);
-                if (!this.structure.get(radical)!.get(letter)!.has(number)) {
-                    this.structure.get(radical)!.get(letter)!.set(number, path);
-                }
             } 
 
         } catch (e) {
             throw new Error(`Paths.load (ligne ${excelRow}) : ${e}`);
         }
 
-        // Charge les arrêts des parcours
+        // Charge les arrêts des parcours.
         Stops.load();
 
-        // Vérifie si les parcours sont valides
-        
+        // Vérifie si les parcours sont valides.
         try {
             for (const path of this.values()) {
                 path.check();
@@ -6047,7 +6783,7 @@ class Paths {
         startCell: string = "A1"
     ): void {
 
-        // Convertit la base de données en un tableau de données
+        // Convertit la base de données en un tableau de données.
         const data: (string | number)[][] = Array
             .from(this.values())
             .map(path => [
@@ -6060,7 +6796,7 @@ class Paths {
                 path.stopsChecked
             ]);
 
-        // Imprime le tableau
+        // Imprime le tableau.
         const table = WorkbookService.printTable(
             this.HEADERS,
              data,
@@ -6099,24 +6835,24 @@ class Train {
 
     /**
      * Constructeur de l'objet Train.
-     * @param {string} key - Clé du train
-     * @param {TrainNumber | number | string | undefined} number - Numéro du train
-     * @param {DateTime | number | string | undefined} date - Date et heure de départ du train
-     * @param {string} service - Service auquel le train est rattaché
-     * @param {Path | string | undefined} path - Parcours sur lequel le train circule
-     * @param {string[]} units - Eléments (numéro de matériel)
-     * @param {string[]} reusesKeys - Clés des trains de réutilisations
+     * @param {string} [key=""] - Clé du train.
+     * @param {TrainNumber | number | string | undefined} number - Numéro du train.
+     * @param {DateTime | number | string | undefined} date - Date et heure de départ du train.
+     * @param {string} [service=""] - Service auquel le train est rattaché.
+     * @param {Path | string | undefined} path - Parcours sur lequel le train circule.
+     * @param {string[]} [units=[]] - Eléments (numéro de matériel).
+     * @param {string[]} [reusesKeys=[]] - Clés des trains de réutilisations.
      */
     constructor(
-        key: string,
+        key: string = "",
         number: TrainNumber | number | string | undefined,
         date: DateTime | number | string | undefined,
-        service: string,
+        service: string = "",
         path: Path | string | undefined,
-        units: string[],
+        units: string[] = [],
         //previousNumbers: TrainNumber[],
         //reusesNumbers: TrainNumber[],
-        reusesKeys: string[]
+        reusesKeys: string[] = []
     ) {
         this.key = key;
         const numberObj = TrainNumber.from(number);
@@ -6142,8 +6878,8 @@ class Train {
     }
 
     /**
-     * Retourne une représentation textuelle simple et stable de l'objet.
-     * Utilisée implicitement dans les conversions string (ex: `${obj}`).
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
         return this.key.toString();
@@ -6154,8 +6890,9 @@ class Train {
      * Si la clé est une string, elle est utilisée pour chercher l'objet Train correspondant
      * dans l'index des trains. Si la clé est un objet Train, il est retourné tel quel.
      * Si la clé est une string mais que l'objet Train correspondant n'existe pas, undefined est retourné.
-     * @param {Train | string | null | undefined} value - Clé ou objet Train
-     * @returns {Train | undefined} - Objet Train correspondant ou undefined si la clé est une string mais que l'objet Train correspondant n'existe pas.
+     * @param {Train | string | null | undefined} value - Clé ou objet Train.
+     * @returns {Train | undefined} - Objet Train correspondant,
+     *  ou undefined si la clé est une string mais que l'objet Train correspondant n'existe pas.
      */
     public static from(
         value: Train | string | null | undefined
@@ -6165,11 +6902,9 @@ class Train {
         return Trains.get(value!);
     }
 
-
-
     /**
-     * Construit la clé du train qui est composée de la date suivie du numéro du train
-     * @returns {string} - Clé du train
+     * Construit la clé du train qui est composée de la date suivie du numéro du train.
+     * @returns {string} - Clé du train.
      */
     public buildKey(): string {
         return `${this.date.format('yyyy-MM-dd')}_${this.number.format()}`;
@@ -6177,7 +6912,7 @@ class Train {
 }
 
 /**
- * Classe Trains contenant la liste des trains
+ * Classe Trains contenant la liste des trains.
  */
 class Trains {
 
@@ -6213,6 +6948,37 @@ class Trains {
     private static readonly COL_REUSE_KEY1 = 11;            // Colonne de la clé de la réutilisation 1
     private static readonly COL_REUSE_KEY2 = 12;            // Colonne de la clé de la réutilisation 2
 
+    // Constantes de lecture du tableau d'importation
+    private static readonly IMPORT_MODE = "TRAIN";          // Mode à filtrer
+    private static readonly IMPORT_1_UNIT = "Court";        // Train court (à 1 élément)
+    private static readonly IMPORT_2_UNITS = "Long";        // Train long (à 2 éléments)
+    private static readonly IMPORT_SHEET = "Import trains"; // Feuille d'import des arrêts
+    private static readonly IMPORT_HEADERS = [[             // En-têtes du tableau d'import des arrêts
+        "Date Circulation",
+        "Ecart",
+        "Etat",
+        "Nom",
+        "Code mission",
+        "Origine",
+        "Heure origine",
+        "Destination",
+        "Heure destination",
+        "Composition",
+        "Mode",
+        "Heure à la gare",
+        "Voie Infra",
+        "Voie à quai à la gare"
+    ]];          
+    private static readonly COL_IMPORT_DATE = 0;                // Colonne de la date                                  
+    private static readonly COL_IMPORT_NUMBER = 3;              // Colonne du numéro de train
+    private static readonly COL_IMPORT_MISSION_CODE = 4;        // Colonne de la date
+    private static readonly COL_IMPORT_FROM = 5;                // Colonne du service
+    private static readonly COL_IMPORT_DEPARTURE_TIME = 6;      // Colonne des jours de circulation
+    private static readonly COL_IMPORT_TO = 7;                  // Colonne de la gare
+    private static readonly COL_IMPORT_ARRIVAL_TIME = 8;        // Colonne de l'heure de départ
+    private static readonly COL_IMPORT_UNITS = 9;               // Colonne de l'heure de passage
+    private static readonly COL_IMPORT_MODE = 10;               // Colonne de l'heure de passage
+
     // Constantes de classe
     public static readonly UNKNOWN_UNIT = "?";
     
@@ -6229,7 +6995,7 @@ class Trains {
 
     /**
      * Vérifie si un train est présent dans la base de données.
-     * @param {string} key - Clé du train
+     * @param {string} key - Clé du train.
      * @returns {boolean} - Vrai si le train gare est présent, faux sinon.
      */
     public static has(key: string): boolean {
@@ -6238,7 +7004,7 @@ class Trains {
 
     /**
      * Renvoie un train correspondant à la clé donnée.
-     * @param {string} key - Clé du train
+     * @param {string} key - Clé du train.
      * @returns {Train | undefined} - Train correspondant, ou undefined si non trouvé.
      */
     public static get(key: string): Train | undefined {
@@ -6261,7 +7027,8 @@ class Trains {
 
     /**
      * Retourne un itérateur sur les valeurs de la base de données des trains.
-     * @returns {IterableIterator<Train>} - Itérateur sur les valeurs de la base de données des trains.
+     * @returns {IterableIterator<Train>} - Itérateur sur les valeurs.
+     *  de la base de données des trains.
      */
     public static values(): IterableIterator<Train> {
         return this.map.values();
@@ -6274,19 +7041,74 @@ class Trains {
     public static clear(): void {
         this.map.clear();
     }
+ 
+    /**
+     * Crée un objet Train avec les paramètres donnés.
+     * Si la clé est vide, génère une clé unique pour le train,
+     *  ou renvoie le train concerné si déjà existant.
+     * Si un train avec la même clé est déjà présent dans la base de données, une erreur est levée.
+     * @param {string} [key=""] - Clé du train.
+     * @param {TrainNumber | number | string | undefined} number - Numéro du train.
+     * @param {DateTime | number | string | undefined} date - Date et heure de départ du train.
+     * @param {string} [service=""] - Service auquel le train est rattaché.
+     * @param {Path | string | undefined} path - Parcours sur lequel le train circule.
+     * @param {string[]} [units=[]] - Eléments (numéro de matériel).
+     * @param {string[]} [reusesKeys=[]] - Clés des trains de réutilisations.
+     * @returns {Train} - Train créé, ou undefined si le train est déjà présent dans la base de données.
+     * @throws {Error} - Si le train est déjà présent dans la base de données.
+     */
+    public static create(
+        key: string = "",
+        number: TrainNumber | number | string | undefined,
+        date: DateTime | number | string | undefined,
+        service: string = "",
+        path: Path | string | undefined,
+        units: string[] = [],
+        //previousNumbers: TrainNumber[],
+        //reusesNumbers: TrainNumber[],
+        reusesKeys: string[] = []
+    ): Train {
+
+        // Instancie l'objet Train.
+        const train = new Train(
+            key,
+            number,
+            date,
+            service,
+            path,
+            units,
+            // previousNumbers,
+            // reusesNumbers,
+            reusesKeys
+        );
+
+        // Insère le train dans la base de données, en générant si besoin la clé
+        return this.insert(train);
+    }
 
     /**
      * Ajoute un train dans la base de données.
-     * Si le train est déjà présent sans suffixe, des suffixes 1 et 2 sont ajoutés.
-     * Si le train est déjà présent avec suffixe 1, un nouveau suffixe est ajouté.
+     * Si un train avec une même clé est déjà présent sans suffixe, des suffixes 1 et 2 sont ajoutés.
      * @param {Train} train - Train à ajouter.
      * @returns {Train} - Train ajouté avec sa clé mise à jour si nécessaire.
      */
-    public static insert(train: Train): Train {
+    private static insert(train: Train): Train {
+
+        // Clé existante : ajoute le train à la base de données.
+        // Si un train avec la même clé est déjà présent dans la base de données, une erreur est levée.
+        if(train.key) {
+
+            // Ajoute l'objet Path dans la base de données, indexé par sa clé.
+            this.set(train);
+
+            return train;
+        }
+
+        // Clé non existante : génère une nouvelle clé.
 
         const radical = train.buildKey();
 
-        // Si train déjà présent sans suffixe, ajout des suffixes 1 et 2
+        // Si train déjà présent sans suffixe, ajoute les suffixes 1 et 2.
         if (this.has(radical)) {
             const firstTrain = this.get(radical)!;
             this.map.delete(radical);
@@ -6297,7 +7119,7 @@ class Trains {
             return train;
         }
 
-        // Si train déjà présent avec suffixe 1, ajout d'un nouveau suffixe
+        // Si train déjà présent avec suffixe 1, ajoute un nouveau suffixe.
         if (this.has(radical + '_1')) {
             let i = 2;
             while (this.has(radical + '_' + i)) i++;
@@ -6306,7 +7128,7 @@ class Trains {
             return train;
         }
 
-        // Nouveau train
+        // Nouveau train : génère la clé.
         train.key = radical;
         this.set(train);
         return train;
@@ -6320,17 +7142,17 @@ class Trains {
      */
     public static delete(key: string): void {
 
-        // Suppression du train de la map
+        // Supprime le train de la map.
         this.map.delete(key);
 
-        // Si train avec suffixe, modification des suffixes suivants
+        // Si train avec suffixe, modifie les suffixes suivants.
         const parts = key.split('_');
         const radical = parts[0];
         if (parts.length > 1) {
             const number = parseInt(parts[1], 10);
             this.map.delete(key);
             let i = number;
-            // Décalage des suffixes suivants
+            // Décale les suffixes suivants.
             while (this.has(radical + '_' + (i + 1))) {
                 const train = this.get(radical + '_' + (i + 1))!;
                 this.map.delete(train.key);
@@ -6338,7 +7160,7 @@ class Trains {
                 this.set(train)
                 i++;
             }
-            // Si présence d'un uniquement élément avec suffixe, suppression du suffixe
+            // Si présence d'un uniquement élément avec suffixe, supprime le suffixe.
             if (i <= 2 && this.has(radical + '_1')) {
                 const train = this.get(radical + '_1')!;
                 this.map.delete(train.key);
@@ -6355,16 +7177,16 @@ class Trains {
      */
     public static load(erase: boolean = false): void {
 
-        // Vérifie si la table à charger existe déjà
+        // Vérifie si la table à charger existe déjà.
         if (this.size > 0) {
             if (!erase) return;
             this.clear();
         }
 
-        // Charge les parcours s'ils ne sont pas encore chargés
+        // Charge les parcours s'ils ne sont pas encore chargés.
         Paths.load(); 
 
-        // Charge la base de données
+        // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
         if (!data || data.length <= 1) {
             Log.warn(`Trains.load : aucune donnée trouvée dans la table.`);
@@ -6374,16 +7196,16 @@ class Trains {
         let excelRow: number = 0;
         try {
 
-            // Parcourt les lignes (hors en-tête)
+            // Parcourt les lignes (hors en-tête).
             for (const [rowIndex, row] of data.slice(1).entries()) {
 
-                // Vérifie si la ligne est vide
+                // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
 
-                // Calcule le numéro de ligne Excel
+                // Calcule le numéro de ligne Excel.
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
                 
-                // Récupère les champs
+                // Récupère les champs.
                 const key = WorkbookService.getString(row, this.COL_KEY) ?? "";
                 const number = WorkbookService.getString(row, this.COL_NUMBER);
                 const date = WorkbookService.getNumber(row, this.COL_DATE);
@@ -6402,8 +7224,8 @@ class Trains {
                 const reusesKeys2 = WorkbookService.getString(row, this.COL_REUSE_KEY2);
                 const reusesKeys = reusesKeys2 ? [reusesKeys1, reusesKeys2] : [reusesKeys1];
 
-                // Instancie l'objet Station
-                const train = new Train(
+                // Crée l'objet Train et l'insère dans la base de données.
+                const train = this.create(
                     key,
                     number,
                     date,
@@ -6414,9 +7236,6 @@ class Trains {
                     // reusesNumbers,
                     reusesKeys
                 );
-                
-                // Ajoute l'objet Train dans la base de données
-                this.set(train);
             } 
 
         } catch (e) {
@@ -6436,7 +7255,7 @@ class Trains {
         startCell: string = "A1"
     ): void {
 
-        // Convertit la base de données en un tableau de données
+        // Convertit la base de données en un tableau de données.
         const data: (string | number)[][] = Array
             .from(this.map.values())
             .map((train: Train) => [
@@ -6455,7 +7274,7 @@ class Trains {
                 train.reuses[1] ? train.reuses[1].key : ""
             ]);
 
-        // Imprime le tableau
+        // Imprime le tableau.
         const table = WorkbookService.printTable(
             this.HEADERS,
              data,
@@ -6464,14 +7283,93 @@ class Trains {
              startCell
         );
 
-        // Met les dates au format "hh:mm:ss"
+        // Met les dates au format "hh:mm:ss".
         const timeColumns = [
             this.COL_DATE
         ];
         for (const col of timeColumns) {
             table.getRange().getColumn(col).setNumberFormat("dd/MM/yyyy");
         }
-}
+    }
+
+    /**
+     * Importe les trains dans la base de données à partir d'un tableau Excel.
+     */
+    public static import(): void {
+
+        // Charge la base de données.
+        const data = WorkbookService.getDataFromSheet(this.IMPORT_SHEET);
+        if (!data || data.length <= 1) {
+            Log.warn(`Trains.load : aucune donnée trouvée dans la table.`);
+            return;
+        }
+
+        let excelRow: number = 0;
+        try {
+
+            // Parcourt les lignes (hors en-tête).
+            for (const [rowIndex, row] of data.slice(1).entries()) {
+
+                // Vérifie si la ligne est vide.
+                if (row.length === 0) continue;
+
+                // Calcule le numéro de ligne Excel.
+                excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
+                
+                // Récupère les champs.
+
+                // Saute les lignes avec le mauvais mode (ex : bus et non train)
+                const mode = WorkbookService.getString(row, this.COL_IMPORT_MODE) ?? "";
+
+                if (mode !== this.IMPORT_MODE) continue;
+
+                const date = WorkbookService.getString(row, this.COL_IMPORT_DATE) ?? "";
+                const number = WorkbookService.getString(row, this.COL_IMPORT_NUMBER) ?? "";
+                const missionCode = WorkbookService.getString(row, this.COL_IMPORT_MISSION_CODE) ?? "";
+                const from = WorkbookService.getString(row, this.COL_IMPORT_FROM) ?? "";
+                const departureTime = WorkbookService.getString(row, this.COL_IMPORT_DEPARTURE_TIME) ?? "";
+                const to = WorkbookService.getString(row, this.COL_IMPORT_TO) ?? "";
+                const arrivalTime = WorkbookService.getString(row, this.COL_IMPORT_ARRIVAL_TIME) ?? "";
+                const composition = WorkbookService.getString(row, this.COL_IMPORT_UNITS) ?? "";
+                let units: string[] = [];
+                switch (composition) {
+                    case this.IMPORT_1_UNIT:
+                        units = ['-'];
+                        break;
+                    case this.IMPORT_2_UNITS:
+                        units = ['-', '-'];
+                        break;
+                }
+
+                // Crée le parcours à partir des gares de départ et d'arrivée.
+                const path = Path.fromTerminals(
+                    from,
+                    departureTime,
+                    to,
+                    arrivalTime,
+                    false,
+                    true,
+                    missionCode
+                );
+
+                // Crée l'objet Train et l'insère dans la base de données.
+                const train = this.create(
+                    "",
+                    number,
+                    date,
+                    "",
+                    path,
+                    units,
+                    // units,
+                    // units,
+                    units
+                );
+            } 
+
+        } catch (e) {
+            throw new Error(`this.load (ligne ${excelRow}) : ${e}`);
+        } 
+    }
 }
 
 /**
@@ -6482,7 +7380,7 @@ class TrainPath {
 }
 
 /**
- * Classe TrainPaths contenant la liste des sillons
+ * Classe TrainPaths contenant la liste des sillons.
  */
 class TrainPaths {
 
@@ -6631,14 +7529,14 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
 
     assert.check(
         'getDayOfWeek(adapted)',
-        dtAdapt.getDayOfWeek(true)?.number,
-        Days.SATURDAY.number
+        dtAdapt.getDayOfWeek(true)?.toString(),
+        Day.SATURDAY.toString()
     );
 
     assert.check(
         'getDayOfWeek(real)',
-        dtAdapt.getDayOfWeek(false)?.number,
-        Days.SUNDAY.number
+        dtAdapt.getDayOfWeek(false)?.toString(),
+        Day.SUNDAY.toString()
     );
 
     /* ==========================================================
@@ -6709,7 +7607,49 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
     );
 
     /* ==========================================================
-    7. resolveAgainst / relativeTo / equalsTo / compare
+    7. JOURS FÉRIÉS (Lundi de Pâques 2026)
+    ========================================================== */
+
+    // 06/04/2026 = Lundi de Pâques
+    const easterMonday2026 = DateTime.from("06/04/2026 6:00")!;
+
+    // Vérifie la détection du jour férié
+    assert.check(
+        'isHoliday (Lundi de Pâques 2026)',
+        easterMonday2026.isHoliday(),
+        true
+    );
+
+    // Vérifie que getDayOfWeek AVEC férié → HOLIDAY
+    assert.check(
+        'getDayOfWeek(withHolidays=true) → HOLIDAY',
+        easterMonday2026.getDayOfWeek(true, true)?.toString(),
+        Day.HOLIDAY.toString()
+    );
+
+    // Vérifie que SANS férié → vrai jour (lundi)
+    assert.check(
+        'getDayOfWeek(withHolidays=false) → Lundi',
+        easterMonday2026.getDayOfWeek(true, false)?.toString(),
+        Day.MONDAY.toString()
+    );
+
+    // Vérifie format avec férié
+    assert.check(
+        'format dddd avec férié',
+        easterMonday2026.format('dddd dd/mm/yyyy', true, true),
+        'Férié 06/04/2026'
+    );
+
+    // Vérifie format sans férié
+    assert.check(
+        'format dddd sans férié',
+        easterMonday2026.format('dddd dd/mm/yyyy', true, false),
+        'Lundi 06/04/2026'
+    );
+
+    /* ==========================================================
+    8. resolveAgainst / relativeTo / equalsTo / compare
     ========================================================== */
 
     const ref = DateTime.from(45830 + 10/24)!;
@@ -6741,7 +7681,7 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
     );
 
     /* ==========================================================
-    8. equalsOrUndefined()
+    9. equalsOrUndefined()
     ========================================================== */
 
     const dt1 = DateTime.from(45830 + 10/24)!;
@@ -6763,7 +7703,7 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
     });
 
     /* ==========================================================
-    9. add / subtract relatifs
+    10. add / subtract relatifs
     ========================================================== */
 
     const A = DateTime.from(2/24, true)!;
@@ -6773,7 +7713,7 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
     assert.check('subtract', round(A.subtract(B).excelValue), round(-1/24));
 
     /* ==========================================================
-    10. PARSE STRING (from + parseDateAndTime)
+    11. PARSE STRING (from + parseDateAndTime)
     ========================================================== */
 
     const parseTests = [
@@ -6785,6 +7725,8 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
 
         // --- Heures seules ---
         { input: "04:30", expected: 4.5 / 24 },
+        { input: "04h30", expected: 4.5 / 24 },
+        { input: "04h30min01s", expected: (4.5 + 1/3600) / 24 },
         { input: "01:00", expected: 1/24 + 1 }, // rollover
 
         // --- Heure négative ---
@@ -6792,16 +7734,19 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
 
         // --- Date seule ---
         { input: "22/06/2025", expected: 45830 },
+        { input: "22-06-2025", expected: 45830 },
         { input: "2025/06/22", expected: 45830 },
 
         // --- Date + heure ---
         { input: "22/06/2025 04:30", expected: 45830 + 4.5/24 },
+        { input: "22-06-2025 04:30", expected: 45830 + 4.5/24 },
 
         // --- Ordre inversé ---
         { input: "04:30 22/06/2025", expected: 45830 + 4.5/24 },
 
         // --- Heure négative avec date (doit être ignoré) ---
         { input: "22/06/2025 -02:00", expected: 45830 + 2/24 },
+        { input: "22-06-2025 -02:00", expected: 45830 + 2/24 },
 
         // --- Double négatif (invalide) ---
         { input: "- - 02:00", expected: 1 + 2/24 },
@@ -6841,7 +7786,7 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
     });
 
     /* ==========================================================
-    11. parseDate formats
+    12. parseDate formats
     ========================================================== */
 
     const dateTests = [
@@ -6871,45 +7816,37 @@ function testDays(options: Partial<AssertDDOptions> = {}) {
 
     const assert = new AssertDD(options);
     Days.load();
+    Day.load();
 
     /* ==========================================================
-       1. Constructeur
+       1. Days.from()
        ========================================================== */
 
-    const constructorTests = [
+    const fromTests = [
         {
             desc: "Jour simple lundi",
-            input: "1",
-            expectedNumber: 1,
-            expectedString: "1"
+            input: 1,
+            expected: "1"
         },
         {
             desc: "Groupe semaine 12345",
             input: "5-4-3-2-1",
-            expectedNumber: 0,
-            expectedString: "12345"
+            expected: "12345"
         },
         {
             desc: "Valeurs invalides ignorées",
             input: "a9b1c7",
-            expectedNumber: 0,
-            expectedString: "17"
+            expected: "17"
         }
     ];
 
-    constructorTests.forEach(t => {
-        const d = new Days("x", "x", t.input);
+    fromTests.forEach(t => {
+        const d = Days.from(t.input)!;
 
         assert.check(
-            `new Days("${t.input}") → numbersString (${t.desc})`,
+            `Days.from("${t.input}") → numbersString (${t.desc})`,
             d.numbersString,
-            t.expectedString
-        );
-
-        assert.check(
-            `new Days("${t.input}") → number (${t.desc})`,
-            d.number,
-            t.expectedNumber
+            t.expected
         );
     });
 
@@ -6921,75 +7858,45 @@ function testDays(options: Partial<AssertDDOptions> = {}) {
         { desc: "Nom complet", input: "lundi", expected: [1] },
         { desc: "Abréviation", input: "ma", expected: [2] },
         { desc: "Numéros mélangés", input: "7;1;3", expected: [1, 3, 7] },
-        { desc: "Texte mixte", input: "lumeven", expected: [1, 3, 5] },
-        { desc: "Mot clé groupe", input: "J", expected: [1, 2, 3, 4, 5] }
+        { desc: "Texte mixte", input: "lumeven", expected: [1, 3, 5] }
     ];
 
     extractTests.forEach(t => {
         const result = Days.extractFromString(t.input);
         assert.check(
-            `Days.extractFromString("${t.input}") (${t.desc})`,
+            `extractFromString("${t.input}") (${t.desc})`,
             JSON.stringify(result),
             JSON.stringify(t.expected)
         );
     });
 
     /* ==========================================================
-       3. extractFromString — intersection
+       3. union / intersection
        ========================================================== */
 
-    const intersectionTests = [
-        {
-            desc: "Intersection simple",
-            input1: "lundi;mercredi",
-            input2: "mer",
-            expected: [3]
-        },
-        {
-            desc: "Intersection groupe / jour",
-            input1: "JOB",
-            input2: "samedi;dimanche",
-            expected: []
-        },
-        {
-            desc: "Intersection multiple",
-            input1: "JOB",
-            input2: "mar-mer",
-            expected: [2, 3]
-        }
-    ];
+    const d1 = Days.from("1-3-5")!;
+    const d2 = Days.from("3-4")!;
 
-    intersectionTests.forEach(t => {
-        const result = Days.extractFromString(t.input1, t.input2);
-        assert.check(
-            `Days.extractFromString("${t.input1}", "${t.input2}") (${t.desc})`,
-            JSON.stringify(result),
-            JSON.stringify(t.expected)
-        );
-    });
+    const inter = Days.intersection(d1, d2);
+    const union = Days.union(d1, d2);
+
+    assert.check("Intersection 135 ∩ 34", inter?.numbersString, "3");
+    assert.check("Union 135 ∪ 34", union?.numbersString, "1345");
 
     /* ==========================================================
-       4. fromNumber
+       4. contains / intersects
        ========================================================== */
 
-    const fromNumberTests = [
-        { input: 1, expected: "Lundi" },
-        { input: 7, expected: "Dimanche" },
-        { input: 0, expected: "Dimanche" }
-    ];
+    const d = Days.from("1-3-5")!;
 
-    fromNumberTests.forEach(t => {
-        const day = Days.fromNumber(t.input);
-        assert.check(
-            `Days.fromNumber(${t.input})`,
-            day?.fullName,
-            t.expected
-        );
-    });
+    assert.check("contains(3)", d.contains(3), true);
+    assert.check("contains(2)", d.contains(2), false);
+    assert.check("intersects true", d.intersects(Days.from(3)!), true);
+    assert.check("intersects false", d.intersects(Days.from(2)!), false);
 
     /* ==========================================================
-    5. Constantes Days.*
-    ========================================================== */
+       5. Constantes Days
+       ========================================================== */
 
     const constantsTests = [
         { const: Days.MONDAY,    num: 1, name: "Lundi" },
@@ -6999,14 +7906,15 @@ function testDays(options: Partial<AssertDDOptions> = {}) {
         { const: Days.FRIDAY,    num: 5, name: "Vendredi" },
         { const: Days.SATURDAY,  num: 6, name: "Samedi" },
         { const: Days.SUNDAY,    num: 7, name: "Dimanche" },
+        { const: Days.HOLIDAY,   num: 8, name: "Férié" },
     ];
 
     constantsTests.forEach(t => {
 
         assert.check(
-            `Days constant number (${t.name})`,
-            t.const.number,
-            t.num
+            `Days constant contains (${t.name})`,
+            t.const.contains(t.num),
+            true
         );
 
         assert.check(
@@ -7016,12 +7924,179 @@ function testDays(options: Partial<AssertDDOptions> = {}) {
         );
 
         assert.check(
-            `Days constant identity fromNumber (${t.name})`,
-            Days.fromNumber(t.num) === t.const,
+            `Days constant identity (${t.name})`,
+            Days.from(t.num) === t.const,
             true
         );
-
     });
+
+    /* ==========================================================
+       6. Day.from / cohérence avec Days
+       ========================================================== */
+
+    constantsTests.forEach(t => {
+
+        const day = Day.from(t.num)!;
+
+        assert.check(
+            `Day.from(${t.num}) fullName`,
+            day.fullName,
+            t.name
+        );
+
+        assert.check(
+            `Day.from(${t.num}) mask`,
+            day.mask,
+            t.const.mask
+        );
+
+        assert.check(
+            `Day.from(${t.num}) index`,
+            day.index,
+            t.num - 1
+        );
+
+        assert.check(
+            `Day.from(${t.num}) identity`,
+            Day.from(day) === day,
+            true
+        );
+    });
+
+    /* ==========================================================
+       7. Cohérence mask → index (log2)
+       ========================================================== */
+
+    for (let i = 0; i < 8; i++) {
+
+        const day = Day.from(i + 1)!;
+
+        assert.check(
+            `maskToIndex ${1 << i}`,
+            day.index,
+            i
+        );
+    }
+
+    /* ==========================================================
+       8. Accesseurs statiques Day
+       ========================================================== */
+
+    const dayConstants = [
+        { getter: () => Day.MONDAY,    index: 0 },
+        { getter: () => Day.TUESDAY,   index: 1 },
+        { getter: () => Day.WEDNESDAY, index: 2 },
+        { getter: () => Day.THURSDAY,  index: 3 },
+        { getter: () => Day.FRIDAY,    index: 4 },
+        { getter: () => Day.SATURDAY,  index: 5 },
+        { getter: () => Day.SUNDAY,    index: 6 },
+        { getter: () => Day.HOLIDAY,   index: 7 },
+    ];
+
+    dayConstants.forEach(t => {
+        const d = t.getter();
+
+        assert.check(
+            `Day getter index ${t.index}`,
+            d.index,
+            t.index
+        );
+
+        assert.check(
+            `Day getter identity ${t.index}`,
+            Day.from(d.code) === d,
+            true
+        );
+    });
+
+    /* ==========================================================
+       9. Iteration Day.values()
+       ========================================================== */
+
+    const values = Array.from(Day.values());
+
+    assert.check(
+        "Day.values length",
+        values.length,
+        8
+    );
+
+    values.forEach((d, i) => {
+        assert.check(
+            `Day.values index ${i}`,
+            d.index,
+            i
+        );
+    });
+
+    /* ==========================================================
+    10. Days.difference / count / numbersString
+    ========================================================== */
+
+    const dA = Days.from("1-3-5")!;
+    const dB = Days.from("3")!;
+
+    const diff = Days.difference(dA, dB);
+
+    assert.check("difference 135 - 3", diff?.numbersString, "15");
+
+    assert.check("count 135", dA.count, 3);
+    assert.check("numbersString 135", dA.numbersString, "135");
+
+    /* ==========================================================
+    11. DaysValues
+    ========================================================== */
+
+    const base = Days.from("1-2-3-4-5-6-7")!;
+    const dv = new DaysValues(base);
+
+    dv.set(Days.from("1-2-3-4-5")!, "A");
+    dv.set(Days.from("6-7")!, "B");
+
+    assert.check(
+        "DaysValues toString split",
+        dv.toString(),
+        "12345: A, 67: B"
+    );
+    assert.check(
+        "DaysValues get Monday",
+        dv.get(Day.MONDAY),
+        "A"
+    );
+    assert.check(
+        "DaysValues get Sunday",
+        dv.get(Day.SUNDAY),
+        "B"
+    );
+
+    // merge automatique + valeur unique pour tous les jours de la semaine
+    dv.set(Days.from("6-7")!, "A");
+
+    assert.check(
+        "DaysValues merge",
+        dv.toString(),
+        "A"
+    );
+
+    // fill gaps
+    const dv2 = new DaysValues(base);
+    dv2.set(Days.from("1-2")!, "X");
+    dv2.fillGaps("Y");
+
+    assert.check(
+        "DaysValues fillGaps",
+        dv2.isComplete(),
+        true
+    );
+
+    // parsing
+    const parsed = DaysValues.from(base, "12345: A, 67: B");
+
+    assert.check(
+        "DaysValues from string",
+        parsed.toString(),
+        "12345: A, 67: B"
+    );
 
     /* ==========================================================
        SYNTHÈSE
@@ -8262,12 +9337,14 @@ function testPath(options: Partial<AssertDDOptions> = {}) {
         "08:00:00",
         "SQY",
         "09:00:00",
+        false,
+        undefined,
         "",
         "",
         "PZB>SQY>MPU;VC"
     );
 
-    path.addStop(new Stop("VC", "", "08:30:00", "08:32:00"));
+    // path.addStop(new Stop("VC", "", "08:30:00", "08:32:00"));
 
     assert.check(
         "Path instance créée",
@@ -8288,8 +9365,7 @@ function testPath(options: Partial<AssertDDOptions> = {}) {
     path.findPath();
 
     path.check();
-    Paths.insert(path);
-Paths.print();
+
     assert.check(
         "Path.findPath - FULL_PATH",
         path.stopsChecked,
@@ -8416,7 +9492,7 @@ Paths.print();
 
     assert.check(
         "signatureIndex contient le Path",
-        ref === path,
+        ref![0] === path,
         true
     );
 
