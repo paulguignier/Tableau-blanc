@@ -36,6 +36,11 @@ function main(workbook: ExcelScript.Workbook) {
         Params.load();
         Connections.load();
 
+        
+        Trains.import();
+        Trains.print();
+        Paths.print();
+
 
 
 
@@ -74,20 +79,16 @@ function runAllTests(testMode: boolean = false): boolean {
     Log.info(`Début des tests`);
 
     try {
-        // testWorkbookService({ printSuccess: false, printFailure: true });
-        // testDateTime({ printSuccess: false, printFailure: true });
-        // testDays({ printSuccess: false, printFailure: true });
-        // testParity({ printSuccess: false, printFailure: true });
-        // testTrainNumber({ printSuccess: false, printFailure: true });
-        // testStation({ printSuccess: false, printFailure: true });
-        // testStationWithParity({ printSuccess: false, printFailure: true });
-        // testConnection({ printSuccess: false, printFailure: true });
-        // testStop({ printSuccess: false, printFailure: true });
-        // testPath({ printSuccess: false, printFailure: true });
-
-        // Trains.import();
-        // Trains.print();
-        // Paths.print();
+        testWorkbookService({ printSuccess: false, printFailure: true });
+        testDateTime({ printSuccess: false, printFailure: true });
+        testDays({ printSuccess: false, printFailure: true });
+        testParity({ printSuccess: false, printFailure: true });
+        testTrainNumber({ printSuccess: false, printFailure: true });
+        testStation({ printSuccess: false, printFailure: true });
+        testStationWithParity({ printSuccess: false, printFailure: true });
+        testConnection({ printSuccess: false, printFailure: true });
+        testStop({ printSuccess: false, printFailure: true });
+        testPath({ printSuccess: false, printFailure: true });
 
     } catch (e) {
         Log.warn("Erreur lors des tests", e.message);
@@ -346,6 +347,8 @@ class AssertDD {
     }
 }
 
+type CellValue = string | number | boolean;
+
 /*
  * Classe utilitaire WorkbookService de manipulation des feuilles de calcul Excel.
  */
@@ -399,12 +402,12 @@ class WorkbookService {
      * Utilise la plage "utilisée" (used range).
      * @param {string} sheetName - Nom de la feuille.
      * @param {boolean} [failOnError=true] - Si vrai, lance une erreur si la feuille est vide ou inexistante.
-     * @returns {(string | number | boolean)[][]} - Données de la feuille.
+     * @returns {CellValue[][]} - Données de la feuille.
      */
     public static getDataFromSheet(
         sheetName: string,
         failOnError: boolean = true
-    ): (string | number | boolean)[][] {
+    ): CellValue[][] {
 
         const sheet = this.getSheet(sheetName, { failOnError });
 
@@ -459,15 +462,16 @@ class WorkbookService {
      * @param {string} tableName - Nom du tableau à chercher.
      * @param {boolean} [failOnError=true] - Si vrai (par défaut),
      *  lance une exception si le tableau n'existe pas. Si faux, renvoie null.
-     * @returns {(string | number | boolean)[][]} - Données du tableau Excel
+     * @returns {CellValue[][]} - Données du tableau Excel
      *  correspondant au nom donné, ou null si il n'existe pas.
      */
     public static getDataFromTable(
         sheetName: string,
         tableName: string,
         failOnError: boolean = true
-    ): (string | number | boolean)[][] {
+    ): CellValue[][] {
         const table = this.getTable(sheetName, tableName, failOnError);
+        if (!table) return [];
         return table.getRange().getValues();
     }
 
@@ -481,7 +485,7 @@ class WorkbookService {
      * @returns {string | undefined} - Valeur de la cellule sous forme de chaîne,
      *  ou undefined si elle est null ou undefined.
      */
-    static getString(row: unknown[], col: number): string | undefined {
+    public static getStringOrUndefined(row: unknown[], col: number): string | undefined {
         const v = row[col];
         if (v === undefined || v === null) return undefined;
         return String(v).trim() || undefined;
@@ -499,7 +503,7 @@ class WorkbookService {
      * @returns {number | undefined} - Valeur de la cellule sous forme de nombre,
      *  ou undefined si la conversion échoue.
      */
-    static getNumber(row: unknown[], col: number): number | undefined {
+    public static getNumberOrUndefined(row: unknown[], col: number): number | undefined {
         const v = row[col];
         if (typeof v === "number") return v;
         if (typeof v === "string") {
@@ -524,7 +528,7 @@ class WorkbookService {
      * @returns {boolean | undefined} - Valeur de la cellule sous forme de booléen,
      *  ou undefined si la conversion échoue.
      */
-    static getBoolean(row: unknown[], col: number): boolean | undefined {
+    public static getBooleanOrUndefined(row: unknown[], col: number): boolean | undefined {
         const v = row[col];
         if (typeof v === "boolean") return v;
         if (typeof v === "number") return v !== 0;
@@ -533,7 +537,97 @@ class WorkbookService {
             return ["true", "1", "oui", "yes"].includes(v.toLowerCase());
         }
         return undefined;
-    }   
+    }  
+    
+    /**
+     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de chaîne,
+     * en supprimant les espaces inutiles, ou la valeur par défaut si la valeur est null ou undefined.
+     * @param {unknown[]} row - Ligne contenant la cellule.
+     * @param {number} col - Colonne contenant la cellule.
+     * @param {string} [defaultValue=""] - Valeur par défaut.
+     * @returns {string} - Valeur de la cellule sous forme de chaîne.
+     **/
+    public static getString(row: unknown[], col: number, defaultValue: string = ""): string {
+        return this.getStringOrUndefined(row, col) ?? defaultValue;
+    }
+
+    /**
+     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de nombre,
+     * ou la valeur par défaut si la valeur est null ou undefined.
+     * @param {unknown[]} row - Ligne contenant la cellule.
+     * @param {number} col - Colonne contenant la cellule.
+     * @param {number} [defaultValue=0] - Valeur par défaut.
+     * @returns {number} - Valeur de la cellule sous forme de nombre.
+     **/
+    public static getNumber(row: unknown[], col: number, defaultValue: number = 0): number {
+        return this.getNumberOrUndefined(row, col) ?? defaultValue;
+    }
+
+    /**
+     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de booléen,
+     * ou la valeur par défaut si la valeur est null ou undefined.
+     * @param {unknown[]} row - Ligne contenant la cellule.
+     * @param {number} col - Colonne contenant la cellule.
+     * @param {boolean} [defaultValue=false] - Valeur par défaut.
+     * @returns {boolean} - Valeur de la cellule sous forme de booléen.
+     **/
+    public static getBoolean(row: unknown[], col: number, defaultValue: boolean = false): boolean {
+        return this.getBooleanOrUndefined(row, col) ?? defaultValue;
+    }
+
+    /**
+     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de chaîne,
+     * ou lance une exception si la valeur est null ou undefined, avec un message d'erreur personnalisé.
+     * @param {unknown[]} row - Ligne contenant la cellule. 
+     * @param {number} col - Colonne contenant la cellule.
+     * @param {string} [errorMessage] - Message d'erreur personnalisé.
+     * @returns {string} - Valeur de la cellule sous forme de chaîne.
+     **/
+    public static getRequiredString(row: unknown[], col: number, errorMessage?: string): string {
+        const value = this.getStringOrUndefined(row, col);
+        if (value === undefined) {
+            throw new Error(errorMessage
+                ?? `La chaine à récupérer est absente`
+                    + ` dans la colonne ${col} de la ligne ${JSON.stringify(row)}.`);
+        }
+        return value;
+    }
+
+    /**
+     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de nombre,
+     * ou lance une exception si la valeur est null ou undefined, avec un message d'erreur personnalisé.
+     * @param {unknown[]} row - Ligne contenant la cellule.
+     * @param {number} col - Colonne contenant la cellule.
+     * @param {string} [errorMessage] - Message d'erreur personnalisé.
+     * @returns {number} - Valeur de la cellule sous forme de nombre.
+     **/
+    public static getRequiredNumber(row: unknown[], col: number, errorMessage?: string): number {
+        const value = this.getNumberOrUndefined(row, col);
+        if (value === undefined) {
+            throw new Error(errorMessage
+                ?? `Le nombre à récupérer est absent`
+                    + ` dans la colonne ${col} de la ligne ${JSON.stringify(row)}.`);
+        }
+        return value;
+    }
+
+    /**
+     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de booléen,
+     * ou lance une exception si la valeur est null ou undefined, avec un message d'erreur personnalisé.
+     * @param {unknown[]} row - Ligne contenant la cellule.
+     * @param {number} col - Colonne contenant la cellule.
+     * @param {string} [errorMessage] - Message d'erreur personnalisé.
+     * @returns {boolean} - Valeur de la cellule sous forme de booléen.
+     **/
+    public static getRequiredBoolean(row: unknown[], col: number, errorMessage?: string): boolean {
+        const value = this.getBooleanOrUndefined(row, col);
+        if (value === undefined) {
+            throw new Error(errorMessage
+                ?? `Le booléen à récupérer est absent`
+                    + ` dans la colonne ${col} de la ligne ${JSON.stringify(row)}.`);
+        }
+        return value;
+    }
 
     /**
      * Vérifie si l'adresse de cellule donnée est valide.
@@ -577,7 +671,7 @@ class WorkbookService {
      */
     public static printTable(
         headers: string[][],
-        data: (string | number | boolean)[][],
+        data: CellValue[][],
         sheetName: string,
         tableName: string,
         startCell: string = "A1",
@@ -588,8 +682,9 @@ class WorkbookService {
         if (headers[0].length !== data[0].length) {
             throw new Error("Les en-têtes et les données doivent avoir la même longueur.");
         }
-        const tableData = headers.concat(data);
-        // const tableData = headers.concat(data.map(row => row.map(cell => cell.toString())));
+        const tableData: CellValue[][] =
+            headers as CellValue[][];
+        tableData.push(...data);
 
         // Vérifie si les données sont non vides.
         if (tableData.length === 0 || tableData[0].length === 0) {
@@ -672,7 +767,7 @@ class Params {
         this.turnaroundTime = DateTime.from(turnaroundTime / 24 / 60, true)!;
 
         this.maxTrainUnits = WorkbookService.getNumber(data[this.ROW_MAX_TRAIN_UNITS], 1) ?? 2;
-        const stationsSuffixesString = WorkbookService.getString(data[this.ROW_STATIONS_SUFFIXES],1) ?? "";
+        const stationsSuffixesString = WorkbookService.getString(data[this.ROW_STATIONS_SUFFIXES],1);
         const separatorRegex = /[\s,.!?;:\-\n\r]+/; // Toute ponctuation est considérée comme un séparateur
         this.stationsSuffixes = stationsSuffixesString
             .split(separatorRegex)
@@ -1423,9 +1518,10 @@ class DateTime {
             });
 
         // Remplace toutes les clés temporaires par les valeurs réelles.
-        Object.entries(tempMap).forEach(([key, val]) => {
+        for (const key in tempMap) {
+            const val = tempMap[key];
             tempFormat = tempFormat.replace(new RegExp(key, "g"), val);
-        });
+        }
         
         return prefix + tempFormat;
     }
@@ -1448,7 +1544,7 @@ class DateTime {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase = false): void {
+    public static load(erase: boolean = false): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.loaded && !erase) return;
@@ -1561,14 +1657,12 @@ class Day {
     }
     
     /**
-     * Retourne un itérateur sur les valeurs de la base de données des jours.
-     * @returns {IterableIterator<Day>} - Itérateur sur les valeurs de la base de données.
+     * Retourne un tableau des valeurs de la base de données des jours.
+     * @returns {Day[]} - Itérateur sur les valeurs de la base de données.
      *  des jours.
      */
-    public static *values(): IterableIterator<Day> {
-        for (const d of this.list) {
-            if (d) yield d;
-        }
+    public static values(): Day[] {
+        return Array.from(this.list.values());
     }
 
     /**
@@ -1585,7 +1679,7 @@ class Day {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase = false): void {
+    public static load(erase: boolean = false): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.loaded) {
@@ -1895,13 +1989,13 @@ class Days {
      * @returns {string} - Chaîne de caractères contenant les chiffres triés.
      */
     private static cleanAndSortNumbers(numbersString: string): number[] {
-        return [...new Set(
+        return Array.from(new Set(
             numbersString
                 .replace(/[^1-8]/g, '')     // Supprime les caractères non numériques
                                             //  et non compris entre 1 et 8
                 .split('')                  // Divise la chaîne en un tableau de chiffres
                 .map((x) => Number(x))      // Convertit les caractères en nombres
-        )].sort((a, b) => a - b);           // Trie les chiffres dans l'ordre
+        )).sort((a, b) => a - b);           // Trie les chiffres dans l'ordre
     }
 
     /**
@@ -2043,14 +2137,12 @@ class Days {
     }
 
     /**
-     * Retourne un itérateur sur les valeurs de la base de données des groupes de jours.
-     * @returns {IterableIterator<Days>} - Itérateur sur les valeurs de la base de données.
+     * Retourne un tableau des valeurs de la base de données des groupes de jours.
+     * @returns {Days[]} - Itérateur sur les valeurs de la base de données.
      *  des groupes de jours.
      */
-    public static *values(): IterableIterator<Days> {
-        for (const d of this.masksList) {
-            if (d) yield d;
-        }
+    public static values(): Days[] {
+        return this.masksList.filter(e => e !== undefined);
     }
 
     /**
@@ -2070,7 +2162,7 @@ class Days {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase = false): void {
+    public static load(erase: boolean = false): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.loaded) {
@@ -2084,7 +2176,7 @@ class Days {
         let excelRow: number = 0;
         try {
 
-            for (const [rowIndex, row] of data.slice(1).entries()) {
+            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
 
                 // Vérifie si la ligne est vide (toutes les valeurs nulles ou vides).
                 if (row.every((cell: unknown) => !cell)) continue;
@@ -2093,37 +2185,38 @@ class Days {
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
 
                 // Extrait les valeurs.
-                const fullName = WorkbookService.getString(row, this.COL_FULL_NAME) ?? "";
-                if (!fullName) {
-                    throw new Error(`Nom complet du groupe de jours`
-                        + ` non renseigné dans le tableau des jours.`);
-                }
+                const fullName = WorkbookService.getRequiredString(
+                    row,
+                    this.COL_FULL_NAME,
+                    `Nom complet du groupe de jours`
+                        + ` non renseigné dans le tableau des jours.`
+                );
                 if (this.has(fullName)) {
                     throw new Error(`Nom complet ${fullName} déjà utilisé.`);
                 }
-                const abreviation = WorkbookService.getString(row, this.COL_ABBREVIATION) ?? ""; 
-                if (!abreviation) {
-                    throw new Error(`Groupe de jours du ${fullName} :`
-                        + ` abréviation non renseignée dans le tableau des jours.`);
-                }
+                const abreviation = WorkbookService.getRequiredString(
+                    row,
+                    this.COL_ABBREVIATION,
+                    `Groupe de jours du ${fullName} :`
+                        + ` abréviation non renseignée dans le tableau des jours.`
+                );
                 if (this.has(abreviation)) {
                     throw new Error(`Groupe de jours du ${fullName} :`
-                        + `Abbreviation ${abreviation} déjà utilisée.`);
+                        + ` abbreviation ${abreviation} déjà utilisée.`);
                 }
-                const numbersString = (WorkbookService.getString(row, this.COL_NUMBERS) ?? "")
-                if (numbersString.length === 0) {
-                    throw new Error(`Groupe de jours du ${fullName} :`
-                        + `Numéros des jours non renseignés ou invalides dans le tableau des jours.`);
-                }
+                const numbersString = WorkbookService.getString(row, this.COL_NUMBERS);
                 const numbers = this.cleanAndSortNumbers(numbersString);
-
-                const codeLetter = (WorkbookService.getString(row, this.COL_CODE_LETTER) ?? "")
+                if (numbers.length === 0) {
+                    throw new Error(`Groupe de jours du ${fullName} :`
+                        + ` numéros des jours non renseignés ou invalides dans le tableau des jours.`);
+                }
+                const codeLetter = WorkbookService.getString(row, this.COL_CODE_LETTER)
                         .toUpperCase()
                         .replace(/[^A-Z]/g, '');
                 // Si groupe de jours, une seule lettre attendue.
                 if (!codeLetter && numbers.length > 1) {
                     throw new Error(`Groupe de jours du ${fullName} :`
-                        + ` Lettre de code non renseignée ou invalide dans le tableau des jours.`);
+                        + ` lettre de code non renseignée ou invalide dans le tableau des jours.`);
                 }
                 const code = (numbersString.length === 1)
                     ? numbersString
@@ -2255,7 +2348,14 @@ class DaysValues {
 
         if (!input || input.trim() === "") return dv;
 
-        const parts = input.split(/[,;]+/);;
+        // Cas avec valeur unique
+        if (!input.includes(":")) {
+            dv.set(days, input.trim());
+            return dv;
+        }
+
+        // Cas avec plusieurs valeurs
+        const parts = input.split(/[,;]+/);
 
         for (const part of parts) {
 
@@ -2270,6 +2370,7 @@ class DaysValues {
                 dv.set(subDays, value);
             }
         }
+        dv.fillGaps("");
 
         return dv;
     }
@@ -2334,7 +2435,7 @@ class DaysValues {
 
         // Reconstruit entries
         this.entries = [];
-        for (const [value, mask] of map.entries()) {
+        for (const [value, mask] of Array.from(map.entries())) {
             this.entries.push({
                 days: Days.get(mask)!,
                 value
@@ -2785,7 +2886,7 @@ class Parity {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase = false): void {
+    public static load(erase: boolean = false): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.loaded) {
@@ -2801,9 +2902,8 @@ class Parity {
             row: number,
             fallback: string
         ): string =>
-            (
-                WorkbookService.getString(data[row], this.COL_LETTER) ?? fallback
-            ).toUpperCase();
+            WorkbookService.getString(data[row], this.COL_LETTER, fallback)
+                .toUpperCase();
 
         this.letters.set(this.ODD, getParityLetter(this.ROW_ODD, "I"));
         this.letters.set(this.EVEN, getParityLetter(this.ROW_EVEN, "P"));
@@ -2812,7 +2912,7 @@ class Parity {
             row: number,
             fallback: number
         ): number =>
-            WorkbookService.getNumber(data[row], this.COL_NUMBER) ?? fallback;
+            WorkbookService.getNumber(data[row], this.COL_NUMBER, fallback);
 
         this.digits.set(this.ODD, getParityDigit(this.ROW_ODD, 1));
         this.digits.set(this.EVEN, getParityDigit(this.ROW_EVEN, 2));
@@ -2832,6 +2932,8 @@ class TrainNumber {
     // Constantes de lecture de la base de données Excel
     private static readonly W_SHEET = "Param";                          // Feuille contenant les motifs des trains W
     private static readonly W_TABLE = "W";                              // Tableau contenant les motifs des trains W
+    private static readonly MOUVEMENTS_SHEET = "Param";                 // Feuille contenant les motifs des évolutions
+    private static readonly MOUVEMENTS_TABLE = "Evolutions";             // Tableau contenant les motifs des évolutions
     private static readonly TRAINS_4DIGIT_SHEET = "Param";              // Feuille contenant les motifs des trains abrégeables à 4 chiffres
     private static readonly TRAINS_4DIGIT_TABLE = "LigneC4chiffres";    // Tableau contenant les motifs des trains abrégeables à 4 chiffres
 
@@ -2839,12 +2941,16 @@ class TrainNumber {
     private static loaded = false;
 
     // Regex globales
-    private static wRegex: RegExp;
-    private static abbreviate4Regex: RegExp;
+    private static wRegex: RegExp;                                      // Regex des trains W
+    private static mouvementsRegex: RegExp;                             // Regex des évolutions
+    private static abbreviate4Regex: RegExp;                            // Regex des trains abrégeables à 4 chiffres
 
     // Propriétés de l'objet TrainNumber
-    public readonly value: string;                  // Numéro de train avec parité
-                                                    //  (la double parité est marquée par ######/#)
+    public readonly value: string;                  // Numéro de train avec parité (la double parité est marquée par ######/#)
+
+    // Cache interne
+    private readonly variants: Set<string>;         // Toutes les variantes équivalentes
+    private readonly variantsByParity: string[];    // Accès direct par parité
 
     /**
      * Constructeur privé de la classe TrainNumber.
@@ -2866,12 +2972,41 @@ class TrainNumber {
         if (!TrainNumber.isValidTrainNumber(normalized)) {
             Log.warn(`Numéro de train invalide : ${value}`);
             this.value = "";
+            this.variants = new Set();
+            this.variantsByParity = [];
             return;
         }
 
-        // Force l'éventuelle double parité.
+        // Calcul unique
+        const base = normalized;
+        const lastDigit = base.charCodeAt(base.length - 1) - 48;
+        const rest = base.slice(0, -1);
+        const even = lastDigit - (lastDigit % 2);
+        const odd = even + 1;
+
+        const evenStr = rest + even;
+        const oddStr = rest + odd;
+        const evenOdd = `${evenStr}/${odd}`;
+        const oddEven = `${oddStr}/${even}`;
+
+        // Cache des variantes
+        this.variants = new Set([
+            evenStr,
+            oddStr,
+            evenOdd,
+            oddEven
+        ]);
+
+        // Accès indexé par parité
+        this.variantsByParity = [];
+        this.variantsByParity[Parity.EVEN] = evenStr;
+        this.variantsByParity[Parity.ODD] = oddStr;
+
+        // La parité double commence par la même parité que la valeur en entrée
+        this.variantsByParity[Parity.DOUBLE] = (normalized === oddStr) ? oddEven : evenOdd;
+
         this.value = applyDoubleParity
-            ? TrainNumber.applyParity(normalized, Parity.DOUBLE)
+            ? this.variantsByParity[Parity.DOUBLE]
             : normalized;
     }
      
@@ -2880,7 +3015,7 @@ class TrainNumber {
      *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
-        return this.value.toString();
+        return this.value;
     }
 
     /**
@@ -2896,7 +3031,7 @@ class TrainNumber {
     public static from(
         value: TrainNumber | string | number | null | undefined,
         doubleParity: boolean = false
-    ): TrainNumber  | undefined {
+    ): TrainNumber {
         if (value == null) {
             throw new Error(`Le numéro de train n'est pas renseigné ou est invalide.`);
         }
@@ -2935,69 +3070,44 @@ class TrainNumber {
      * Si le numéro de train ne correspond pas, il est renvoyé inchangé.
      * @returns {string} - Numéro de train abrégé de 6 à 4 chiffres s'il est abrégeable.
      */
-    private abbreviateTo4Digits(): string {
-
-        const abbreviated = TrainNumber.abbreviate4Regex?.test(this.value.split("/")[0])
-            ? this.value.substring(2)
-            : this.value;
-
-        return abbreviated;
+    private static abbreviate(value: string): string {
+        return this.abbreviate4Regex?.test(value.split("/")[0])
+            ? value.substring(2)
+            : value;
     }
 
     /**
-     * Adapte le numéro du train en fonction de la parité demandée.
-     * Applique la parité demandée au numéro du train.
-     * Si le numéro du train est pair, il est inchangé si la parité demandée est paire,
-     *  et incrémenté de 1 si la parité demandée est impaire.
-     * Si le numéro du train est impair, il est décrémenté de 1 si la parité demandée est paire,
-     *  et inchangé si la parité demandée est impaire.
-     * Si la parité demandée est double, le numéro du train est donné
-     *  par sa valeur paire, suivi d'un '/' et du chiffre impair suivant.
-     * Si la parité demandée est indéfinie, le numéro du train est inchangé.
-     * @param {string} value - Numéro du train à adapter.
-     * @param {number} parity - Parité demandée (paire, impaire, double).
-     * @returns {string} - Numéro du train adapté.
+     * Teste si une valeur correspond à ce train (toutes formes confondues).
      */
-    private static applyParity(value: string, parity: number): string {
+    public includes(value: TrainNumber | string | number | null | undefined): boolean {
 
-        const base = value.split("/")[0];
-        const lastDigit = parseInt(base.slice(-1), 10);
-        const rest = base.slice(0, -1);
-        const even = lastDigit - (lastDigit % 2);
-        const opposedDigit = lastDigit + (lastDigit === even ? 1 : -1);
+        if (value == null) return false;
 
-        switch (parity) {
-            case Parity.EVEN:
-                return rest + even;
-            case Parity.ODD:
-                return rest + (even + 1);
-            case Parity.DOUBLE:
-                return rest + lastDigit + "/" + opposedDigit;
-            default:
-                return base;
-        }
+        const str = value instanceof TrainNumber
+            ? value.value
+            : TrainNumber.normalize(String(value));
+
+        return this.variants.has(str);
     }
 
     /**
-     * Adapte le numéro du train en fonction de la parité demandée.
-     * @param {number} parityValue - Parité demandée (paire, impaire, double).
-     * @param {boolean} abbreviateTo4Digits - Si vrai, le numéro du train est abrégé à 4 chiffres.
+     * Adapte le numéro du train en fonction de la parité demandée..
+     * @param {number} parityValue Parité demandée (paire, impaire, double).
+     * @param {boolean} abbreviateTo4Digits Si vrai, le numéro du train est abrégé à 4 chiffres.
      *  Si faux, le numéro du train n'est pas abrégé.
-     * @returns {string} - Numéro du train adapté.
+     * @returns {string} Numéro du train adapté
      */
     public adaptWithParity(parityValue: number, abbreviateTo4Digits: boolean = false): string {
 
-        if (!parityValue) return this.value;
-
-        const base = abbreviateTo4Digits? this.abbreviateTo4Digits() : this.value;
-        return TrainNumber.applyParity(base, parityValue);
+        const adaptedValue = this.variantsByParity[parityValue] ?? this.value;
+        return abbreviateTo4Digits? TrainNumber.abbreviate(adaptedValue) : adaptedValue;
     }
 
     /**
      * Retourne le numéro du train en fonction des paramètres :
-     *  - si abbreviateTo4Digits est vrai, le numéro du train est abrégé à 4 chiffres,
+     *  - si abbreviate est vrai, le numéro du train est abrégé à 4 chiffres,
      *  - si withoutDoubleParity est vrai, le numéro du train est renommé sans double parité.
-     * @param {boolean} [abbreviateTo4Digits=false] - Si vrai, le numéro du train est abrégé
+     * @param {boolean} [abbreviate=false] - Si vrai, le numéro du train est abrégé
      *  de 6 à 4 chiffres pour les trains commerciaux. Si faux (par défaut), le numéro n'est pas abrégé.
      * @param {boolean} [withoutDoubleParity=false] - Si vrai, le numéro est renommé
      *  pour ne pas indiquer le changement de parité. Si faux (par défaut), le numéro de train
@@ -3005,13 +3115,13 @@ class TrainNumber {
      * @returns {string} - Numéro du train.
      */
     public format(
-        abbreviateTo4Digits: boolean = false,
+        abbreviate: boolean = false,
         withoutDoubleParity: boolean = false
     ): string {
         let result = this.value;
 
-        if (abbreviateTo4Digits) {
-            result = this.abbreviateTo4Digits();
+        if (abbreviate) {
+            result = TrainNumber.abbreviate(result);
         }
     
         if (withoutDoubleParity) {
@@ -3028,6 +3138,14 @@ class TrainNumber {
     public isW(): boolean {
         return TrainNumber.wRegex?.test(this.value) ?? false;
     }
+
+    /**
+     * Teste si le train est une évolution.
+     * @returns {boolean} - Vrai si le train est une évolution, faux sinon.
+     */
+    public isMouvement(): boolean {
+        return TrainNumber.mouvementsRegex?.test(this.value) ?? false;
+    }
    
     /**
      * Charge les paramètres des numéros de train
@@ -3036,58 +3154,54 @@ class TrainNumber {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase = false): void {
+    public static load(erase: boolean = false): void {
 
         // Vérifie si les tables à charger existent déjà.
         if (this.loaded && !erase) return;
 
-        this.loadWRegex();
-        this.loadAbbreviateRegex();
+        this.loadRegex();
 
         this.loaded = true;
     }
 
     /**
-     * Charge les motifs des numéros de train W.
+     * Charge les motifs des trains spécifiques.
      * Les valeurs de la table sont transformées en regex partielles avec les numéros
      *  remplacés par des chiffres, puis combinées en une regex globale unique.
      */
-    private static loadWRegex(): void {
-        const data = WorkbookService.getDataFromTable(this.W_SHEET, this.W_TABLE);
-    
-        // Transforme chaque motif en regex partielle.
-        const regexParts: string[] = data
-            .slice(1)
-            .flat()
-            .filter((v: unknown) => typeof v === "string" && v.trim() !== "")
-            .map((pattern: string) => {
-                return '^' + pattern.trim().replace(/#/g, '\\d') + '$';
-            });
+    private static loadRegex(): void {
+            
+        const dataToRegex = (data: CellValue[][]) => {
+            const parts = data
+                .slice(1)
+                .reduce((acc, row) => acc.concat(row), [])
+                .filter((v: unknown): v is string => typeof v === "string" && v.trim() !== "")
+                .map(pattern => {
+                    return '^' + pattern.trim().replace(/#/g, '\\d') + '$';
+                });
 
-        // Crée une regex globale combinée.
-        this.wRegex = new RegExp(regexParts.join('|'));
-    }
+            return parts.length
+                ? new RegExp(parts.join('|'))
+                : /^$/;
+        };
 
-    /**
-     * Charge les motifs des numéros de train abrégeables à 4 chiffres.
-     * Les valeurs de la table sont transformées en regex partielles avec les numéros
-     *  remplacés par des chiffres, puis combinées en une regex globale unique.
-     */
-    private static loadAbbreviateRegex(): void {
-        const data = WorkbookService.getDataFromTable(this.TRAINS_4DIGIT_SHEET,
-            this.TRAINS_4DIGIT_TABLE);
-    
-        // Transforme chaque motif en regex partielle.
-        const regexParts: string[] = data
-            .slice(1)
-            .flat()
-            .filter((v: unknown) => typeof v === "string" && v.trim() !== "")
-            .map((pattern: string) => {
-                return '^' + pattern.trim().replace(/#/g, '\\d') + '$';
-            });
+        const Wdata = WorkbookService.getDataFromTable(
+            this.W_SHEET,
+            this.W_TABLE
+        );
+        this.wRegex = dataToRegex(Wdata);
 
-        // Crée une regex globale combinée.
-        this.abbreviate4Regex = new RegExp(regexParts.join('|'));
+        const mouvementsData = WorkbookService.getDataFromTable(
+            this.MOUVEMENTS_SHEET,
+            this.MOUVEMENTS_TABLE
+        );
+        this.mouvementsRegex = dataToRegex(mouvementsData);
+
+        const abbreviate4Data = WorkbookService.getDataFromTable(
+            this.TRAINS_4DIGIT_SHEET,
+            this.TRAINS_4DIGIT_TABLE
+        );
+        this.abbreviate4Regex = dataToRegex(abbreviate4Data);
     }
 }
 
@@ -3272,12 +3386,12 @@ class Stations {
     }
 
     /**
-     * Retourne un itérateur sur les valeurs de la base de données des gares.
-     * @returns {IterableIterator<Station>} - Itérateur sur les valeurs
+     * Retourne un tableau des valeurs de la base de données des gares.
+     * @returns {Station[]} - Itérateur sur les valeurs
      *  de la base de données des gares.
      */
-    public static values(): IterableIterator<Station> {
-        return this.list.values();
+    public static values(): Station[] {
+        return Array.from(this.list.values());
     }
 
     /**
@@ -3306,7 +3420,7 @@ class Stations {
         // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
         if (!data || data.length <= 1) {
-            Log.warn(`this.load : aucune donnée trouvée dans la table.`);
+            Log.warn(`Stations.load : aucune donnée trouvée dans la table.`);
             return;
         }
 
@@ -3315,7 +3429,7 @@ class Stations {
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of data.slice(1).entries()) {
+            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
@@ -3324,11 +3438,12 @@ class Stations {
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
 
                 // Récupère les champs.
-                const abbreviation = WorkbookService.getString(row, this.COL_ABBR)?.toUpperCase() ?? "";
-                const name = WorkbookService.getString(row, this.COL_NAME) ?? "";
-                const referenceStationAbbv = WorkbookService.getString(row, this.COL_REFERENCE_STATION) ?? "";
-                const turnaroundLetters = WorkbookService.getString(row, this.COL_TURNAROUND) ?? "";
-                const reverseLineDirection = !!WorkbookService.getBoolean(row, this.COL_REVERSE_LINE_PARITY);
+                const abbreviation = WorkbookService.getString(row, this.COL_ABBR)
+                    .toUpperCase();
+                const name = WorkbookService.getString(row, this.COL_NAME);
+                const referenceStationAbbv = WorkbookService.getString(row, this.COL_REFERENCE_STATION);
+                const turnaroundLetters = WorkbookService.getString(row, this.COL_TURNAROUND);
+                const reverseLineDirection = WorkbookService.getBoolean(row, this.COL_REVERSE_LINE_PARITY);
 
                 // Crée l'objet Station et l'insère dans la base de données.
                 const station = this.create(
@@ -3645,7 +3760,7 @@ class StationWithParity {
      * @param {Set<number>} [visited=new Set<number>()] - Ensemble des gares déjà visitées.
      * @returns {StationWithParity[]} - Tableau contenant toutes les gares visitées.
      */
-    public expandWithChildren(visited = new Set<number>()): StationWithParity[] {
+    public expandWithChildren(visited: Set<number> = new Set<number>()): StationWithParity[] {
 
         if (this._expandedCache) return this._expandedCache;
 
@@ -3783,12 +3898,12 @@ class StationsWithParity {
     }
     
     /**
-     * Retourne un itérateur sur les valeurs de la base de données des gares avec parité.
-     * @returns {IterableIterator<StationWithParity>} - Itérateur sur les valeurs
+     * Retourne un tableau des valeurs de la base de données des gares avec parité.
+     * @returns {StationWithParity[]} - Itérateur sur les valeurs
      *  de la base de données des gares avec parité.
      */
-    public static values(): IterableIterator<StationWithParity> {
-        return this.list.values();
+    public static values(): StationWithParity[] {
+        return Array.from(this.list.values());
     }
 
     /**
@@ -3838,19 +3953,19 @@ class StationsWithParity {
 class Connection {
 
     // Constantes des valeurs par défaut
-    static readonly DEFAULT_CONNECTION_TIME= 1; // Durée de connection par défaut en jours
-                                                //  (si 0 ou non renseignée)
-                                                //  La durée est très importante pour privilégier
-                                                //  les connexions avec une durée de connexion
-                                                //  déjà évaluée à partir de parcours réels
+    public static readonly DEFAULT_CONNECTION_TIME= 1;  // Durée de connection par défaut en jours
+                                                        //  (si 0 ou non renseignée)
+                                                        //  La durée est très importante pour privilégier
+                                                        //  les connexions avec une durée de connexion
+                                                        //  déjà évaluée à partir de parcours réels
 
     // Propriétés de l'objet Connection
-    public readonly from: StationWithParity;    // Gare de départ
-    public readonly to: StationWithParity;      // Gare d'arrivée
-    private _time: DateTime;                    // Temps de trajet
-    public readonly withTurnaround: boolean;    // Connexion impliquant un rebroussement
-    public readonly withMovement: boolean;      // Connexion sous régime de l'évolution
-    public readonly changeParity: boolean;      // Connexion avec changement de parité
+    public readonly from: StationWithParity;            // Gare de départ
+    public readonly to: StationWithParity;              // Gare d'arrivée
+    private _time: DateTime;                            // Temps de trajet
+    public readonly withTurnaround: boolean;            // Connexion impliquant un rebroussement
+    public readonly withMovement: boolean;              // Connexion sous régime de l'évolution
+    public readonly changeParity: boolean;              // Connexion avec changement de parité
 
     /**
      * Constructeur d'une connexion.
@@ -4107,17 +4222,17 @@ class Connections {
     }
 
     /**
-     * Retourne un itérateur sur les valeurs de la base de données des connexions.
-     * @returns {IterableIterator<Connection>} - Itérateur sur les valeurs
+     * Retourne un tableau des valeurs de la base de données des connexions.
+     * @returns {Connection[]} - Itérateur sur les valeurs
      *  de la base de données des connexions.
      */
-    public static *values(): IterableIterator<Connection> {
-        for (const arr of this.list) {
+    public static values(): Connection[] {
+        const result: Connection[] = [];
+        for (const arr of this.list ){
             if (!arr) continue;
-            for (const c of arr) {
-                yield c;
-            }
-        }
+            result.push(...arr);
+        };
+        return result;
     }
 
     /**
@@ -4155,7 +4270,7 @@ class Connections {
         try {
             
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of data.slice(1).entries()) {
+            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
@@ -4168,8 +4283,8 @@ class Connections {
                 const to = WorkbookService.getString(row, this.COL_TO)?.toUpperCase();
                 if (!from || !to) continue;
                 const timeInMinutes = WorkbookService.getNumber(row, this.COL_TIME);
-                const withMovement = !!WorkbookService.getBoolean(row, this.COL_MOVEMENT);
-                const changeParity = !!WorkbookService.getBoolean(row, this.COL_CHANGE_PARITY);
+                const withMovement = WorkbookService.getBoolean(row, this.COL_MOVEMENT);
+                const changeParity = WorkbookService.getBoolean(row, this.COL_CHANGE_PARITY);
 
                 // Instancie les propriétés objets (si 0 ou non renseignée : valeur par défaut).
                 const excelTime = timeInMinutes
@@ -4897,15 +5012,15 @@ class Stops {
         "Passage",
         "Voie"
     ]];                                            
-    private static readonly COL_IMPORT_NUMBER = 0;        // Colonne du numéro de train
+    private static readonly COL_IMPORT_NUMBER = 0;              // Colonne du numéro de train
     private static readonly COL_IMPORT_DATE = 1;                // Colonne de la date
     private static readonly COL_IMPORT_SERVICE = 2;             // Colonne du service
     private static readonly COL_IMPORT_DAYS = 3;                // Colonne des jours de circulation
     private static readonly COL_IMPORT_STATION = 4;             // Colonne de la gare
-    private static readonly COL_IMPORT_DEPARTURE_TIME = 5;      // Colonne de l'heure de départ
-    private static readonly COL_IMPORT_PASSAGE_TIME = 6;        // Colonne de l'heure de passage
-    private static readonly COL_IMPORT_TRACK = 7;               // Colonne de la voie
-    private static readonly COL_IMPORT_NEXT_STATION = 8;        // Colonne de la gare suivante
+    private static readonly COL_IMPORT_ARRIVAL_TIME = 5;        // Colonne de l'heure d'arrivée
+    private static readonly COL_IMPORT_DEPARTURE_TIME = 6;      // Colonne de l'heure de départ
+    private static readonly COL_IMPORT_PASSAGE_TIME = 7;        // Colonne de l'heure de passage
+    private static readonly COL_IMPORT_TRACK = 8;               // Colonne de la voie
 
     /**
      * Charge les arrêts.
@@ -4925,7 +5040,7 @@ class Stops {
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of data.slice(1).entries()) {
+            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
@@ -4934,23 +5049,26 @@ class Stops {
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
 
                 // Récupère le parcours correspondant.
-                const pathKey = WorkbookService.getString(row, this.COL_PATH_KEY);
-                if (!pathKey) throw new Error(`pathKey manquant.`);
+                const pathKey = WorkbookService.getRequiredString(
+                    row,
+                    this.COL_PATH_KEY,
+                    `pathKey manquant.`
+                );
                 const path = Paths.get(pathKey);
                 if (!path) {
                     throw new Error(`Parcours "${pathKey}" inexistant.`);
                 }
 
                 // Récupère les champs.
-                const station = WorkbookService.getString(row, this.COL_STATION) || "";
+                const station = WorkbookService.getString(row, this.COL_STATION);
                 const stationAfterTurnaround =
                     WorkbookService.getString(row, this.COL_STATION_AFTER_TURNAROUND);
                 const arrivalTime =
-                    WorkbookService.getNumber(row, this.COL_ARRIVAL_TIME);
+                    WorkbookService.getNumberOrUndefined(row, this.COL_ARRIVAL_TIME);
                 const departureTime =
-                    WorkbookService.getNumber(row, this.COL_DEPARTURE_TIME);
+                    WorkbookService.getNumberOrUndefined(row, this.COL_DEPARTURE_TIME);
                 const passageTime =
-                    WorkbookService.getNumber(row, this.COL_PASSAGE_TIME);
+                    WorkbookService.getNumberOrUndefined(row, this.COL_PASSAGE_TIME);
                 const tracks = WorkbookService.getString(row, this.COL_TRACK);
 
                 // Instancie l'objet Stop.
@@ -4989,7 +5107,7 @@ class Stops {
         const data: (string | number)[][] = [];
     
         for (const path of Paths.values()) {
-            for (const stop of path.stops.values()) {
+            for (const stop of Array.from(path.stops.values())) {
                 data.push([
                     path.key,
                     stop.key,
@@ -5044,7 +5162,7 @@ class Stops {
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of data.slice(1).entries()) {
+            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
@@ -5053,29 +5171,27 @@ class Stops {
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
 
                 // Récupère les champs.
-                const trainNumber = WorkbookService.getString(row, this.COL_IMPORT_NUMBER) || "";
-                const date = WorkbookService.getNumber(row, this.COL_IMPORT_DATE) || 0;
-                const service = WorkbookService.getString(row, this.COL_IMPORT_SERVICE) || "";
-                const days = WorkbookService.getString(row, this.COL_IMPORT_DAYS) || "";
-                const station = WorkbookService.getString(row, this.COL_IMPORT_STATION) || "";
-                const stationAfterTurnaround =
-                    WorkbookService.getString(row, this.COL_IMPORT_STATION_AFTER_TURNAROUND);
+                const trainNumber = WorkbookService.getString(row, this.COL_IMPORT_NUMBER);
+                const date = WorkbookService.getNumber(row, this.COL_IMPORT_DATE);
+                const service = WorkbookService.getString(row, this.COL_IMPORT_SERVICE);
+                const days = WorkbookService.getString(row, this.COL_IMPORT_DAYS);
+                const station = WorkbookService.getString(row, this.COL_IMPORT_STATION);
                 const arrivalTime =
-                    WorkbookService.getNumber(row, this.COL_IMPORT_ARRIVAL_TIME);
+                    WorkbookService.getNumberOrUndefined(row, this.COL_IMPORT_ARRIVAL_TIME);
                 const departureTime =
-                    WorkbookService.getNumber(row, this.COL_IMPORT_DEPARTURE_TIME);
+                    WorkbookService.getNumberOrUndefined(row, this.COL_IMPORT_DEPARTURE_TIME);
                 const passageTime =
-                    WorkbookService.getNumber(row, this.COL_IMPORT_PASSAGE_TIME);
+                    WorkbookService.getNumberOrUndefined(row, this.COL_IMPORT_PASSAGE_TIME);
                 const tracks = WorkbookService.getString(row, this.COL_IMPORT_TRACK);
 
                 // Instancie l'objet Stop.
                 const stop = new Stop(
                     station,
-                    stationAfterTurnaround,
+                    "",
                     arrivalTime,
                     departureTime,
                     passageTime,
-                    true,
+                    false,
                     tracks
                 );
             } 
@@ -5165,7 +5281,7 @@ class Path {
      *  ou undefined si le parcours n'a pas d'arrêt de destination.
      */
     public get destination(): Stop | undefined {
-        return this.stops.at(-1);
+        return this.stops[this.stops.length - 1] ;
     }
 
     /**
@@ -5278,12 +5394,13 @@ class Path {
             signature,
             stops
         );
+        
         path.convertStopsToRelative();
 
         if (!signature) path.buildSignatureFromStops();
         path.rebuildStopIndex();
         path.rebuildStopPosition();
-
+        
         if (findPath) {
             path.findPath();
         } else {
@@ -5303,7 +5420,7 @@ class Path {
         const origin = this.origin?.stationAbbreviation ?? "";
         const dest = this.destination?.stationAbbreviation ?? "";
     
-        const parts = [origin, dest];
+        const parts = [origin + '>' +  dest];
 
         if (this.missionCode) parts.push(this.missionCode);
         if (this.name) parts.push(this.name);
@@ -6096,7 +6213,8 @@ class Path {
         const firstConnection = connections[0];
     
         const firstExisting = this.stops[0];
-        if (firstExisting.stationAbbreviation !== firstConnection.from.station.abbreviation) {
+ 
+        if (!firstExisting.station.includes(firstConnection.from)) {
             throw new Error(`Le premier arrêt calculé ne correspond pas au premier arrêt de la signature.`);
         }
         const areRelativeTimes = firstExisting.departureTime?.isRelative;
@@ -6290,12 +6408,12 @@ class Paths {
     }
     
     /**
-     * Retourne un itérateur sur les valeurs de la base de données des parcours.
-     * @returns {IterableIterator<Path>} - Itérateur sur les valeurs.
+     * Retourne un tableau des valeurs de la base de données des parcours.
+     * @returns {Path[]} - Itérateur sur les valeurs.
      *  de la base de données des parcours.
      */
-    public static values(): IterableIterator<Path> {
-        return this.map.values();
+    public static values(): Path[] {
+        return Array.from(this.map.values());
     }
 
     /**
@@ -6375,7 +6493,7 @@ class Paths {
             // Ajoute l'objet Path dans l'index par signature, si pas encore présent
             //  (parcours calculé uniquement).
             if (path.stopsChecked === Path.FULL_PATH && !this.signatureIndex.has(path.signature)) {
-                this.signatureIndex.set(path.signature, path);
+                this.signatureIndex.set(path.signature, [path]);
             }
     
             // Ajoute l'objet Path dans la structure des radicaux et suffixes.
@@ -6442,7 +6560,7 @@ class Paths {
         //  et le renvoie si trouvé.
         const numberMap = radicalMap.get(letterKey)!;
     
-        for (const existing of numberMap.values()) {
+        for (const existing of Array.from(numberMap.values())) {
             if (existing.equalsStops(path)) {
                 return existing;
             }
@@ -6533,7 +6651,7 @@ class Paths {
             radicalMap.delete("");
             radicalMap.set("A", numberMap);
 
-            for (const path of numberMap.values()) {
+            for (const path of Array.from(numberMap.values())) {
                 const number = this.extractNumber(path.key);
                 this.map.delete(path.key);
                 path.key = this.buildKey(radical, "A", number);
@@ -6683,7 +6801,7 @@ class Paths {
         signature: string
     ): string | null {
     
-        for (const [letter, numberMap] of radicalMap.entries()) {
+        for (const [letter, numberMap] of Array.from(radicalMap.entries())) {
     
             // Récupère un seul Path (le premier)
             const firstPath = numberMap.values().next().value as Path;
@@ -6715,7 +6833,7 @@ class Paths {
         // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
         if (!data || data.length <= 1) {
-            Log.warn(`this.load : aucune donnée trouvée dans la table.`);
+            Log.warn(`Paths.load : aucune donnée trouvée dans la table.`);
             return;
         }
 
@@ -6723,7 +6841,7 @@ class Paths {
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of data.slice(1).entries()) {
+            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
@@ -6732,13 +6850,13 @@ class Paths {
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
                 
                 // Récupère les champs.
-                const key = WorkbookService.getString(row, this.COL_KEY) ?? "";
-                const parityLetter = WorkbookService.getString(row, this.COL_PARITY) ?? "";
-                const lineDirectionLetter = WorkbookService.getString(row, this.COL_LINE_PARITY) ?? "";
-                const missionCode = WorkbookService.getString(row, this.COL_MISSION_CODE) ?? "";
-                const name = WorkbookService.getString(row, this.COL_NAME) ?? "";
-                const signature = WorkbookService.getString(row, this.COL_SIGNATURE) ?? "";
-                const stopsChecked = WorkbookService.getNumber(row, this.COL_STOP_CHECKED) ?? 0;
+                const key = WorkbookService.getString(row, this.COL_KEY);
+                const parityLetter = WorkbookService.getString(row, this.COL_PARITY);
+                const lineDirectionLetter = WorkbookService.getString(row, this.COL_LINE_PARITY);
+                const missionCode = WorkbookService.getString(row, this.COL_MISSION_CODE);
+                const name = WorkbookService.getString(row, this.COL_NAME);
+                const signature = WorkbookService.getString(row, this.COL_SIGNATURE);
+                const stopsChecked = WorkbookService.getNumber(row, this.COL_STOP_CHECKED);
 
                 // Crée l'objet Path et l'insère dans la base de données.
                 const path = this.create(
@@ -6811,8 +6929,8 @@ class Paths {
 
 /**
  * Classe Train définissant un train, pour un unique jour, étant la réutilisation
- * d'un ou deux trains précédents, et ayant une ou deux réutilisations,
- * en faisant référence à un sillon avec horaires pouvant circuler plusieurs jours par semaine.
+ *  d'un ou deux trains précédents, et ayant une ou deux réutilisations,
+ *  en faisant référence à un sillon avec horaires pouvant circuler plusieurs jours par semaine.
  */
 class Train {
 
@@ -6827,10 +6945,7 @@ class Train {
     public service: string;                         // Service auquel le train est rattaché
     public path: Path;                              // Parcours sur lequel le train circule
     public units: string[] = []                     // Eléments (numéro de matériel)
-    public previous: Train[] = [];                  // Trains précédents
-    //public previousNumbers: TrainNumber[] = [];     // Numéros des trains précédents
-    public reuses: Train[] = [];                    // Trains de réutilisations
-    //public reusesNumbers: TrainNumber[] = [];       // Numéros des trains de réutilisations
+    public previousKeys: string[] = [];             // Clés des trains précédents
     public reusesKeys: string[] = [];               // Clés des trains de réutilisations
 
     /**
@@ -6841,6 +6956,7 @@ class Train {
      * @param {string} [service=""] - Service auquel le train est rattaché.
      * @param {Path | string | undefined} path - Parcours sur lequel le train circule.
      * @param {string[]} [units=[]] - Eléments (numéro de matériel).
+     * @param {string[]} [previousKeys=[]] - Clés des trains précédents.
      * @param {string[]} [reusesKeys=[]] - Clés des trains de réutilisations.
      */
     constructor(
@@ -6850,8 +6966,7 @@ class Train {
         service: string = "",
         path: Path | string | undefined,
         units: string[] = [],
-        //previousNumbers: TrainNumber[],
-        //reusesNumbers: TrainNumber[],
+        previousKeys: string[] = [],
         reusesKeys: string[] = []
     ) {
         this.key = key;
@@ -6872,9 +6987,22 @@ class Train {
         }
         this.path = pathObj;
         this.units = units;
-        //this.previousNumbers = previousNumbers;
-        //this.reusesNumbers = reusesNumbers
+        this.previousKeys = previousKeys;
         this.reusesKeys = reusesKeys;
+    }
+
+    /**
+     * Retourne les trains précédents correspondants aux clés en paramètres.
+     */
+    public get previous(): (Train | undefined)[] {
+        return this.previousKeys.map(key => Train.from(key));
+    }
+
+    /**
+     * Retourne les réutilisations (trains suivants) correspondants aux clés en paramètres.
+     */
+    public get reuse(): (Train | undefined)[] {
+        return this.reusesKeys.map(key => Train.from(key));
     }
 
     /**
@@ -6897,7 +7025,7 @@ class Train {
     public static from(
         value: Train | string | null | undefined
     ): Train | undefined {
-        if (value == null || value === "") return undefined;
+        if (value == null || value === "" || value === "-") return undefined;
         if (value instanceof Train) return value;
         return Trains.get(value!);
     }
@@ -6925,28 +7053,18 @@ class Trains {
         "Date",
         "Service",
         "Parcours",
-        "Elément Nord",
-        "Elément Sud",
-        "Train Précédent Nord",
-        "Train Précédent Sud",
-        "Réutilisation Nord",
-        "Réutilisation Sud",
-        "Clé réutilisation Nord",
-        "Clé réutilisation Sud"
+        "Eléments",
+        "Trains précédents",
+        "Réutilisations"
     ]];
     private static readonly COL_KEY = 0;                    // Colonne de la clé du train
     private static readonly COL_NUMBER = 1;                 // Colonne du numéro du train
-    private static readonly COL_DATE = 2;                   // Colonne des jours de circulation
+    private static readonly COL_DATE = 2;                   // Colonne de la date et de l'heure de départ
     private static readonly COL_SERVICE = 3;                // Colonne du service auquel le train est rattaché
     private static readonly COL_PATH = 4;                   // Colonne du parcours du train
-    private static readonly COL_UNIT1 = 5;                  // Colonne de l'unité 1
-    private static readonly COL_UNIT2 = 6;                  // Colonne de l'unité 2
-    private static readonly COL_PREVIOUS1 = 7;              // Colonne du train précedent 1
-    private static readonly COL_PREVIOUS2 = 8;              // Colonne du train précedent 2
-    private static readonly COL_REUSE1 = 9;                 // Colonne de la réutilisation 1
-    private static readonly COL_REUSE2 = 10;                // Colonne de la réutilisation 2
-    private static readonly COL_REUSE_KEY1 = 11;            // Colonne de la clé de la réutilisation 1
-    private static readonly COL_REUSE_KEY2 = 12;            // Colonne de la clé de la réutilisation 2
+    private static readonly COL_UNITS = 5;                  // Colonne des éléments composant le train
+    private static readonly COL_PREVIOUS = 6;               // Colonne des trains précédents
+    private static readonly COL_REUSES = 7;                 // Colonne des réutilisations
 
     // Constantes de lecture du tableau d'importation
     private static readonly IMPORT_MODE = "TRAIN";          // Mode à filtrer
@@ -7022,16 +7140,16 @@ class Trains {
             throw new Error(`Le train ${train} est déjà présent`
                 + ` dans la base de données.`);
         }
-        this.map.set(train.key, train);;
+        this.map.set(train.key, train);
     }
 
     /**
-     * Retourne un itérateur sur les valeurs de la base de données des trains.
-     * @returns {IterableIterator<Train>} - Itérateur sur les valeurs.
+     * Retourne un tableau des valeurs de la base de données des trains.
+     * @returns {Train[]} - Itérateur sur les valeurs.
      *  de la base de données des trains.
      */
-    public static values(): IterableIterator<Train> {
-        return this.map.values();
+    public static values(): Train[] {
+        return Array.from(this.map.values());
     }
  
     /**
@@ -7053,6 +7171,7 @@ class Trains {
      * @param {string} [service=""] - Service auquel le train est rattaché.
      * @param {Path | string | undefined} path - Parcours sur lequel le train circule.
      * @param {string[]} [units=[]] - Eléments (numéro de matériel).
+     * @param {string[]} [previousKeys=[]] - Clés des trains précedents.
      * @param {string[]} [reusesKeys=[]] - Clés des trains de réutilisations.
      * @returns {Train} - Train créé, ou undefined si le train est déjà présent dans la base de données.
      * @throws {Error} - Si le train est déjà présent dans la base de données.
@@ -7064,8 +7183,7 @@ class Trains {
         service: string = "",
         path: Path | string | undefined,
         units: string[] = [],
-        //previousNumbers: TrainNumber[],
-        //reusesNumbers: TrainNumber[],
+        previousKeys: string[] = [],
         reusesKeys: string[] = []
     ): Train {
 
@@ -7077,8 +7195,7 @@ class Trains {
             service,
             path,
             units,
-            // previousNumbers,
-            // reusesNumbers,
+            previousKeys,
             reusesKeys
         );
 
@@ -7192,12 +7309,20 @@ class Trains {
             Log.warn(`Trains.load : aucune donnée trouvée dans la table.`);
             return;
         }
+        const splitAndFilter = (str: string) => 
+            str.split(/[ +,:;]+/)
+                .filter(unit => unit.length > 0);
+        const adaptWithUnits = (trainKeys: string, units: string[]) => {
+            const t = splitAndFilter(trainKeys);
+            while (t.length < units.length) t.push(t[0]);
+            return t;
+        };
 
         let excelRow: number = 0;
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of data.slice(1).entries()) {
+            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
@@ -7206,23 +7331,17 @@ class Trains {
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
                 
                 // Récupère les champs.
-                const key = WorkbookService.getString(row, this.COL_KEY) ?? "";
+                const key = WorkbookService.getString(row, this.COL_KEY);
                 const number = WorkbookService.getString(row, this.COL_NUMBER);
                 const date = WorkbookService.getNumber(row, this.COL_DATE);
-                const service = WorkbookService.getString(row, this.COL_SERVICE) ?? "";
-                const path = WorkbookService.getString(row, this.COL_PATH) ?? "";
-                const unit1 = WorkbookService.getString(row, this.COL_UNIT1) ?? "";
-                const unit2 = WorkbookService.getString(row, this.COL_UNIT2);
-                const units = unit2 ? [unit1, unit2] : [unit1];
-                const previous1 = WorkbookService.getString(row, this.COL_PREVIOUS1) ?? "";
-                const previous2 = WorkbookService.getString(row, this.COL_PREVIOUS2);
-                const previousNumbers = previous2 ? [previous1, previous2] : [previous1];
-                const reuse1 = WorkbookService.getString(row, this.COL_REUSE1) ?? "";
-                const reuse2 = WorkbookService.getString(row, this.COL_REUSE2);
-                const reusesNumbers = reuse2 ? [reuse1, reuse2] : [reuse1];
-                const reusesKeys1 = WorkbookService.getString(row, this.COL_REUSE_KEY1) ?? "";
-                const reusesKeys2 = WorkbookService.getString(row, this.COL_REUSE_KEY2);
-                const reusesKeys = reusesKeys2 ? [reusesKeys1, reusesKeys2] : [reusesKeys1];
+                const service = WorkbookService.getString(row, this.COL_SERVICE);
+                const path = WorkbookService.getString(row, this.COL_PATH);
+                const unitsString = WorkbookService.getString(row, this.COL_UNITS);
+                const units = splitAndFilter(unitsString);
+                const previousString = WorkbookService.getString(row, this.COL_PREVIOUS);
+                const previous = adaptWithUnits(previousString, units);
+                const reusesString = WorkbookService.getString(row, this.COL_REUSES);
+                const reuses = adaptWithUnits(reusesString, units);
 
                 // Crée l'objet Train et l'insère dans la base de données.
                 const train = this.create(
@@ -7232,14 +7351,13 @@ class Trains {
                     service,
                     path,
                     units,
-                    // previousNumbers,
-                    // reusesNumbers,
-                    reusesKeys
+                    previous,
+                    reuses
                 );
             } 
 
         } catch (e) {
-            throw new Error(`this.load (ligne ${excelRow}) : ${e}`);
+            throw new Error(`Trains.load (ligne ${excelRow}) : ${e}`);
         } 
     }
 
@@ -7255,6 +7373,13 @@ class Trains {
         startCell: string = "A1"
     ): void {
 
+        const joinUnits = (units: string[]) =>
+            units.length === 0
+                ? ""
+                : units.every(u => u === units[0])
+                    ? units[0]
+                    : units.join(' + ');
+
         // Convertit la base de données en un tableau de données.
         const data: (string | number)[][] = Array
             .from(this.map.values())
@@ -7264,14 +7389,9 @@ class Trains {
                 train.date.excelValue,
                 train.service,
                 train.path.key,
-                train.units[0] ?? "",
-                train.units[1] ?? "",
-                train.previous[0] ? train.previous[0].number.format(false, true) : "",
-                train.previous[1] ? train.previous[1].number.format(false, true) : "",
-                train.reuses[0] ? train.reuses[0].number.format(false, true) : "",
-                train.reuses[1] ? train.reuses[1].number.format(false, true) : "",
-                train.reuses[0] ? train.reuses[0].key : "",
-                train.reuses[1] ? train.reuses[1].key : ""
+                joinUnits(train.units),
+                joinUnits(train.previousKeys),
+                joinUnits(train.reusesKeys)
             ]);
 
         // Imprime le tableau.
@@ -7308,7 +7428,7 @@ class Trains {
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of data.slice(1).entries()) {
+            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
@@ -7319,27 +7439,23 @@ class Trains {
                 // Récupère les champs.
 
                 // Saute les lignes avec le mauvais mode (ex : bus et non train)
-                const mode = WorkbookService.getString(row, this.COL_IMPORT_MODE) ?? "";
+                const mode = WorkbookService.getString(row, this.COL_IMPORT_MODE);
 
                 if (mode !== this.IMPORT_MODE) continue;
 
-                const date = WorkbookService.getString(row, this.COL_IMPORT_DATE) ?? "";
-                const number = WorkbookService.getString(row, this.COL_IMPORT_NUMBER) ?? "";
-                const missionCode = WorkbookService.getString(row, this.COL_IMPORT_MISSION_CODE) ?? "";
-                const from = WorkbookService.getString(row, this.COL_IMPORT_FROM) ?? "";
-                const departureTime = WorkbookService.getString(row, this.COL_IMPORT_DEPARTURE_TIME) ?? "";
-                const to = WorkbookService.getString(row, this.COL_IMPORT_TO) ?? "";
-                const arrivalTime = WorkbookService.getString(row, this.COL_IMPORT_ARRIVAL_TIME) ?? "";
-                const composition = WorkbookService.getString(row, this.COL_IMPORT_UNITS) ?? "";
-                let units: string[] = [];
-                switch (composition) {
-                    case this.IMPORT_1_UNIT:
-                        units = ['-'];
-                        break;
-                    case this.IMPORT_2_UNITS:
-                        units = ['-', '-'];
-                        break;
-                }
+                const date = WorkbookService.getString(row, this.COL_IMPORT_DATE);
+                const number = WorkbookService.getString(row, this.COL_IMPORT_NUMBER);
+                const missionCode = WorkbookService.getString(row, this.COL_IMPORT_MISSION_CODE);
+                const from = WorkbookService.getString(row, this.COL_IMPORT_FROM);
+                const departureTime = WorkbookService.getString(row, this.COL_IMPORT_DEPARTURE_TIME);
+                const to = WorkbookService.getString(row, this.COL_IMPORT_TO);
+                const arrivalTime = WorkbookService.getString(row, this.COL_IMPORT_ARRIVAL_TIME);
+                const composition = WorkbookService.getString(row, this.COL_IMPORT_UNITS);
+                const units = composition === this.IMPORT_1_UNIT
+                    ? ['-']
+                    : composition === this.IMPORT_2_UNITS
+                        ? ['-', '-']
+                        : [];
 
                 // Crée le parcours à partir des gares de départ et d'arrivée.
                 const path = Path.fromTerminals(
@@ -7360,23 +7476,131 @@ class Trains {
                     "",
                     path,
                     units,
-                    // units,
-                    // units,
+                    units,
                     units
                 );
             } 
 
         } catch (e) {
-            throw new Error(`this.load (ligne ${excelRow}) : ${e}`);
+            throw new Error(`Trains.import (ligne ${excelRow}) : ${e}`);
         } 
     }
 }
 
 /**
- * Classe représentant un train.
+ * Classe TrainPath définissant un sillon, c'est à dire la capacité d'un train à rouler
+ *  sur un ou plusieurs jours de la semaine, sur un ou plusieurs services donnés.
  */
 class TrainPath {
 
+    // Constantes des éléments
+    public static readonly NORTH: number = 0;
+    public static readonly SOUTH: number = 1;
+
+    // Propriétés de l'objet TrainPath
+    public key: string;                             // Clé du sillon
+    public number: TrainNumber;                     // Numéro du sillon
+    public days: Days;                              // Jours de circulation du sillon
+    public services: string[];                      // Services auxquels le sillon est rattaché
+    public path: Path;                              // Parcours sur lequel le sillon circule
+    public units: string[] = []                     // Composistion du sillon
+    public previousKeys: string[] = [];             // Clés des sillons précédents
+    public reusesKeys: string[] = [];               // Clés des sillons de réutilisations
+
+    /**
+     * Constructeur de l'objet TrainPath.
+     * @param {string} [key=""] - Clé du sillon.
+     * @param {TrainNumber | number | string | undefined} number - Numéro du sillon.
+     * @param {Days | string | number} days - Jours de circulation du sillon.
+     * @param {string[] | string} [services=[]] - Services auxquels le sillon est rattaché.
+     * @param {Path | string | undefined} path - Parcours sur lequel le sillon circule.
+     * @param {string[]} [units=[]] - Composistion du sillon.
+     * @param {string[]} [previousKeys=[]] - Clés des sillons précédents.
+     * @param {string[]} [reusesKeys=[]] - Clés des sillons de réutilisations.
+     */
+    constructor(
+        key: string = "",
+        number: TrainNumber | number | string | undefined,
+        days: Days | string | number,
+        services: string[] | string = [],
+        path: Path | string | undefined,
+        units: string[] = [],
+        previousKeys: string[] = [],
+        reusesKeys: string[] = []
+    ) {
+        this.key = key;
+        const numberObj = TrainNumber.from(number);
+        if (!numberObj) {
+            throw new Error(`Le numéro du sillon ${this} est invalide.`);
+        }
+        this.number = numberObj;
+        const daysObj = Days.from(days);
+        if (!daysObj) {
+            throw new Error(`Les jours sillon ${this.number} sont invalides.`);
+        }
+        this.services = (typeof services === "string")
+            ? services.split(/[ +,:;]+/)
+            : services;
+        if (this.services.length === 0) {
+            throw new Error(`Le sillon ${this.number} doit être affecté à au moins un service.`);
+        }
+        const pathObj = Path.from(path);
+        if (!pathObj) {
+            throw new Error(`Le parcours du sillon ${this.number} est invalide.`);
+        }
+        this.path = pathObj;
+        this.units = units;
+        this.previousKeys = previousKeys;
+        this.reusesKeys = reusesKeys;
+    }
+
+    /**
+     * Retourne les sillons précédents correspondants aux clés en paramètres.
+     */
+    public get previous(): (TrainPath | undefined)[] {
+        return this.previousKeys.map(key => TrainPath.from(key));
+    }
+
+    /**
+     * Retourne les réutilisations (sillons suivants) correspondants aux clés en paramètres.
+     */
+    public get reuse(): (TrainPath | undefined)[] {
+        return this.reusesKeys.map(key => TrainPath.from(key));
+    }
+
+    /**
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
+     */
+    public toString(): string {
+        return this.key.toString();
+    }
+
+    /**
+     * Retourne l'objet TrainPath correspondant à la clé ou l'objet TrainPath donné.
+     * Si la clé est une string, elle est utilisée pour chercher l'objet TrainPath correspondant
+     * dans l'index des sillons. Si la clé est un objet TrainPath, il est retourné tel quel.
+     * Si la clé est une string mais que l'objet TrainPath correspondant n'existe pas, undefined est retourné.
+     * @param {TrainPath | string | null | undefined} value - Clé ou objet TrainPath.
+     * @returns {TrainPath | undefined} - Objet TrainPath correspondant,
+     *  ou undefined si la clé est une string mais que l'objet TrainPath correspondant n'existe pas.
+     */
+    public static from(
+        value: TrainPath | string | null | undefined
+    ): TrainPath | undefined {
+        if (value == null || value === "" || value === "-") return undefined;
+        if (value instanceof TrainPath) return value;
+        return TrainPaths.get(value!);
+    }
+
+    /**
+     * Construit la clé du sillon qui est composée du premier service rattaché
+     *  suivi du numéro de sillon et du groupe de jours de circulation.
+     * @returns {string} - Clé du sillon.
+     */
+    public buildKey(): string {
+        return `${this.services[0]}_${this.number.format()}_${this.days.code}`;
+    }
 }
 
 /**
@@ -7384,6 +7608,274 @@ class TrainPath {
  */
 class TrainPaths {
 
+    // Constantes de lecture de la base de données Excel
+    private static readonly SHEET = "Sillons";              // Feuille contenant la liste des sillons
+    private static readonly TABLE = "Sillons";              // Tableau contenant la liste des sillons
+    private static readonly HEADERS = [[                    // En-têtes du tableau des sillons
+        "Clé",
+        "Numéro du sillon",
+        "Jours",
+        "Services",
+        "Parcours",
+        "Eléments",
+        "Sillons précédents",
+        "Réutilisations"
+    ]];
+    private static readonly COL_KEY = 0;                    // Colonne de la clé du sillon
+    private static readonly COL_NUMBER = 1;                 // Colonne du numéro du sillon
+    private static readonly COL_DAYS = 2;                   // Colonne des jours de circulation
+    private static readonly COL_SERVICES = 3;               // Colonne des services auxquels le sillon est rattaché
+    private static readonly COL_PATH = 4;                   // Colonne du parcours du sillon
+    private static readonly COL_UNITS = 5;                  // Colonne de la composition du sillon
+    private static readonly COL_PREVIOUS = 6;               // Colonne du sillon précédent
+    private static readonly COL_REUSES = 7;                 // Colonne de la réutilisation
+
+    // Constantes de classe
+    public static readonly UNKNOWN_UNIT = "?";
+    
+    // Map des sillons indexées par abréviation
+    public static readonly map: Map<string, TrainPath> = new Map();
+
+    /**
+     * Nombre de sillons enregistrés dans la base de données.
+     * @returns {number} - Nombre de sillons enregistrés.
+     */
+    public static get size(): number {
+        return this.map.size;
+    }
+
+    /**
+     * Vérifie si un sillon est présent dans la base de données.
+     * @param {string} key - Clé du sillon.
+     * @returns {boolean} - Vrai si le sillon gare est présent, faux sinon.
+     */
+    public static has(key: string): boolean {
+        return this.map.has(key);
+    }
+
+    /**
+     * Renvoie un sillon correspondant à la clé donnée.
+     * @param {string} key - Clé du sillon.
+     * @returns {TrainPath | undefined} - TrainPath correspondant, ou undefined si non trouvé.
+     */
+    public static get(key: string): TrainPath | undefined {
+        return this.map.get(key);
+    }
+
+    /**
+     * Ajoute un sillon dans la base de données, référencé par sa clé.
+     * Si le sillon est déjà présent, une erreur est levée.
+     * @param {TrainPath} trainPath - TrainPath à ajouter.
+     * @throws {Error} - Si le sillon est déjà présent dans la base de données.
+     */
+    private static set(trainPath: TrainPath): void {
+        if (this.has(trainPath.key)) {
+            throw new Error(`Le sillon ${trainPath} est déjà présent`
+                + ` dans la base de données.`);
+        }
+        this.map.set(trainPath.key, trainPath);
+    }
+
+    /**
+     * Retourne un tableau des valeurs de la base de données des sillons.
+     * @returns {TrainPath[]} - Itérateur sur les valeurs.
+     *  de la base de données des sillons.
+     */
+    public static values(): TrainPath[] {
+        return Array.from(this.map.values());
+    }
+ 
+    /**
+     * Efface tous les sillons de la base de données.
+     * Cela permet de forcer le rechargement des sillons si besoin.
+     */
+    public static clear(): void {
+        this.map.clear();
+    }
+ 
+    /**
+     * Crée un objet TrainPath avec les paramètres donnés.
+     * Si la clé est vide, génère une clé unique pour le sillon,
+     *  ou renvoie le sillon concerné si déjà existant.
+     * Si un sillon avec la même clé est déjà présent dans la base de données, une erreur est levée.
+     * @param {string} [key=""] - Clé du sillon.
+     * @param {TrainNumber | number | string | undefined} number - Numéro du sillon.
+     * @param {Days | string | number} days - Jours de circulation du sillon.
+     * @param {string[] | string} [services=[]] - Services auxquels le sillon est rattaché.
+     * @param {Path | string | undefined} path - Parcours sur lequel le sillon circule.
+     * @param {string[]} [units=[]] - Composistion du sillon.
+     * @param {string[]} [previousKeys=[]] - Clés des sillons précédents.
+     * @param {string[]} [reusesKeys=[]] - Clés des sillons de réutilisations.
+     * @returns {TrainPath} - TrainPath créé, ou undefined si le sillon est déjà présent dans la base de données.
+     * @throws {Error} - Si le sillon est déjà présent dans la base de données.
+     */
+    public static create(
+        key: string = "",
+        number: TrainNumber | number | string | undefined,
+        days: Days | string | number,
+        services: string[] | string = [],
+        path: Path | string | undefined,
+        units: string[] = [],
+        previousKeys: string[] = [],
+        reusesKeys: string[] = []
+    ): TrainPath {
+
+        // Instancie l'objet TrainPath.
+        const trainPath = new TrainPath(
+            key,
+            number,
+            days,
+            services,
+            path,
+            units,
+            previousKeys,
+            reusesKeys
+        );
+
+        // Insère le sillon dans la base de données, en générant si besoin la clé
+        return this.insert(trainPath);
+    }
+
+    /**
+     * Ajoute un sillon dans la base de données.
+     * @param {TrainPath} trainPath - TrainPath à ajouter.
+     * @returns {TrainPath} - TrainPath ajouté.
+     */
+    private static insert(trainPath: TrainPath): TrainPath {
+
+        // Ajoute l'objet Path dans la base de données, indexé par sa clé.
+        // Si un sillon avec la même clé est déjà présent dans la base de données, une erreur est levée.
+        this.set(trainPath);
+
+        return trainPath;
+    }
+
+    /**
+     * Supprime le sillon de la base de données dont la clé est donnée en paramètre.
+     * @param {string} key - Clé du sillon à supprimer.
+     */
+    public static delete(key: string): void {
+
+        // Supprime le sillon de la map.
+        this.map.delete(key);
+    }
+
+    /**
+     * Charge les sillons.
+     * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
+     *  Si faux (par défaut), ne recharge pas si déjà chargé.
+     */
+    public static load(erase: boolean = false): void {
+
+        // Vérifie si la table à charger existe déjà.
+        if (this.size > 0) {
+            if (!erase) return;
+            this.clear();
+        }
+
+        // Charge les parcours s'ils ne sont pas encore chargés.
+        Paths.load(); 
+
+        // Charge la base de données.
+        const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
+        if (!data || data.length <= 1) {
+            Log.warn(`TrainPaths.load : aucune donnée trouvée dans la table.`);
+            return;
+        }
+        const splitAndFilter = (str: string) => 
+            str.split(/[ +,:;]+/)
+                .filter(unit => unit.length > 0);
+        const adaptWithUnits = (trainPathKeys: string, units: string[]) => {
+            const t = splitAndFilter(trainPathKeys);
+            while (t.length < units.length) t.push(t[0]);
+            return t;
+        };
+
+        let excelRow: number = 0;
+        try {
+
+            // Parcourt les lignes (hors en-tête).
+            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
+
+                // Vérifie si la ligne est vide.
+                if (row.length === 0) continue;
+
+                // Calcule le numéro de ligne Excel.
+                excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
+                
+                // Récupère les champs.
+                const key = WorkbookService.getString(row, this.COL_KEY);
+                const number = WorkbookService.getString(row, this.COL_NUMBER);
+                const days = WorkbookService.getString(row, this.COL_DAYS);
+                const services = WorkbookService.getString(row, this.COL_SERVICES);
+                const path = WorkbookService.getString(row, this.COL_PATH);
+                const unitsString = WorkbookService.getString(row, this.COL_UNITS);
+                const units = splitAndFilter(unitsString);
+                const previousString = WorkbookService.getString(row, this.COL_PREVIOUS);
+                const previous = adaptWithUnits(previousString, units);
+                const reusesString = WorkbookService.getString(row, this.COL_REUSES);
+                const reuses = adaptWithUnits(reusesString, units);
+
+                // Crée l'objet TrainPath et l'insère dans la base de données.
+                const trainPath = this.create(
+                    key,
+                    number,
+                    days,
+                    services,
+                    path,
+                    units,
+                    previous,
+                    reuses
+                );
+            } 
+
+        } catch (e) {
+            throw new Error(`TrainPaths.load (ligne ${excelRow}) : ${e}`);
+        } 
+    }
+
+    /**
+     * Sauvegarde les sillons de la base de données dans un tableau.
+     * @param {string} [sheetName=this.SHEET] - Nom de la feuille de calcul.
+     * @param {string} [tableName=this.TABLE] - Nom du tableau.
+     * @param {string} [startCell="A1"] - Adresse de la cellule de départ pour le tableau.
+     */
+    public static print(
+        sheetName: string = this.SHEET,
+        tableName: string = this.TABLE,
+        startCell: string = "A1"
+    ): void {
+
+        const joinUnits = (units: string[]) =>
+            units.length === 0
+                ? ""
+                : units.every(u => u === units[0])
+                    ? units[0]
+                    : units.join(' + ');
+
+        // Convertit la base de données en un tableau de données.
+        const data: (string | number)[][] = Array
+            .from(this.map.values())
+            .map((trainPath: TrainPath) => [
+                trainPath.key,
+                trainPath.number.format(false, true),
+                trainPath.days.code,
+                trainPath.services.join(' ,'),
+                trainPath.path.key,
+                joinUnits(trainPath.units),
+                joinUnits(trainPath.previousKeys),
+                joinUnits(trainPath.reusesKeys)
+            ]);
+
+        // Imprime le tableau.
+        const table = WorkbookService.printTable(
+            this.HEADERS,
+             data,
+             sheetName,
+             tableName,
+             startCell
+        );
+    }
 }
 
 function testWorkbookService(options: Partial<AssertDDOptions> = {}) {
@@ -7391,72 +7883,77 @@ function testWorkbookService(options: Partial<AssertDDOptions> = {}) {
     const testSheetName = "testWorkbookService";
     const testTableName = "testTable";
 
-    // 1️⃣ Test getSheet : création si inexistante
+    // 1️⃣ Création feuille
     let sheet = WorkbookService.getSheet(testSheetName, { createIfMissing: true });
-    assert.check("Création d'une nouvelle feuille", sheet.getName(), testSheetName);
+    assert.check("Création feuille", sheet.getName(), testSheetName);
 
-    // 2️⃣ Test getSheet : récupération feuille existante
+    // 2️⃣ Récup feuille existante
     const sheet2 = WorkbookService.getSheet(testSheetName);
-    assert.check("Récupération feuille existante", sheet2.getName(), testSheetName);
+    assert.check("Récup feuille", sheet2.getName(), testSheetName);
 
-    // 3️⃣ Test checkCellName : valide
-    assert.check("Cellule valide A1", WorkbookService.checkCellName("A1"), "A1");
+    // 3️⃣ checkCellName OK
+    assert.check("Cellule valide", WorkbookService.checkCellName("A1"), "A1");
 
-    // 4️⃣ Test checkCellName : invalide
-    assert.check(
-        "Cellule invalide 123",
-        WorkbookService.checkCellName("123", false),
-        ""
-    );
+    // 4️⃣ checkCellName KO
+    assert.check("Cellule invalide", WorkbookService.checkCellName("123", false), "");
 
-    // 5️⃣ Test printTable : création tableau avec données simples
+    // 5️⃣ Création tableau
     const headers = [["ColStr", "ColNum", "ColBool"]];
     const data = [
         ["Paris", 42, true],
         ["", "12", "FALSE"],
         [undefined, "abc", undefined]
     ];
-    const table = WorkbookService.printTable(headers, data, testSheetName, testTableName, "A1", true);
+
+    const table = WorkbookService.printTable(headers, data, testSheetName, testTableName);
     assert.check("Création tableau", table?.getName(), testTableName);
 
-    // 6️⃣ Test getTable : récupération tableau existant
-    const table2 = WorkbookService.getTable(testSheetName, testTableName, true);
-    assert.check("Récupération tableau existant", table2?.getName(), testTableName);
+    // 6️⃣ Lecture brute
+    const tableData = WorkbookService.getDataFromTable(testSheetName, testTableName);
+    assert.check("Lecture brute", tableData[1][0], "Paris");
 
-    // 7️⃣ Test getDataFromTable : vérifie les données brutes
-    const tableData = WorkbookService.getDataFromTable(testSheetName, testTableName, true);
-    assert.check("Lecture donnée brute [Paris]", tableData[1][0], "Paris");
+    const row1 = tableData[1];
+    const row2 = tableData[2];
+    const row3 = tableData[3];
 
-    // --- TESTS I/O WorkbookService ------------------------------------
-
-    const row1 = tableData[1]; // ["Paris", 42, true]
-    const row2 = tableData[2]; // ["", "12", "FALSE"]
-    const row3 = tableData[3]; // [undefined, "abc", ""]
-
-    // 8️⃣ getString
+    // --- getString (avec défaut "")
     assert.check("getString normal", WorkbookService.getString(row1, 0), "Paris");
-    assert.check("getString chaîne vide", WorkbookService.getString(row2, 0), undefined);
-    assert.check("getString undefined", WorkbookService.getString(row3, 0), undefined);
+    assert.check("getString vide => ''", WorkbookService.getString(row2, 0), "");
+    assert.check("getString undefined => ''", WorkbookService.getString(row3, 0), "");
 
-    // 9️⃣ getNumber
+    // --- getNumber (défaut 0)
     assert.check("getNumber number", WorkbookService.getNumber(row1, 1), 42);
-    assert.check("getNumber string numérique", WorkbookService.getNumber(row2, 1), 12);
-    assert.check("getNumber string invalide", WorkbookService.getNumber(row3, 1), undefined);
+    assert.check("getNumber string", WorkbookService.getNumber(row2, 1), 12);
+    assert.check("getNumber invalide => 0", WorkbookService.getNumber(row3, 1), 0);
 
-    // 🔟 getBoolean
+    // --- getBoolean (défaut false)
     assert.check("getBoolean true", WorkbookService.getBoolean(row1, 2), true);
     assert.check("getBoolean 'FALSE'", WorkbookService.getBoolean(row2, 2), false);
-    assert.check("getBoolean undefined", WorkbookService.getBoolean(row3, 2), undefined);
+    assert.check("getBoolean undefined => false", WorkbookService.getBoolean(row3, 2), false);
 
-    // 1️⃣1️⃣ Nettoyage : supprime la feuille de test
+    // --- getRequired (OK)
+    assert.check("getRequiredString OK", WorkbookService.getRequiredString(row1, 0), "Paris");
+    assert.check("getRequiredNumber OK", WorkbookService.getRequiredNumber(row1, 1), 42);
+    assert.check("getRequiredBoolean OK", WorkbookService.getRequiredBoolean(row1, 2), true);
+
+    // --- getRequired (KO)
+    let errorCount = 0;
+
+    try { WorkbookService.getRequiredString(row2, 0); } catch { errorCount++; }
+    try { WorkbookService.getRequiredNumber(row3, 1); } catch { errorCount++; }
+    try { WorkbookService.getRequiredBoolean(row3, 2); } catch { errorCount++; }
+
+    assert.check("getRequired KO déclenche erreur", errorCount, 3);
+
+    // 7️⃣ Suppression feuille
     WorkbookService.getSheet(testSheetName)?.delete();
     assert.check(
-        "Suppression feuille test",
+        "Suppression feuille",
         WorkbookService.getSheet(testSheetName, { failOnError: false }),
         null
     );
 
-    // 1️⃣2️⃣ Résumé
+    // 8️⃣ Résumé
     assert.printSummary("Tests WorkbookService");
 }
 
@@ -8557,14 +9054,35 @@ function testTrainNumber(options: Partial<AssertDDOptions> = {}) {
     });
 
     // ------------------------------------------------------------
+    // includes()
+    // ------------------------------------------------------------
+
+    const tn = TrainNumber.from(146490);
+
+    const includesTests = [
+        { value: "146490", expected: true },
+        { value: "146491", expected: true },
+        { value: "146490/1", expected: true },
+        { value: "146491/0", expected: true },
+        { value: "146492", expected: false }
+    ];
+
+    includesTests.forEach(t => {
+        assert.check(
+            `includes(${t.value})`,
+            tn.includes(t.value),
+            t.expected
+        );
+    });
+
+    // ------------------------------------------------------------
     // isW()
     // ------------------------------------------------------------
 
     const wTests = [
         { value: 146490, expected: true },
         { value: 569907, expected: true },
-        { value: 147490, expected: false },
-        { value: 165470, expected: false }
+        { value: 147490, expected: false }
     ];
 
     wTests.forEach(t => {
@@ -8573,74 +9091,43 @@ function testTrainNumber(options: Partial<AssertDDOptions> = {}) {
     });
 
     // ------------------------------------------------------------
-    // Tests toString()
+    // isMouvement()
     // ------------------------------------------------------------
 
-    const printTests = [
+    const mouvementTests = [
+        { value: "E46490", expected: true },
+        { value: "146490", expected: false }
+    ];
+
+    mouvementTests.forEach(t => {
+        const tn = TrainNumber.from(t.value);
+        assert.check(`isMouvement(${t.value})`, tn.isMouvement(), t.expected);
+    });
+
+    // ------------------------------------------------------------
+    // format()
+    // ------------------------------------------------------------
+
+    const formatTests = [
         {
-            desc: "Sans abréviation, sans double parité",
+            desc: "Abrégé",
             value: 146490,
-            doubleParity: false,
-            abbreviate: false,
-            withoutDoubleParity: false,
-            expected: "146490"
+            expected: "6490",
+            args: [true, false]
         },
         {
-            desc: "Abréviation à 4 chiffres",
+            desc: "Double masquée",
             value: 146490,
-            doubleParity: false,
-            abbreviate: true,
-            withoutDoubleParity: false,
-            expected: "6490"
-        },
-        {
-            desc: "Non abrégeable à 4 chiffres",
-            value: 569907,
-            doubleParity: false,
-            abbreviate: true,
-            withoutDoubleParity: false,
-            expected: "569907"
-        },
-        {
-            desc: "Double parité implicite conservée",
-            value: "146490/1",
-            doubleParity: false,
-            abbreviate: false,
-            withoutDoubleParity: false,
-            expected: "146490/1"
-        },
-        {
-            desc: "Double parité forcée par constructeur",
-            value: 146490,
-            doubleParity: true,
-            abbreviate: false,
-            withoutDoubleParity: false,
-            expected: "146490/1"
-        },
-        {
-            desc: "Double parité avec abréviation",
-            value: 146490,
-            doubleParity: true,
-            abbreviate: true,
-            withoutDoubleParity: false,
-            expected: "6490/1"
-        },
-        {
-            desc: "Double parité masquée",
-            value: 146490,
-            doubleParity: true,
-            abbreviate: true,
-            withoutDoubleParity: true,
-            expected: "6490"
+            expected: "6490",
+            args: [true, true]
         }
     ];
 
-    printTests.forEach(t => {
-        const tn = TrainNumber.from(t.value, t.doubleParity);
-
+    formatTests.forEach(t => {
+        const tn = TrainNumber.from(t.value, false);
         assert.check(
-            `TrainNumber(${t.value}, doubleParity=${t.doubleParity}).format(${t.abbreviate}, ${t.withoutDoubleParity}) (${t.desc})`,
-            tn.format(t.abbreviate, t.withoutDoubleParity),
+            `format(${t.value}) (${t.desc})`,
+            tn.format(...t.args),
             t.expected
         );
     });
@@ -8725,7 +9212,7 @@ function testStation(options: Partial<AssertDDOptions> = {}) {
        - Accès par ID et clé
        ========================================================== */
 
-    const firstStation = Stations.values().next().value as Station;
+    const firstStation = Stations.values()[0] as Station;
 
     assert.check(
         "Stations contient au moins une Station",
@@ -9038,7 +9525,7 @@ function testConnection(options: Partial<AssertDDOptions> = {}) {
           2. values() / accès
           ========================================================== */
    
-       const firstConnection = Connections.values().next().value as Connection;
+       const firstConnection = Connections.values()[0] as Connection;
    
        assert.check(
            "Connections.values() retourne une Connection",
@@ -9513,7 +10000,7 @@ function testPath(options: Partial<AssertDDOptions> = {}) {
        ========================================================== */
 
     const rebuilt = new Path();
-    rebuilt.stops = [...path.stops];
+    rebuilt.stops = Array.from(path.stops);
     rebuilt.stopsChecked = Path.FULL_PATH;
 
     const rebuiltConnections = rebuilt.buildConnectionsFromStops();

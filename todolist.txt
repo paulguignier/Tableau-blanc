@@ -1,46 +1,20 @@
-vérif les . à partir de Paths y compris sur les classes, avec verbe sur chaque commentaire
-supprimer stationName
 
-vérifier la largeur de tout le code
 faire le template des classes
-
-
-faire un Parity.setFromTrainNumber(TrainNumber) à différencier de TrainNumber
-
-mettre toutes les classes au nouveau format comme Day
-calcul date et heure à vérifier
-chargement des temps avec adaptTime
 
 addStop : enlever le lien avec firstStop et lastStop : le faire lors du check + enlever firstStation et lastStation car non lue dans load
 Vérif prise en compte temps de retournement ds calcul des temps FindPath
 changeNumber
-Fichier test complet avec train factice
+
 
 FindPath Déduire du temps de parcours les accélérations freinage : différence entre temps sans arrêt et temps avec arrêt, divisé par le nombre de gare sans arrêt => déduire 1/2 sur les connexions encadrantes, et 1 au milieu
 Optimiser liste sillons avec compareTo
-Ajouter nom Pdt dans sillons
-lecture des extractions Solfe : trouver si un sillon existe déjà
+
 
 Evolutions
-Trains double (ex transbo)
 
 ajout d'une méthode pour temps de réut, et savoir si RBT avant réut
-
-
-classe Trains
-firstStation et lastStation en get avec firstStationName et lastStationName
-
-
-
-
-
-renommer commentaires avec des verbes
-
-
 
 
 
 vérifier que lors de la lecture des horaires, ce n'est pas la valeur 0 qui est lue mais " quand la cellule est vide
 
-
-voir pour remplacer les map avec chaine
