@@ -1,10 +1,6 @@
 
 faire le template des classes
 
-addStop : enlever le lien avec firstStop et lastStop : le faire lors du check + enlever firstStation et lastStation car non lue dans load
-Vérif prise en compte temps de retournement ds calcul des temps FindPath
-changeNumber
-
 
 FindPath Déduire du temps de parcours les accélérations freinage : différence entre temps sans arrêt et temps avec arrêt, divisé par le nombre de gare sans arrêt => déduire 1/2 sur les connexions encadrantes, et 1 au milieu
 Optimiser liste sillons avec compareTo
@@ -18,3 +14,4 @@ ajout d'une méthode pour temps de réut, et savoir si RBT avant réut
 
 vérifier que lors de la lecture des horaires, ce n'est pas la valeur 0 qui est lue mais " quand la cellule est vide
 
+méthode mettoyage Paths non utilisés

@@ -29,14 +29,14 @@ function main(workbook: ExcelScript.Workbook) {
 
     // Lance la fonction de tests.
     // Si les tests sont actifs, la suite du programme n'est pas exécuté. 
-    if (runAllTests(testMode)) return;
+    // if (runAllTests(testMode)) return;
 
     try {
         Log.info(`Chargement des paramètres`);
         Params.load();
         Connections.load();
 
-        
+ 
         Trains.import();
         Trains.print();
         Paths.print();
@@ -79,16 +79,16 @@ function runAllTests(testMode: boolean = false): boolean {
     Log.info(`Début des tests`);
 
     try {
-        testWorkbookService({ printSuccess: false, printFailure: true });
-        testDateTime({ printSuccess: false, printFailure: true });
-        testDays({ printSuccess: false, printFailure: true });
-        testParity({ printSuccess: false, printFailure: true });
-        testTrainNumber({ printSuccess: false, printFailure: true });
-        testStation({ printSuccess: false, printFailure: true });
-        testStationWithParity({ printSuccess: false, printFailure: true });
-        testConnection({ printSuccess: false, printFailure: true });
-        testStop({ printSuccess: false, printFailure: true });
-        testPath({ printSuccess: false, printFailure: true });
+        // testWorkbookService({ printSuccess: false, printFailure: true });
+        // testDateTime({ printSuccess: false, printFailure: true });
+        // testDays({ printSuccess: false, printFailure: true });
+        // testParity({ printSuccess: false, printFailure: true });
+        // testTrainNumber({ printSuccess: false, printFailure: true });
+        // testStation({ printSuccess: false, printFailure: true });
+        // testStationWithParity({ printSuccess: false, printFailure: true });
+        // testConnection({ printSuccess: false, printFailure: true });
+        // testStop({ printSuccess: false, printFailure: true });
+        // testPath({ printSuccess: false, printFailure: true });
 
     } catch (e) {
         Log.warn("Erreur lors des tests", e.message);
@@ -99,7 +99,7 @@ function runAllTests(testMode: boolean = false): boolean {
     Log.info(`Fin des tests`);
     return true;
 
-  
+ 
 
 
 
@@ -148,8 +148,8 @@ class Log {
         debug: true,                        //  Remontée des messages de debug
         info: true,                         //  Remontée des messages d'information
         warn: true                          //  Remontée des messages d'avertissement
-    };                                      
-    
+    }; 
+ 
     /**
      * Vérifie si une valeur est concatenable (null, undefined, string, number, boolean).
      * @param {unknown} value - Valeur à vérifier.
@@ -183,7 +183,7 @@ class Log {
 
         const output: unknown[] = [];
         let buffer = `[${level}]`;
-    
+ 
         args.forEach(arg => {
             if (this.isConcatable(arg)) {
                 buffer += " " + String(arg);
@@ -196,15 +196,15 @@ class Log {
                 output.push(arg);
             }
         });
-    
+ 
         // Flush final
         if (buffer.trim() !== "") {
             output.push(buffer);
         }
-    
+ 
         CONSOLE.log(...output);
-    }    
-    
+    } 
+ 
     /**
      * Configure les options de l'affichage des logs.
      * @param {Partial<LogOptions>} options - Options de l'affichage des logs :
@@ -224,7 +224,7 @@ class Log {
         if (!this.options.debug) return;
         this.log("DEBUG", args);
     }
-    
+ 
     /**
      * Envoie un message au console avec le niveau "INFO".
      * @param {...unknown[]} args - Arguments à passer au console.log.
@@ -233,7 +233,7 @@ class Log {
         if (!this.options.info) return;
         this.log("INFO", args);
     }
-    
+ 
     /**
      * Envoie un message au console avec le niveau "WARN".
      * @param {...unknown[]} args - Arguments à passer au console.log.
@@ -242,7 +242,7 @@ class Log {
         if (!this.options.warn) return;
         this.log("WARN", args);
     }
-    
+ 
 }
 
 /*
@@ -374,29 +374,29 @@ class WorkbookService {
             failOnError?: boolean;      // Vrai par défaut
         }
     ): ExcelScript.Worksheet | null {
-    
+ 
         const createIfMissing = options?.createIfMissing ?? false;
         const failOnError = options?.failOnError ?? true;
-        
+ 
         let sheet = WORKBOOK.getWorksheet(sheetName);
-    
+ 
         if (!sheet) {
             if (createIfMissing) {
                 sheet = WORKBOOK.addWorksheet(sheetName);
                 Log.info(`Feuille "${sheetName}" créée.`);
                 return sheet;
             }
-    
+ 
             const msg = `La feuille "${sheetName}" n'existe pas.`;
             if (failOnError) throw new Error(msg);
             Log.warn(msg);
 
             return null;
         }
-    
+ 
         return sheet;
     }
-    
+ 
     /**
      * Renvoie toutes les données non vides d'une feuille Excel.
      * Utilise la plage "utilisée" (used range).
@@ -537,8 +537,8 @@ class WorkbookService {
             return ["true", "1", "oui", "yes"].includes(v.toLowerCase());
         }
         return undefined;
-    }  
-    
+    } 
+ 
     /**
      * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de chaîne,
      * en supprimant les espaces inutiles, ou la valeur par défaut si la valeur est null ou undefined.
@@ -787,7 +787,7 @@ class ExcelDate {
 
     // Cache des jours fériés par année
     private static holidayCache = new Map<number, Set<number>>();
-        
+ 
     // Propriétés de l'objet DateTime
     public readonly value: number;
     public readonly year: number;
@@ -833,17 +833,17 @@ class ExcelDate {
         const separatorRegex = /[/\-]/; // Séparateur : / ou -
         const parts = value.split(separatorRegex);
         if (parts.length < 2 || parts.length > 3) return undefined;
-    
+ 
         let day: number;
         let month: number;
         let year: number;
-    
+ 
         const p0 = Number(parts[0]);
         const p1 = Number(parts[1]);
         const p2 = parts.length === 3 ? Number(parts[2]) : undefined;
-    
+ 
         if ([p0, p1, p2].some(v => v !== undefined && isNaN(v))) return undefined;
-    
+ 
         if (parts.length === 2) {
             // dd/MM (année courante)
             day = p0;
@@ -860,7 +860,7 @@ class ExcelDate {
             month = p1;
             year = p2!;
         }
-    
+ 
         if (
             day <= 0 || day > 31 ||
             month <= 0 || month > 12
@@ -868,7 +868,7 @@ class ExcelDate {
 
         const jsDate = new Date(Date.UTC(year, month - 1, day));
         const excelEpoch = Date.UTC(1899, 11, 30);
-        
+ 
         return (jsDate.getTime() - excelEpoch) / 86400000;
     }
 
@@ -878,15 +878,15 @@ class ExcelDate {
      * @returns {boolean} - Vrai si la date est un jour férié, faux sinon.
      */
     public static getHolidays(year: number): Set<number> {
-    
+ 
         if (this.holidayCache.has(year)) {
             return this.holidayCache.get(year)!;
         }
-    
+ 
         const set = new Set<number>();
-    
+ 
         const add = (m: number, d: number) => set.add(m * 100 + d);
-    
+ 
         // Donne les jours fériés fixes
         add(1, 1);
         add(5, 1);
@@ -896,7 +896,7 @@ class ExcelDate {
         add(11, 1);
         add(11, 11);
         add(12, 25);
-    
+ 
         // Calcule le jour de Pâques
         const a = year % 19;
         const b = Math.floor(year / 100);
@@ -910,27 +910,27 @@ class ExcelDate {
         const k = c % 4;
         const l = (32 + 2 * e + 2 * i - h - k) % 7;
         const m = Math.floor((a + 11 * h + 22 * l) / 451);
-    
+ 
         const easterMonth = Math.floor((h + l - 7 * m + 114) / 31);
         const easterDay = ((h + l - 7 * m + 114) % 31) + 1;
-    
+ 
         const addDays = (delta: number): [number, number] => {
             const d = new Date(Date.UTC(year, easterMonth - 1, easterDay + delta));
             return [d.getUTCMonth() + 1, d.getUTCDate()];
         };
-    
+ 
         // Calcule le Lundi de Pâques
         let [mm, dd] = addDays(1);
         add(mm, dd);
-    
+ 
         // Calcule le jour de l'Ascension
         [mm, dd] = addDays(39);
         add(mm, dd);
-    
+ 
         // Calcule le Lundi de Pentecôte
         [mm, dd] = addDays(50);
         add(mm, dd);
-    
+ 
         this.holidayCache.set(year, set);
         return set;
     }
@@ -971,19 +971,19 @@ class ExcelTime {
                                         //  est considérée comme un séparateur (ex : 'h', 'min' ...)
         const parts = value.split(separatorRegex).filter((t) => Boolean(t));
         if (parts.length < 2 || parts.length > 3) return undefined;
-    
+ 
         const [hStr, mStr, sStr = "0"] = parts;
-    
+ 
         const h = Number(hStr);
         const m = Number(mStr);
         const s = Number(sStr);
-    
+ 
         if (
             isNaN(h) || isNaN(m) || isNaN(s) ||
             m < 0 || m >= 60 ||
             s < 0 || s >= 60
         ) return undefined;
-    
+ 
         return (h * 3600 + m * 60 + s) / 86400;
     }
 }
@@ -1006,6 +1006,10 @@ class DateTime {
 
     // Heure de changement de journée (fraction de jour Excel)
     public static rolloverHour: number;             // Heure de changement de journée (en temps Excel)
+
+    // Ecart minimal entre 
+    public static readonly MAX_GAP: number = 3/24/3600; // Différence maximale entre 2 horaires
+                                                        //  pour les considérer comme égaux
 
     // Format des dates et heures
     public static readonly DATE_FORMAT_FOR_ID: string = "yymmdd";
@@ -1073,7 +1077,7 @@ class DateTime {
         isRelative?: boolean,
         adaptTime: boolean = true
     ): DateTime | undefined {
-        
+ 
         if (value == null || value === "") return undefined;
 
         if (value instanceof DateTime) {
@@ -1090,7 +1094,7 @@ class DateTime {
 
         if (typeof value === "string") {
             const trimmed = value.trim();
-    
+ 
             // 👉 cas nombre "simple"
             if (/^-?\d+(?:[.,]\d+)?$/.test(trimmed)) {
                 v = Number(trimmed.replace(",", "."));
@@ -1102,14 +1106,14 @@ class DateTime {
         } else {
             v = value;
         }
-    
+ 
         if (v === undefined || isNaN(v)) return undefined;
-    
+ 
         // Un temps absolu doit être >= 0
         if (!isRelative && v < 0) return undefined;
-    
+ 
         return new DateTime(v, isRelative ?? false, adaptTime);
-    }  
+    } 
 
     /**
      * Retourne l'objet ExcelDate de la date, adaptée ou non.
@@ -1156,7 +1160,7 @@ class DateTime {
         const dateObj = this.getDateObj(adaptedValue);
         return dateObj?.month ?? 0;
     }
-   
+ 
     /**
      * Retourne le jour du mois de la date, adapté ou non.
      * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir le jour du mois
@@ -1168,7 +1172,7 @@ class DateTime {
         const dateObj = this.getDateObj(adaptedValue);
         return dateObj?.day ?? 0;
     }
-    
+ 
     /**
      * Retourne le jour de la semaine correspondant à la date, adapté ou non.
      * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir le jour de la semaine
@@ -1200,7 +1204,7 @@ class DateTime {
         }
         return timeObj.value;
     }
-    
+ 
     /**
      * Retourne le nombre d'heures de l'heure correspondant au temps, adapté ou non.
      * Si le temps est relatif, renvoie le nombre d'heures relatif.
@@ -1269,51 +1273,51 @@ class DateTime {
         isRelative?: boolean,
         adaptTime: boolean = true
     ): DateTime | undefined {
-        
+ 
         if (!value) return undefined;
-    
+ 
         const parts = value.trim().split(/[ ;]+/);
-    
+ 
         let date: number | undefined;
         let time: number | undefined;
-        
+ 
         type SignState = "unknown" | "negative" | "invalid";
         let signState: SignState = "unknown";
-    
+ 
         for (let part of parts) {
-    
+ 
             if (part === '-') {
                 signState = (signState === "unknown") ? "negative" : "invalid";
                 continue;
             }
-    
+ 
             if (part.startsWith('-')) {
                 signState = (signState === "unknown") ? "negative" : "invalid";
                 part = part.slice(1);
             }
-    
+ 
             if (part.includes('/') || part.split('-').length === 3) {
                 date = ExcelDate.parseDate(part);
                 if (date === undefined) return undefined;
-    
+ 
                 signState = "invalid";
             }
             else if (part.includes(':') || part.toLowerCase().includes('h')) {
                 const parsedTime = ExcelTime.parseTime(part);
                 if (parsedTime === undefined) return undefined;
-    
+ 
                 time = parsedTime;
             }
         }
 
         if (date === undefined && time === undefined) return undefined;
-    
+ 
         if (time !== undefined && signState === "negative") {
             time = -time;
         }
-    
+ 
         const result = (date ?? 0) + (time ?? 0);
-    
+ 
         return new DateTime(result, isRelative, adaptTime);
     }
 
@@ -1348,7 +1352,7 @@ class DateTime {
         //     adaptée si l'heure est inférieure à l'heure de changement de jour,
         //     d'une valeur comprise entre 0 et 1, ou dépassant 1 si adaptée.
         this._time = new ExcelTime(timeOfDays);
-        
+ 
         this._computed = true;
     }
 
@@ -1398,7 +1402,7 @@ class DateTime {
         return (
             !! other &&
             this.isRelative === other.isRelative &&
-            this.excelValue === other.excelValue
+            (Math.abs(this.excelValue - other.excelValue) < DateTime.MAX_GAP)
         );
     }
 
@@ -1428,7 +1432,7 @@ class DateTime {
         }
         return this.excelValue - other.excelValue;
     }
-    
+ 
     /**
      * Ajoute un temps relatif à un autre temps relatif.
      * @param {DateTime} other - Temps relatif à ajouter.
@@ -1477,7 +1481,7 @@ class DateTime {
         let prefix = "";
         if (this.excelValue < 0) prefix = "-";
         const pad = (v: number) => v.toString().padStart(2, "0");
-    
+ 
         const tokens: Record<string, string> = {
         // Année
         "yyyy": this.getYear(adaptTime).toString(),
@@ -1522,7 +1526,7 @@ class DateTime {
             const val = tempMap[key];
             tempFormat = tempFormat.replace(new RegExp(key, "g"), val);
         }
-        
+ 
         return prefix + tempFormat;
     }
 
@@ -1538,7 +1542,7 @@ class DateTime {
     public static adaptTime(time: number): number {
         return (time < this.rolloverHour) ? time + 1 : time;
     }
-    
+ 
     /**
      * Charge les paramètres des dates et heures de changement de journée.
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
@@ -1559,7 +1563,7 @@ class DateTime {
     }
 }
 
-class Day {    
+class Day { 
 
     // Indicateur de chargement
     private static loaded = false;
@@ -1596,7 +1600,7 @@ class Day {
     public get index(): number {
         return Day.maskToIndex(this.mask);
     }
-    
+ 
     /**
      * Retourne une représentation textuelle simple et stable de l'objet,
      *  utilisée implicitement dans les conversions string (ex: `${obj}`).
@@ -1626,12 +1630,12 @@ class Day {
      */
     public static from(
         value: Day | number | string | null | undefined): Day | undefined {
-        
+ 
         if (value == null || value === '') return undefined;
         if (value instanceof Day) return value;
 
         const days = Days.get(String(value));
-    
+ 
         if (!days || days.count !== 1) {
             throw new Error(`Le jour de la semaine "${value}" n'existe pas.`);
         }
@@ -1648,14 +1652,14 @@ class Day {
      */
     private static maskToIndex(mask: number): number {
         const index = Math.log2(mask);
-    
+ 
         if (!Number.isInteger(index) || index < 0 || index > 7) {
             throw new Error(`Mask invalide pour Day: ${mask}`);
         }
-    
+ 
         return index;
     }
-    
+ 
     /**
      * Retourne un tableau des valeurs de la base de données des jours.
      * @returns {Day[]} - Itérateur sur les valeurs de la base de données.
@@ -1711,7 +1715,7 @@ class Days {
     // Constantes de lecture de la base de données Excel
     private static readonly SHEET = "Param";        // Feuille contenant les paramètres des jours de la semaine
     private static readonly TABLE = "Jours";        // Tableau contenant les paramètres des jours de la semaine
-    private static readonly COL_NUMBERS = 0;        // Colonne contenant le numéro du jour  
+    private static readonly COL_NUMBERS = 0;        // Colonne contenant le numéro du jour 
     private static readonly COL_CODE_LETTER = 1;    // Colonne contenant la lettre de code du groupe de jours
     private static readonly COL_FULL_NAME = 2;      // Colonne contenant le nom complet du jour de la semaine
     private static readonly COL_ABBREVIATION = 3;   // Colonne contenant l'abréviation du jour de la semaine
@@ -1738,7 +1742,7 @@ class Days {
     // Map des groupes de jours de la semaine identifiés par leur code, nom ou abréviation,
     //  (plusieurs codes possibles par groupe de jour, y compris ceux non optimisés)
     private static mapByString: Map<string, Days> = new Map<string, Days>();
-    
+ 
     // Liste des groupes de jours donnés en paramètre, y compris chaque jour de la semaine seul,
     //  triée par leur nombre de jours dans l'ordre décroissant.
     // Les groupes de jours les plus importants seront utilisés en priorité
@@ -1840,7 +1844,7 @@ class Days {
      */
     public static from(
         value: Days | number | string | null | undefined): Days | undefined {
-        
+ 
         if (value == null || value === '') return undefined;
         if (value instanceof Days) return value;
 
@@ -1876,7 +1880,7 @@ class Days {
         if (mask <= 0 || mask >= 256) return undefined
         return this.masksList[mask] ?? this.create(this.maskToNumbers(mask));
     }
-    
+ 
     /**
      * Transforme un tableau de numéros de jours en un masque de bits.
      * Chaque numéro correspond à un bit dans le masque, allant de 1 (lundi) à 7 (dimanche), et 8 (férié).
@@ -1941,7 +1945,7 @@ class Days {
 
         const mask = days1.mask & days2.mask;
         if (mask === 0) return undefined;
-    
+ 
         return Days.fromMask(mask);
     }
 
@@ -2039,7 +2043,7 @@ class Days {
                 remaining &= ~d.mask; // Supprime les bits.
             }
         }
-        
+ 
         result.sort((a, b) => {
             const aFirst = a.mask & -a.mask;
             const bFirst = b.mask & -b.mask;
@@ -2058,7 +2062,7 @@ class Days {
         return (typeof value === 'number')
             ? value >= 0 && value < this.masksList.length && !!this.masksList[value]
             : this.mapByString.has(value);
-    }   
+    } 
 
     /**
      * Retourne le groupe de jours correspondant au code alphanumérique ou aux numéros concaténés fourni.
@@ -2071,7 +2075,7 @@ class Days {
         return (typeof value === 'number')
             ? this.masksList[value]
             : this.mapByString.get(value);
-    }   
+    } 
 
     /**
      * Crée un nouveau groupe de jours et l'ajoute à la base de données.
@@ -2095,7 +2099,7 @@ class Days {
         if (numbers.length === 0) {
             throw new Error(`Le groupe de jours ${code} ne contient pas de jours.`);
         }
-    
+ 
         // Vérifie que le groupe de jour n'existe pas déjà.
         const mask = this.numbersToMask(numbers);
         if (this.has(mask)) {
@@ -2173,10 +2177,13 @@ class Days {
         // Charge la base de données.
         const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
 
+        const dataTable = Array.from(data.slice(1).entries());
+        const nbOfRows: number = dataTable.length;
         let excelRow: number = 0;
         try {
 
-            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
+            // Parcourt les lignes (hors en-tête).
+            for (const [rowIndex, row] of dataTable) {
 
                 // Vérifie si la ligne est vide (toutes les valeurs nulles ou vides).
                 if (row.every((cell: unknown) => !cell)) continue;
@@ -2280,7 +2287,7 @@ class Days {
         this.compressionRules.sort(
             (a, b) => b.count - a.count
         );
-    
+ 
         // Tri du tableau d'analyse des codes, de la plus grande chaine à la plus petite.
         this.extractionPatterns.sort((a, b) => b.pattern.length - a.pattern.length)
 
@@ -2297,7 +2304,7 @@ class Days {
 class DaysValues {
 
     // Propriétés de l'objet Days
-    
+ 
     public readonly days: Days;                             // Groupe de jours total concerné
     private entries: { days: Days, value: string }[] = [];  // Liste de règles (Days → valeur)
 
@@ -2521,7 +2528,7 @@ class Parity {
     // Map des lettres et nombres désignants les parités
     private static letters: Map<number, string> = new Map();
     private static digits: Map<number, number> = new Map();
-    
+ 
     // Indicateur de chargement
     private static loaded = false;
 
@@ -2542,7 +2549,7 @@ class Parity {
         this.value = value;
         this.doubleParityAllowed = doubleParityAllowed;
     }
-    
+ 
     /**
      * Retourne une représentation textuelle simple et stable de l'objet,
      *  utilisée implicitement dans les conversions string (ex: `${obj}`).
@@ -2590,10 +2597,10 @@ class Parity {
             if (value.doubleParityAllowed === doubleParityAllowed) return value;
             return this.getOrCreate(value.value, doubleParityAllowed);
         }
-    
+ 
         const normalized = this.normalize(value, doubleParityAllowed);
         return this.getOrCreate(normalized, doubleParityAllowed);
-    }        
+    } 
 
     /**
      * Normalise en une valeur de parité une valeur, qui peut être :
@@ -2608,10 +2615,10 @@ class Parity {
         value: string | number | null | undefined,
         doubleParityAllowed: boolean
     ): number {
-    
+ 
         // La valeur est nulle ou undefined
         if (value == null) return this.UNDEFINED;
-    
+ 
         // La valeur est un nombre
         if (typeof value === 'number') {
             if (
@@ -2625,30 +2632,30 @@ class Parity {
                     ? this.UNDEFINED
                     : value;
             }
-    
+ 
             // Nombres négatifs → undefined
             if (value <= 0) return this.UNDEFINED;
-    
+ 
             // Parité du nombre
             return value % 2 === 0 ? this.EVEN : this.ODD;
         }
-    
+ 
         // La valeur est une chaine
         const str = value.trim().toUpperCase();
-    
+ 
         if (str === '' || str === '0') return this.UNDEFINED;
-    
+ 
         // Double implicite (ex: "12345/6")
         if (str.includes('/')) {
             return doubleParityAllowed ? this.DOUBLE : this.UNDEFINED;
         }
-    
+ 
         // Tentative de conversion numérique
         const numeric = parseInt(str, 10);
         if (!Number.isNaN(numeric)) {
             return this.normalize(numeric, doubleParityAllowed);
         }
-    
+ 
         // Lettres
         const odd = this.letter(this.ODD);
         const even = this.letter(this.EVEN);
@@ -2663,7 +2670,7 @@ class Parity {
                     return doubleParityAllowed ? this.DOUBLE : this.UNDEFINED;
             }
         }
-    
+ 
         return this.UNDEFINED;
     }
 
@@ -2750,21 +2757,21 @@ class Parity {
      */
     public includes(other: string | number | Parity | null | undefined): boolean {
         const requested = Parity.from(other, this.doubleParityAllowed);
-       
+ 
         // undefined n'inclut rien
         if (this.value === Parity.UNDEFINED) {
             return false;
         }
-    
+ 
         // La parité double inclut toutes les parités définies
         if (this.value === Parity.DOUBLE) {
             return requested.value !== Parity.UNDEFINED;
         }
-    
+ 
         // Sinon : égalité stricte
         return this.value === requested.value;
     }
-    
+ 
     /**
      * Inverse la parité actuelle.
      * Si la parité actuelle est paire, elle devient impaire, et inversement.
@@ -2784,7 +2791,7 @@ class Parity {
                 return this;
         }
     }
-    
+ 
     /**
      * Combine une parité avec une autre en les aditionnant.
      * Si la parité de départ n'autorise pas les parités doubles, il est impossible de combiner
@@ -2801,7 +2808,7 @@ class Parity {
         if (!this.doubleParityAllowed) throw new Error(`Il n'est pas possible de combiner une`
             + ` parité à une autre si celle de départ n'autorise pas les parités doubles.`
             + ` Le résultat est forcément une parité qui accepte les parités doubles.`);
-    
+ 
         if (!this.isDefined()) {
             return Parity.from(other.value, true);
         }
@@ -2809,10 +2816,10 @@ class Parity {
         if (!other.isDefined() || this.value === other.value) {
             return this;
         }
-        
+ 
         return Parity.double();
-    }    
-    
+    } 
+ 
     /**
      * Retourne le chiffre de parité correspondant.
      * @param {number} parity - Valeur de la parité.
@@ -3009,7 +3016,7 @@ class TrainNumber {
             ? this.variantsByParity[Parity.DOUBLE]
             : normalized;
     }
-     
+ 
     /**
      * Retourne une représentation textuelle simple et stable de l'objet,
      *  utilisée implicitement dans les conversions string (ex: `${obj}`).
@@ -3123,11 +3130,11 @@ class TrainNumber {
         if (abbreviate) {
             result = TrainNumber.abbreviate(result);
         }
-    
+ 
         if (withoutDoubleParity) {
             result = result.split('/')[0];
         }
-    
+ 
         return result;
     }
 
@@ -3146,7 +3153,7 @@ class TrainNumber {
     public isMouvement(): boolean {
         return TrainNumber.mouvementsRegex?.test(this.value) ?? false;
     }
-   
+ 
     /**
      * Charge les paramètres des numéros de train
      *  - regex des numéros de train W,
@@ -3170,7 +3177,7 @@ class TrainNumber {
      *  remplacés par des chiffres, puis combinées en une regex globale unique.
      */
     private static loadRegex(): void {
-            
+ 
         const dataToRegex = (data: CellValue[][]) => {
             const parts = data
                 .slice(1)
@@ -3252,7 +3259,7 @@ class Station {
         this.turnaround = Parity.from(turnaround, true);
         this.reverseLineDirection = reverseLineDirection;
     }
-    
+ 
     /**
      * Retourne une représentation textuelle simple et stable de l'objet,
      *  utilisée implicitement dans les conversions string (ex: `${obj}`).
@@ -3276,7 +3283,7 @@ class Stations {
         "Gare de rattachement",
         "Gare de rebroussement",
         "Parité de ligne inversée"
-    ]];                                             
+    ]]; 
     private static readonly COL_ABBR = 0;                   // Colonne de l'abréviation de la gare
     private static readonly COL_NAME = 1;                   // Colonne du nom de la gare
     private static readonly COL_REFERENCE_STATION = 2;      // Colonne de la gare de rattachement
@@ -3290,7 +3297,7 @@ class Stations {
     public static abbrMap: Record<string, Station> = Object.create(null);
     // Map des gares indexées par nom
     public static nameMap: Record<string, Station> = Object.create(null);
-    
+ 
     /**
      * Retourne le nombre de gares enregistrées dans la base de données
      * @returns {number} - Nombre de gares enregistrées
@@ -3403,7 +3410,7 @@ class Stations {
         this.abbrMap = Object.create(null);
         this.nameMap = Object.create(null);
     }
-    
+ 
     /**
      * Charge les gares.
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
@@ -3424,12 +3431,14 @@ class Stations {
             return;
         }
 
-        let excelRow: number = 0;
         const referenceStationPairs: [Station, string][] = [];
+        const dataTable = Array.from(data.slice(1).entries());
+        const nbOfRows: number = dataTable.length;
+        let excelRow: number = 0;
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
+            for (const [rowIndex, row] of dataTable) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
@@ -3535,7 +3544,7 @@ class StationWithParity {
         this.id = id;
         this.key = StationWithParity.keyOf(station, parity); 
     }
-    
+ 
     /**
      * Retourne la gare (objet Station) associée à cet objet StationWithParity.
      * @returns {Station} - Gare (objet Station) associée.
@@ -3608,7 +3617,7 @@ class StationWithParity {
                 parityObj
             )!;
         }
-        
+ 
         // La valeur est une chaîne qui correspond à la clé d'une gare avec parité :
         //  retourne l'instance de StationWithParity correspondante.
         if (!parityObj.isDefined() && StationsWithParity.hasKey(value)) {
@@ -3688,7 +3697,7 @@ class StationWithParity {
      * @returns {StationWithParity | undefined} - Gare après rebroussement si possible, sinon undefined.
      */
     public stationAfterTurnaround(): StationWithParity | undefined {
-    
+ 
         // La gare de rebroussement est donnée par l'inversion de parité si définie,
         //  ou sans changement sinon.
         const reversedParity = this.parity.invert();
@@ -3716,7 +3725,7 @@ class StationWithParity {
     public hasSameStationTo(other: StationWithParity | null | undefined): boolean {
         return !!other && Math.floor(this.id / 3) === Math.floor(other.id / 3);
     }
-    
+ 
     /**
      * Vérifie si la gare avec parité a parmi ses gares rattachées une seconde gare, c'est à dire :
      *  - que cette seconde gare est identique ou est une gare fille de la première,
@@ -3728,7 +3737,7 @@ class StationWithParity {
         return !!other
             && this.expandWithChildren().includes(other);
     }
-    
+ 
     /**
      * Vérifie si l'objet StationWithParity est identique à l'autre.
      * @param other - Autre objet StationWithParity à comparer.
@@ -3778,7 +3787,7 @@ class StationWithParity {
         // Evite une boucle infinie.
         if (visited.has(this.id)) return [];
         visited.add(this.id);
-    
+ 
         // Génère l'expansion de la parité.
         if (!this.hasDefinedParity()) {
             const base = Math.floor(this.id / 3) * 3;
@@ -3848,7 +3857,7 @@ class StationsWithParity {
         if (!s) throw new Error(`Gare avec parité : ID ${id} inconnue`);
         return s;
     }
-    
+ 
     /**
      * Renvoie une gare avec parité correspondant à la clé donnée.
      * @param {string} key - Clé de la gare avec parité.
@@ -3857,7 +3866,7 @@ class StationsWithParity {
     public static getByKey(key: string): StationWithParity | undefined {
         return this.keyMap[key];
     }
-    
+ 
     /**
      * Renvoie la gare avec parité correspondant à la gare et la parité données.
      * @param {Station} station - Gare à trouver.
@@ -3896,7 +3905,7 @@ class StationsWithParity {
         this.list[swp.id] = swp;
         this.keyMap[swp.key] = swp;
     }
-    
+ 
     /**
      * Retourne un tableau des valeurs de la base de données des gares avec parité.
      * @returns {StationWithParity[]} - Itérateur sur les valeurs
@@ -4066,7 +4075,7 @@ class Connections {
         "Rebroussement",
         "Evolution",
         "Changement de parité"
-    ]];                                         
+    ]]; 
     private static readonly COL_FROM = 0;               // Colonne de la gare de départ
     private static readonly COL_TO = 1;                 // Colonne de la gare d'arrivée
     private static readonly COL_TIME = 2;               // Colonne de la durée de parcours (en minutes)
@@ -4102,7 +4111,7 @@ class Connections {
     ): number[] {
         const swp = (input instanceof Station)
             ? StationsWithParity.getFromStationAndParity(input, Parity.UNDEFINED)
-            : input;    
+            : input; 
             return swp
                 ? swp.expandWithChildren()
                     .filter(s => s.id % 3 !== 0)
@@ -4120,21 +4129,21 @@ class Connections {
         from: Station | StationWithParity,
         to: Station | StationWithParity
     ): boolean {
-    
+ 
         const fromIds = this.resolveIds(from);
         const toIds = this.resolveIds(to);
-    
+ 
         for (const fromId of fromIds) {
             const neighbors = this.list[fromId];
             if (!neighbors) continue;
-    
+ 
             for (const c of neighbors) {
                 if (toIds.includes(c.to.id)) {
                     return true;
                 }
             }
         }
-    
+ 
         return false;
     }
 
@@ -4148,21 +4157,21 @@ class Connections {
         from: Station | StationWithParity,
         to: Station | StationWithParity
     ): Connection | undefined {
-    
+ 
         const fromIds = this.resolveIds(from);
         const toIds = this.resolveIds(to);
-    
+ 
         for (const fromId of fromIds) {
             const neighbors = this.list[fromId];
             if (!neighbors) continue;
-    
+ 
             for (const c of neighbors) {
                 if (toIds.includes(c.to.id)) {
                     return c;
                 }
             }
         }
-    
+ 
         return undefined;
     }
 
@@ -4266,11 +4275,13 @@ class Connections {
             return;
         }
 
+        const dataTable = Array.from(data.slice(1).entries());
+        const nbOfRows: number = dataTable.length;
         let excelRow: number = 0;
         try {
-            
+
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
+            for (const [rowIndex, row] of dataTable) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
@@ -4290,7 +4301,7 @@ class Connections {
                 const excelTime = timeInMinutes
                     ? timeInMinutes / 24 / 60
                     : Connection.DEFAULT_CONNECTION_TIME;
-                
+ 
                 // Crée l'objet Connection et l'insère dans la base de données.
                 const connection = this.create(
                     from,
@@ -4357,12 +4368,12 @@ class Connections {
     public static shortestPathWithGroups(
         routeStations: StationWithParity[][]
     ): Connection[] | undefined {
-    
+ 
         this.load();
 
         const queue: State[] = [];
         const visited = new Map<number, number>();
-    
+ 
         // Expand la route avec toutes les parités possibles.
         const expandedRouteStations: number[][][] =
         routeStations.map(group =>
@@ -4383,7 +4394,7 @@ class Connections {
                 ));
             }
         }
-    
+ 
         return this.runGroupedDijkstra(
             queue,
             visited,
@@ -4407,32 +4418,32 @@ class Connections {
         visited: Map<number, number>,
         routeStations: number[][][]
     ): Connection[] | undefined {
-    
-        
+ 
+ 
         while (queue.length > 0) {
-    
+ 
             queue.sort((a, b) => a.cost - b.cost);
             const state = queue.shift()!;
-    
+ 
             const key = state.key;
-    
+ 
             if (visited.has(key) && visited.get(key)! <= state.cost) {
                 continue;
             }
-    
+ 
             visited.set(key, state.cost);
-    
+ 
             // Condition de fin sécurisée
             if (state.groupIndex >= routeStations.length) {
                 return state.buildPath();
             }
-    
+ 
             const nextStates =
                 this.expandNeighbors(state, routeStations);
-    
+ 
             queue.push(...nextStates);
         }
-    
+ 
         return undefined;
     }
 
@@ -4448,30 +4459,30 @@ class Connections {
         state: State,
         routeStations: number[][][]
     ): State[] {
-    
+ 
         const result: State[] = [];
-    
+ 
         // Donne les gares voisines.
         const neighbors = this.getNeighbors(state.stationId);
-    
+ 
         for (const connection of neighbors) {
 
             // Donne l'id de la gare voisine.
             const nextStationId = connection.to.id;
-    
+ 
             // Ajoute le coût de la connection : temps de parcours, ou temps de retournement.
             const nextCost = state.cost
                 + (connection.withTurnaround
                     ? Params.turnaroundTime.excelValue
                     : connection.time.excelValue);
-    
+ 
             let nextGroup = state.groupIndex;
             let nextMask = state.visitedMask;
-    
+ 
             if (nextGroup >= routeStations.length) continue;
-    
+ 
             const currentGroup = routeStations[nextGroup];
-    
+ 
             // Cherche le groupe de la gare voisine.
             let matched = false;
             for (let i = 0; i < currentGroup.length; i++) {
@@ -4488,7 +4499,7 @@ class Connections {
                     nextMask = 0;
                 }
             }
-    
+ 
             // Ajoute le nouvel état.
             result.push(new State(
                 nextStationId,
@@ -4613,7 +4624,7 @@ class Stop {
     private _departureTime?: DateTime;              // Temps / Heure de départ de l'arrêt
     private _passageTime?: DateTime;                // Temps / Heure de passage à l'arrêt (sans arrêt)
     private _tracks: string[];                      // Voies de l'arrêt
-    
+ 
     /**
      * Constructeur d'un arrêt.
      * @param {StationWithParity | Station | string} station - Gare de l'arrêt.
@@ -4741,8 +4752,8 @@ class Stop {
         this._withTurnaround = this.canTurnaroundTo(value);
         if (!!this._passageTime) {
             this.setTimes(
-                this.arrivalTime,
-                Params.turnaroundTime.resolveAgainst(this.arrivalTime!),
+                this._passageTime,
+                Params.turnaroundTime.resolveAgainst(this._passageTime!),
                 undefined
             );
         }
@@ -4888,7 +4899,7 @@ class Stop {
      * @param {DateTime} reference - Référence à utiliser pour convertir les heures.
      */
     public convertToRelativeTime(reference: DateTime, throwErrorIfAlreadyRelative: boolean = false): void {
-        
+ 
         // Temps de référence déjà relatif : pas de conversion possible.
         // Vérifie simplement que les temps soient déjà relatifs.
         if (reference.isRelative){
@@ -4958,6 +4969,24 @@ class Stop {
     }
 
     /**
+     * Compare cet arrêt avec un autre arrêt, le premier devant inclure le second,
+     *  en vérifiant la gare avec parité, le rebroussement,
+     *  les heures d'arrivée, de départ et de passage.
+     * @param {Stop | null | undefined} other - Autre arrêt à comparer.
+     * @returns {boolean} - Vrai si les arrêts sont égaux, faux sinon.
+     */
+    public includes(other: Stop | null | undefined): boolean {
+        return (
+            !! other &&
+            this.station.includes(other.station) &&
+            this._withTurnaround === other.withTurnaround &&
+            DateTime.equalsOrUndefined(this._arrivalTime, other.arrivalTime) &&
+            DateTime.equalsOrUndefined(this._departureTime, other.departureTime) &&
+            DateTime.equalsOrUndefined(this._passageTime, other.passageTime)
+        );
+    }
+
+    /**
      * Ajoute une voie à l'arrêt si elle n'y est pas déjà.
      * Si la voie n'est pas déjà dans la liste des voies, l'ajoute et trie la liste.
      * @param {string} track - Voie à ajouter.
@@ -4974,7 +5003,7 @@ class Stop {
  * Classe Stops contenant la liste des arrêts.
  */
 class Stops {
-        
+ 
     // Constantes de lecture de la base de données Excel
     private static readonly SHEET = "Arrêts";               // Feuille contenant la liste des arrêts
     private static readonly TABLE = "Arrêts";               // Tableau contenant la liste des arrêts
@@ -4987,7 +5016,7 @@ class Stops {
         "Passage",
         "Voie",
         "Gare suivante"
-    ]];                                            
+    ]]; 
     private static readonly COL_PATH_KEY = 0;                   // Colonne du numéro de train
     private static readonly COL_STATION = 1;                    // Colonne de la gare avec parité
     private static readonly COL_STATION_AFTER_TURNAROUND = 2;   // Colonne de la gare après rebroussement
@@ -5011,7 +5040,7 @@ class Stops {
         "Départ",
         "Passage",
         "Voie"
-    ]];                                            
+    ]]; 
     private static readonly COL_IMPORT_NUMBER = 0;              // Colonne du numéro de train
     private static readonly COL_IMPORT_DATE = 1;                // Colonne de la date
     private static readonly COL_IMPORT_SERVICE = 2;             // Colonne du service
@@ -5035,12 +5064,14 @@ class Stops {
             Log.warn(`Stops.load : aucune donnée trouvée dans la table.`);
             return;
         }
-    
+ 
+        const dataTable = Array.from(data.slice(1).entries());
+        const nbOfRows: number = dataTable.length;
         let excelRow: number = 0;
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
+            for (const [rowIndex, row] of dataTable) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
@@ -5090,7 +5121,7 @@ class Stops {
             throw new Error(`Stops.load (ligne ${excelRow}) : ${e}`);
         }
     }
-    
+ 
     /**
      * Sauvegarde les arrêts des trains de la base de données dans un tableau.
      * @param {string} [sheetName=this.SHEET] - Nom de la feuille de calcul.
@@ -5105,7 +5136,7 @@ class Stops {
 
         // Crée le tableau final avec les données de chaque arrêt pour chaque train.
         const data: (string | number)[][] = [];
-    
+ 
         for (const path of Paths.values()) {
             for (const stop of Array.from(path.stops.values())) {
                 data.push([
@@ -5129,7 +5160,12 @@ class Stops {
             tableName,
             startCell
         );
-    
+
+        // Trie le tableau selon la colonne des clés
+        table.getSort().apply([
+            { key: this.COL_PATH_KEY, ascending: true },
+        ]);
+ 
         // Met les horaires au format "hh:mm:ss".
         const timeColumns = [
             this.COL_ARRIVAL_TIME,
@@ -5158,11 +5194,13 @@ class Stops {
             return;
         }
 
+        const dataTable = Array.from(data.slice(1).entries());
+        const nbOfRows: number = dataTable.length;
         let excelRow: number = 0;
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
+            for (const [rowIndex, row] of dataTable) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
@@ -5214,7 +5252,7 @@ class Path {
     public static readonly  WITH_VIA_STOPS = 2;     // Parcours avec gares intermédiaires
     public static readonly  FULL_PATH = 3;          // Parcours complet calculé par chainage de connexions 
     public static readonly  ERROR_WITH_STOPS = -1;  // Parcours avec erreur
-    
+ 
     // Propriétés de l'objet Path
     public key: string;                             // Clé du parcours
     public parity: Parity;                          // Parité du parcours
@@ -5227,7 +5265,7 @@ class Path {
                                                     //  séparées par '>' pour les arrêts ordonnés et
                                                     //  par ';' si leur ordre de parcours est laissé libre
     private _routeStations?: StationWithParity[][] = [];     // Tableau des gares ou groupes de gares d'arrêts
-                                                    // du parcours définis dans la signature                                            
+                                                    // du parcours définis dans la signature 
     public stops: Stop[] = [];                      // Gares d'arrêt ou gares de passage du parcours
     private _stopsIndex: Map<string, Stop> = new Map();   // Dictionnaire des arrêts référencés
                                                     //  par leur clé (abréviation_parité)
@@ -5304,6 +5342,11 @@ class Path {
      */
     public get routeStations(): StationWithParity[][] {
 
+        if (!this._signature) {
+            this._routeStations = [];
+            return this._routeStations;
+        }
+
         if (this._routeStations?.length === 0) {
 
             this._routeStations = this._signature
@@ -5317,7 +5360,7 @@ class Path {
                         .filter((s): s is StationWithParity => s !== undefined)
                 );
         }
-    
+ 
         return this._routeStations ?? [];
     }
 
@@ -5381,10 +5424,10 @@ class Path {
         const arrivalTimeObj = DateTime.from(arrivalTime, areRelativeTimes);
         if (!arrivalTimeObj) throw new Error(`Heure d'arrivée ${arrivalTime} incorrecte.`);
 
-        const s1 = new Stop(fromObj, undefined, undefined, departureTimeObj, undefined, areRelativeTimes);  
+        const s1 = new Stop(fromObj, undefined, undefined, departureTimeObj, undefined, areRelativeTimes); 
         const s2 = new Stop(toObj, undefined, arrivalTimeObj, undefined, undefined, areRelativeTimes);
         const stops = [s1, s2];
-        
+ 
         const path = Paths.create(
             "",
             undefined,
@@ -5394,13 +5437,10 @@ class Path {
             signature,
             stops
         );
-        
-        path.convertStopsToRelative();
+ 
+        // Renvoie directement le parcours s'il existait déjà
+        if (path.stopsChecked !== Path.UNCHECKED) return path;
 
-        if (!signature) path.buildSignatureFromStops();
-        path.rebuildStopIndex();
-        path.rebuildStopPosition();
-        
         if (findPath) {
             path.findPath();
         } else {
@@ -5419,7 +5459,7 @@ class Path {
     public buildRadical(): string {
         const origin = this.origin?.stationAbbreviation ?? "";
         const dest = this.destination?.stationAbbreviation ?? "";
-    
+ 
         const parts = [origin + '>' +  dest];
 
         if (this.missionCode) parts.push(this.missionCode);
@@ -5433,17 +5473,17 @@ class Path {
      * Si les trains du parcours sont déjà passés par l'arrêt et que erase est faux,
      *  lance une erreur.
      * @param {Stop} stop - Arrêt à ajouter.
-     * @param {boolean} [orderStops=true] - Si vrai, ordonne les arrêts du parcours.
+     * @param {boolean} [finalize=true] - Si vrai, finalise les arrêts avec tri
+     *  et recréation des index.
      * @param {boolean} [erase=false] - Si vrai, remplace l'arrêt s'il existe déjà. Si faux
      *  (par défaut), le nouvel arrêt n'est pas pris en compte.
      * @returns {Stop | null} - L'arrêt ajouté, ou null si une erreur a été levée.
      * @throws {Error} - Si les trains du parcours sont déjà passé par l'arrêt
      *  et que erase est faux.
      */
-    public addStop(stop: Stop, orderStops: boolean = true, erase: boolean = false): void {
+    public addStop(stop: Stop, finalize: boolean = true, erase: boolean = false): void {
 
         const hasDefinedParity = stop.station.parity.isDefined();
-        const stationAfterTurnaround = stop.stationAfterTurnaround;
 
         // Le parcours a été calculé => contient des arrêts avec parité.
         if (this.stopsChecked === Path.FULL_PATH) {
@@ -5458,18 +5498,11 @@ class Path {
                     Log.warn(`L'arrêt "${stop}" est déjà associé aux trains`
                         + ` du parcours ${this}. Un même train ne peut pas revenir`
                         + ` dans la même gare et avec le même sens.`
-                        + ` Le deuxième arrêt ne sera donc pas pris en compte.`);                
+                        + ` Le deuxième arrêt ne sera donc pas pris en compte.`); 
                     return;
                 }
-                this.stops.splice(this.stops.indexOf(this._stopsIndex.get(stop.key)!), 1);
+                this.removeStop(stop.key);
             }
-            // Met à jour les parités (parité sur l'ensemble du parcours et parité de ligne).
-            this.parity = this.parity.combineWith(stop.station.parity);
-            this.lineDirection = this.lineDirection.combineWith(
-                stop.station.station.reverseLineDirection
-                    ? stop.station.parity.invert()
-                    : stop.station.parity
-            );
 
         // Le parcours n'a pas été calculé : il ne contient pas d'arrêts avec parité.
         } else {
@@ -5489,35 +5522,62 @@ class Path {
                         + ` Le deuxième arrêt ne sera donc pas pris en compte.`);
                     return;
                 }
-                this.stops.splice(this.stops.indexOf(this._stopsIndex.get(stop.key)!), 1);
-                this._stopsIndex.delete(stop.key);
+                this.removeStop(stop.key);
             }
             // Si l'arrêt n'est pas présent dans la signature, suppression de la signature
             //  qui sera générée à nouveau pour tenir compte du nouvel arrêt.
-            const foundInSignature = this.routeStations.some(group =>
-                group.some(station =>
-                    stop.station.includes(station)
-                )
-            );
-            if (!foundInSignature) this._signature = "";
+            if (!this.isStopInSignature(stop)) {
+                this._signature = "";
+            }
         }
 
         // Ajoute l'arrêt dans le tableau des arrêts.
         this.stops.push(stop);
-        this._stopsIndex.set(stop.key, stop);
-        if (!!stationAfterTurnaround && hasDefinedParity) {
-            this._stopsIndex.set(stationAfterTurnaround.key, stop);
-        }
 
         // Trie les arrêts du parcours, reconstruit l'index et la signature.
-        if (orderStops) {
-            this.orderStops();
-            this.rebuildStopPosition();
-            if (this._signature === "") this.buildSignatureFromStops();
+        if (finalize) this.finalizeStops();
+    } 
+
+    /**
+     * Supprime un arrêt du parcours.
+     */
+    private removeStop(station: Station | StationWithParity | string): void {
+        const existing = this.getStop(station);
+        if (!existing) return;
+ 
+        this.stops.splice(this.stops.indexOf(existing), 1);
+        this._stopsIndex.delete(existing.key);
+        this._stopPosition.clear();
+    }
+
+    /**
+     * Vérifie si un arrêt est inclus dans la signature.
+     * @param {Stop} stop - Arrêts à vérifier.
+     * @returns {boolean} - Vrai si l'arrêts est inclus dans la signature, faux sinon.
+     */
+    private isStopInSignature(stop: Stop): boolean {
+        if (!this._signature) return false;
+        return this.routeStations.some(group =>
+            group.some(station => stop.station.includes(station))
+        );
+    }
+ 
+    /**
+     * Finalise les arrêts du parcours en triant et reconstruisant l'index et la signature.
+     */
+    public finalizeStops(): void {
+        this.orderStops();
+        this.rebuildStopIndex();
+        this.rebuildStopPosition();
+ 
+        if (this.stopsChecked === Path.FULL_PATH) {
+            this.recomputeParities();
         }
-        
-        return;
-    }    
+ 
+        if (!this._signature) {
+            this.buildSignatureFromStops();
+        }
+    }
 
     /**
      * Trie les arrêts du parcours par ordre chronologique.
@@ -5533,6 +5593,91 @@ class Path {
     }
 
     /**
+     * Calcule les parités du parcours en fonction des arrêts.
+     */
+    private recomputeParities(): void {
+
+        this.parity = Parity.undefined(true);
+        this.lineDirection = Parity.undefined(true);
+ 
+        for (const stop of this.stops) {
+            this.parity = this.parity.combineWith(stop.station.parity);
+ 
+            this.lineDirection = this.lineDirection.combineWith(
+                stop.station.station.reverseLineDirection
+                    ? stop.station.parity.invert()
+                    : stop.station.parity
+            );
+        }
+    }
+
+ 
+    /**
+     * Construit un index des arrêts en fonction de leur clés.
+     * Les clés sont utilisées pour accéder rapidement à un arrêt.
+     * L'index est mis à jour automatiquement lorsque la liste des arrêts change.
+     */
+    private rebuildStopIndex(): void {
+
+        this._stopsIndex.clear();
+
+        for (const stop of this.stops) {
+            this._stopsIndex.set(stop.key, stop);
+            if (!!stop.stationAfterTurnaround && stop.station.parity.isDefined()) {
+                this._stopsIndex.set(stop.stationAfterTurnaround.key, stop);
+            }
+        }
+    }
+
+    /**
+     * Reconstruit l'index des arrêts en fonction de leur position dans le parcours.
+     * Les clés sont utilisées pour accéder rapidement à la position d'un arrêt.
+     * L'index est mis à jour automatiquement lorsque la liste des arrêts change.
+     */
+    private rebuildStopPosition(): void {
+
+        this._stopPosition.clear();
+
+        for (let i = 0; i < this.stops.length; i++) {
+            const stop = this.stops[i];
+            this._stopPosition.set(stop.key, i);
+            if (!!stop.stationAfterTurnaround && stop.station.parity.isDefined()) {
+                this._stopPosition.set(stop.stationAfterTurnaround.key, i);
+            }
+        }
+    }
+
+    /**
+     * Construit la signature du parcours en fonction de la liste des arrêts.
+     * La signature est une chaîne de caractères qui identifie de manière unique
+     *  le parcours. Elle est utilisée pour chercher les connexions entre les
+     *  différents parcours.
+     */
+    public buildSignatureFromStops(): void {
+
+        this._signature = this.stops
+            .map(s => s.key).join(">");
+        this._routeStations = [];
+    }
+
+    /**
+     * Construit la signature du parcours en fonction de la liste des groupes de gares.
+     * La signature est une chaîne de caractères qui identifie de manière unique le parcours.
+     * Elle est utilisée pour chercher les connexions entre les différents parcours.
+     * @returns {string} - Signature du parcours.
+     */
+    public buildSignatureFromRouteStations(): string {
+ 
+        return this.routeStations
+            .map(group =>
+                group
+                    .map(station => station.key)
+                    .join(";")
+            )
+            .join(">");
+    }
+
+    /**
      * Retourne l'arrêt du parcours associé à une gare.
      * Si la gare a une parité définie, renvoie l'arrêt correspondant.
      * Sinon, cherche l'arrêt dans le sens pair, puis dans le sens impair.
@@ -5543,9 +5688,14 @@ class Path {
      */
     public getStop(station: StationWithParity | Station | string): Stop | undefined {
 
+        // Recherche rapide par clé
+        if (typeof station === "string" && this._stopsIndex.has(station)) {
+            return this._stopsIndex.get(station);
+        }
+
         const stationObj = StationWithParity.from(station);
         if (!stationObj) throw new Error(`La gare ${station} est inconnue.`);
-    
+ 
         // Fonction interne : logique existante appliquée à UNE gare.
         const findDirect = (swp: StationWithParity): Stop | undefined => {
 
@@ -5608,15 +5758,15 @@ class Path {
     public nextStop(
         stop: Stop | StationWithParity | Station | string
     ): Stop | undefined {
-        
+ 
         const stopObj = (stop instanceof Stop)
             ? stop
             : this.getStop(stop);
         if (!stopObj) return undefined;
-    
+ 
         const index = this._stopPosition.get(stopObj.key);
         if (index === undefined || index === this.stops.length - 1) return undefined;
-    
+ 
         return this.stops[index + 1];
     }
 
@@ -5629,15 +5779,15 @@ class Path {
     public previousStop(
         stop: Stop | StationWithParity | Station | string
     ): Stop | undefined {
-    
+ 
         const stopObj = (stop instanceof Stop)
             ? stop
             : this.getStop(stop);
         if (!stopObj) return undefined;
-    
+ 
         const index = this._stopPosition.get(stopObj.key);
         if (index === undefined || index === 0) return undefined;
-    
+ 
         return this.stops[index - 1];
     }
 
@@ -5661,12 +5811,16 @@ class Path {
      */
     public equalsStops(other: Path): boolean {
 
-        if (this.stops.length !== other.stops.length) return false;
+        // Affecte les parcours pour que path1 contienne au moins tous les arrêts de path2
+        //  (si path1 et path2 n'ont pas le même état, path1 doit être le parcours calculé)
+        const path1 = (this.stopsChecked === Path.FULL_PATH) ? this : other;
+        const path2 = (this.stopsChecked === Path.FULL_PATH) ? other : this;
 
-        for (let i = 0; i < this.stops.length; i++) {
-            if (!this.stops[i].equalsTo(other.getStop(this.stops[i].station))) return false;
+        for (let i = 0; i < path2.stops.length; i++) {
+            const stop2 = path2.stops[i];
+            const stop1 = path1.getStop(stop2.station);
+            if (!stop2.includes(stop1)) return false;
         }
-
         return true;
     }
 
@@ -5690,83 +5844,18 @@ class Path {
     }
 
     /**
-     * Construit un index des arrêts en fonction de leur clés.
-     * Les clés sont utilisées pour accéder rapidement à un arrêt.
-     * L'index est mis à jour automatiquement lorsque la liste des arrêts change.
-     */
-    private rebuildStopIndex(): void {
-
-        this._stopsIndex.clear();
-
-        for (const stop of this.stops) {
-            this._stopsIndex.set(stop.key, stop);
-            if (!!stop.stationAfterTurnaround && stop.station.parity.isDefined()) {
-                this._stopsIndex.set(stop.stationAfterTurnaround.key, stop);
-            }
-        }
-    }
-
-    /**
-     * Reconstruit l'index des arrêts en fonction de leur position dans le parcours.
-     * Les clés sont utilisées pour accéder rapidement à la position d'un arrêt.
-     * L'index est mis à jour automatiquement lorsque la liste des arrêts change.
-     */
-    private rebuildStopPosition(): void {
-
-        this._stopPosition.clear();
-
-        for (let i = 0; i < this.stops.length; i++) {
-            const stop = this.stops[i];
-            this._stopPosition.set(stop.key, i);
-            if (!!stop.stationAfterTurnaround && stop.station.parity.isDefined()) {
-                this._stopPosition.set(stop.stationAfterTurnaround.key, i);
-            }
-        }
-    }
-
-    /**
-     * Construit la signature du parcours en fonction de la liste des arrêts.
-     * La signature est une chaîne de caractères qui identifie de manière unique
-     *  le parcours. Elle est utilisée pour chercher les connexions entre les
-     *  différents parcours.
-     */
-    public buildSignatureFromStops(): void {
-
-        this._signature = this.stops
-            .map(s => s.key).join(">");
-        this._routeStations = [];
-    }
-
-    /**
-     * Construit la signature du parcours en fonction de la liste des groupes de gares.
-     * La signature est une chaîne de caractères qui identifie de manière unique le parcours.
-     * Elle est utilisée pour chercher les connexions entre les différents parcours.
-     * @returns {string} - Signature du parcours.
-     */
-    public buildSignatureFromRouteStations(): string {
-        
-        return this.routeStations
-            .map(group =>
-                group
-                    .map(station => station.key)
-                    .join(";")
-            )
-            .join(">");
-    }
-
-    /**
      * Vérifie que le parcours est correct.
      * @throws {Error} - Si une erreur est détectée.
      */
     public check(): void {
-  
+ 
         // Ne fait pas de vérification si le parcours a une erreur
         switch (this.stopsChecked) {
             case Path.ERROR_WITH_STOPS:
             case Path.UNCHECKED:
                 return;
         }
-        
+ 
         try {
 
             this.checkTerminals();
@@ -5798,7 +5887,7 @@ class Path {
      * @throws {Error} - Si une erreur est détectée.
      */
     private checkTerminals(): void {
-        
+ 
         // Vérifie l'existence d'une gare de départ.
         const firstStop = this.stops[0];
         if (!firstStop) {
@@ -5858,7 +5947,7 @@ class Path {
      * @throws {Error} - Si une erreur est détectée.
      */
     private checkSignature() {
-        
+ 
         // Vérifie l'existance de la signature, ou la constitue si inexistante
         //  dans le cas où le parcours n'a pas été calculé.
         let sigStations = this.routeStations;
@@ -5873,7 +5962,7 @@ class Path {
             }
         }
 
-        // Reglè de comparaison des arrêts de la signature avec ceux du parcours :
+        // Règle de comparaison des arrêts de la signature avec ceux du parcours :
         //  - si le parcours est calculé, la gare de la signature doit inclure l'arrêt du parcours
         //     (avec parité définie),
         //  - si le parcours n'est pas calculé,
@@ -5888,7 +5977,7 @@ class Path {
         //  (ne peut pas être dans un ordre quelconque avec d'autres gares)
         //  et correspond à la gare de départ.
         const firstStop = this.stops[0];
-        
+ 
         if (sigStations.length === 0
             || sigStations[0].length !== 1
             || !areSameStations(sigStations[0][0], firstStop)
@@ -5908,7 +5997,7 @@ class Path {
             sigStations.push([lastStop.station]);
             Log.info(`La gare d'arrivée ${lastStop} a été ajoutée à la fin de la signature.`);
         };
-        
+ 
         const cleaned: StationWithParity[][] = [];
         // Décompte du nombre d'arrêt trouvés dans la signature
         let foundStops: number = 0;
@@ -5925,7 +6014,7 @@ class Path {
                 cleaned.push(sigStations[i]);
                 continue;
             }
-    
+ 
             const group = sigStations[i];
             const filtered = group.filter(station => {
 
@@ -5956,7 +6045,7 @@ class Path {
 
                 return !isFirstStop && !isLastStop && isIntermediateStop;
             });
-    
+ 
             if (filtered.length > 0) {
                 cleaned.push(filtered);
             }
@@ -5981,7 +6070,7 @@ class Path {
             this._signature = normalizedSignature;
         }
     }
-    
+ 
     /**
      * Vérifie que tous les arrêts intermédiaires sont corrects, en vérifiant
      *  que les heures de passage sont concordantes et que les gares intermédiaires
@@ -6028,7 +6117,7 @@ class Path {
                     //  dans la liste des arrêts du parcours. Chaque arrêt ou ensemble d'arrêts
                     //  non ordonnés (séparées par ';') sont ajoutés dans un cache stopFromSigToFind,
                     //  dont tous les arrêts doivent être trouvés avant de passer au (groupe) suivant. 
-                    
+ 
                     // Constitue la liste des arrêts de la signature à trouver.
                     if (stopFromSigToFind.size === 0) {
                         sigStations[j].reduce((map, value) => {
@@ -6131,7 +6220,7 @@ class Path {
             //  le parcours nouvellement calculé est ajouté avec une nouvelle liste
             Paths.signatureIndex.set(this.signature, [this]);
         }
-            
+ 
     }
 
     /**
@@ -6154,7 +6243,7 @@ class Path {
         return connections;
     }
 
-    
+ 
     /**
      * Construit la liste des connexions entre les arrêts d'un parcours déjà calculé.
      * @returns {Connection[]} - Liste des connexions entre les arrêts.
@@ -6162,13 +6251,13 @@ class Path {
     public buildConnectionsFromStops(): Connection[] {
 
         const connections: Connection[] = [];
-    
+ 
         if (this.stops.length < 2 || this.stopsChecked !== Path.FULL_PATH) {
             return connections;
         }
-    
+ 
         for (let i = 0; i < this.stops.length - 1; i++) {
-    
+ 
             const fromStop = this.stops[i];
             const fromStation = fromStop.station;
             const fromStationAfterTurnaround = fromStop.stationAfterTurnaround;
@@ -6187,7 +6276,7 @@ class Path {
                 connections.push(connection);
             }
         }
-    
+ 
         return connections;
     }
 
@@ -6208,10 +6297,10 @@ class Path {
 
         // Initialise le cache des connexions depuis le dernier arrêt connu.
         let buffer: Connection[] = [];
-    
+ 
         // Reconstruit le premier arrêt à partir des stops existants.
         const firstConnection = connections[0];
-    
+ 
         const firstExisting = this.stops[0];
  
         if (!firstExisting.station.includes(firstConnection.from)) {
@@ -6232,12 +6321,12 @@ class Path {
 
         // Parcourt les connexions.
         for (const c of connections) {
-    
+
             // Vérifie si la connexion implique un retournement.
             if (c.withTurnaround && buffer.length === 0) {
-                // Si le buffer est vide, pas besoin de prendre en compte la connexion
-                //  de retournement pour la suite du parcours car le temps de retournement
-                //  est déjà pris en compte dans le dernier arrêt.
+                // Si le buffer est vide, le retournement se fait dans la dernière gare prise en compte.
+                // Il n'y a donc pas besoin de prendre en compte la connexion de retournement
+                //  dans le buffer, il faut uniquement mettre à jour le dernier arrêt avec le retournement.
                 lastStop.stationAfterTurnaround = c.to;
                 continue;
             }
@@ -6260,20 +6349,22 @@ class Path {
                     continue;
                 }
 
-                // Retranche le temps de retournement.
-                const totalTurnaroundTime =
-                    buffer.reduce((sum, x) =>
+                // Calcul le(s) temps de retournement à retrancher du temps de parcours total,
+                //  sauf pour la dernière connexion du buffer (le temps de retournement sera pris
+                //  en compte dans le temps d'arrêt du dernier arrêt connu trouvé)
+                const totalTurnaroundTime = buffer
+                    .slice(0, -1)
+                    .reduce((sum, x) =>
                         sum + (x.withTurnaround ? Params.turnaroundTime.excelValue : 0), 0);
 
                 // Calcule le temps de parcours entre les deux arrêts connus à proratiser.
-                const interpolatedTime = endTime.excelValue - startTime.excelValue - totalTurnaroundTime;               
-    
+                const interpolatedTime = endTime.excelValue - startTime.excelValue - totalTurnaroundTime; 
+ 
                 // Calcule la somme des temps de parcours.
                 const totalTime =
                 buffer.reduce((sum, x) =>
                     sum + x.time.excelValue, 0);
                 const ratio = interpolatedTime / totalTime;
-    
                 let elapsed = 0;
 
                 // Parcourt les connexions du buffer pour créer les arrêts.
@@ -6281,24 +6372,27 @@ class Path {
                     const bc = buffer[i];
 
                     if (bc.withTurnaround) {
-                        // Si le buffer est vide, pas besoin de prendre en compte la connexion
-                        //  de retournement pour la suite du parcours car le temps de retournement
-                        //  est déjà pris en compte dans le dernier arrêt.
-                        lastStop.stationAfterTurnaround = c.to;
+                        // Si la connexion est un retournement, le dernier arrêt est forcement
+                        //  un arrêt calculé, donc avec une heure de passage
+                        //  (sinon la connexion aurait été sautée au début de la première boucle for).
+                        // Donc le dernier arrêt est transformé en arrêt avec rebroussement, 
+                        //  avec pour durée le temps de retournement par défaut.
+                        lastStop.stationAfterTurnaround = bc.to;
+                        elapsed += Params.turnaroundTime.excelValue;
                         continue;
+                    } else {
+                        elapsed += bc.time.excelValue * ratio;
                     }
-    
-                    elapsed += bc.time.excelValue;
-    
+ 
                     // Calcule l'heure de passage.
-                    const interpolated = startTime.excelValue + elapsed * ratio;
+                    const interpolated = startTime.excelValue + elapsed;
                     lastStop = new Stop(
                         bc.to,
                         undefined,
                         undefined,
                         undefined,
                         interpolated,
-                        areRelativeTimes);    
+                        areRelativeTimes); 
                     newStops.push(lastStop);
                 }
 
@@ -6307,28 +6401,27 @@ class Path {
                     lastStop.setTimes(stop.arrivalTime.excelValue, stop.departureTime?.excelValue, undefined, areRelativeTimes);
                 }
                 lastStop.tracks = stop.tracks;
-    
+ 
                 buffer = [];
             }
-    
+ 
         }
 
         // Lève une erreur s'il reste du buffer (fin du trajet).
         // Il est nécessaire d'aboutir à un arrêt connu (au maximum le dernier arrêt).
         if (buffer.length) {
             throw new Error(`Echec dans la construction des arrêts du parcours`
-                + `à partir des connexions trouvées : Le dernier arrêt ${lastStop} du parcours calculé`
-                + ` n'existait pas dans le parcours initial.`);    
+                + ` à partir des connexions trouvées : Le dernier arrêt ${lastStop} du parcours calculé`
+                + ` n'existait pas dans le parcours initial.`); 
         }
-    
+ 
         // Met à jour le parcours en ajoutant chaque nouvel arrêt calculé.
         this.eraseStops();
         this.stopsChecked = Path.FULL_PATH;
         for (const stop of newStops) {
             this.addStop(stop, false);
         }
-        this.orderStops();
-        this.rebuildStopPosition();
+        this.finalizeStops();
     }
 }
 
@@ -6338,7 +6431,7 @@ class Path {
 class Paths {
 
     // Constantes de lecture de la base de données Excel
-    private static readonly SHEET = "Parcours";             // Feuille contenant la liste des parcours  
+    private static readonly SHEET = "Parcours";             // Feuille contenant la liste des parcours 
     private static readonly TABLE = "Parcours";             // Tableau contenant la liste des parcours
     private static readonly HEADERS = [[                    // En-têtes du tableau des parcours
         "Clé",
@@ -6406,7 +6499,7 @@ class Paths {
         }
         this.map.set(path.key, path);;
     }
-    
+ 
     /**
      * Retourne un tableau des valeurs de la base de données des parcours.
      * @returns {Path[]} - Itérateur sur les valeurs.
@@ -6465,6 +6558,12 @@ class Paths {
             stopsChecked
         );
 
+        // Convertit les horaires en relatifs
+        path.convertStopsToRelative();
+
+        // Finalise la gestion des arrêts (tri et mise à jour des maps)
+        path.finalizeStops();
+
         // Insère le parcours dans la base de données, en générant si besoin la clé
         return this.insert(path);
     }
@@ -6495,7 +6594,7 @@ class Paths {
             if (path.stopsChecked === Path.FULL_PATH && !this.signatureIndex.has(path.signature)) {
                 this.signatureIndex.set(path.signature, [path]);
             }
-    
+ 
             // Ajoute l'objet Path dans la structure des radicaux et suffixes.
             const radical = this.extractRadical(path.key);
             if (!this.structure.has(radical)) {
@@ -6517,63 +6616,63 @@ class Paths {
 
         const radical = path.buildRadical();
         const signature = path.signature;
-    
+ 
         let radicalMap = this.structure.get(radical);
-    
+ 
         // Nouveau radical : ajoute le radical et le parcours dans la structure.
         if (!radicalMap) {
             radicalMap = new Map();
             this.structure.set(radical, radicalMap);
-    
+ 
             const numberMap = new Map<number, Path>();
             numberMap.set(0, path);
-    
+ 
             // Par convention, le premier parcours d'un radical différent
             //  n'a pas de suffixe lettre => représenté par "".
             radicalMap.set("", numberMap);
-    
+ 
             path.key = radical;
             this.set(path);
-    
+ 
             return path;
         }
-    
+ 
         // Radical existant : recherche l'existance de la signature.
         let letterKey = this.findLetterBySignature(radicalMap, signature);
-    
+
         // Nouvelle signature : ajoute la signature et le parcours dans la structure.
         if (letterKey === null) {
             letterKey = this.nextLetter(radicalMap);
-    
+ 
             const numberMap = new Map<number, Path>();
             numberMap.set(0, path);
-    
+ 
             radicalMap.set(letterKey, numberMap);
-    
+ 
             path.key = this.buildKey(radical, letterKey, 0);
             this.set(path);
-    
+ 
             return path;
         }
-    
+ 
         // Signature existante : recherche l'existance d'un parcours identique (mêmes horaires)
         //  et le renvoie si trouvé.
         const numberMap = radicalMap.get(letterKey)!;
-    
+
         for (const existing of Array.from(numberMap.values())) {
             if (existing.equalsStops(path)) {
                 return existing;
             }
         }
-    
-        // Pas de parcours trouvé : le nouveau parcours est bien unique : génère la cléi.
+ 
+        // Pas de parcours trouvé : le nouveau parcours est bien unique : génère la clé.
         const number = this.nextNumber(numberMap);
-    
+ 
         numberMap.set(number, path);
-    
+ 
         path.key = this.buildKey(radical, letterKey, number);
         this.set(path);
-    
+ 
         return path;
     }
 
@@ -6587,27 +6686,24 @@ class Paths {
         // Supprime l'objet Path de la base de données, indexé par sa clé.
         this.map.delete(path.key);
 
-        // Supprime les arrêts de l'objet Path de l'index par signature.
-
-
         // Détermine les composantes de la clé
         const radical = path.buildRadical();
         const letter = this.extractLetter(path.key);
         const number = this.extractNumber(path.key);
-    
+ 
         const radicalMap = this.structure.get(radical);
         if (!radicalMap) return;
-    
+ 
         const numberMap = radicalMap.get(letter);
         if (!numberMap) return;
-    
+ 
         numberMap.delete(number);
-    
+ 
         // Nettoie l'étage nombre.
         if (numberMap.size === 0) {
             radicalMap.delete(letter);
         }
-    
+ 
         // Nettoie l'étage lettre.
         if (radicalMap.size === 0) {
             this.structure.delete(radical);
@@ -6627,7 +6723,7 @@ class Paths {
             }
         }
     }
-    
+ 
     /**
      * Cherche le prochain suffixe lettre libre dans la liste des suffixes utilisés.
      * Si un seul élément existe déjà (donc sans suffixe, valeur "" dans la map),
@@ -6640,14 +6736,14 @@ class Paths {
     private static nextLetter(
         radicalMap: Map<string, Map<number, Path>>
     ): string {
-    
+ 
         // Si un seul élément existe déjà (donc sans suffixe), donne à cet élément le suffixe "A"
         //  et au nouvel élément le suffixe "B".
         if (radicalMap.size === 1 && radicalMap.has("")) {
-    
+ 
             const numberMap = radicalMap.get("")!;
             const radical = this.extractRadical(numberMap.values().next().value!.key)!;
-    
+ 
             radicalMap.delete("");
             radicalMap.set("A", numberMap);
 
@@ -6657,16 +6753,16 @@ class Paths {
                 path.key = this.buildKey(radical, "A", number);
                 this.set(path);
             }
-    
+ 
             return "B";
         }
-    
+ 
         // Si plusieurs éléments existent déjà (donc avec suffixes),
         //  cherche le premier suffixe lettre non utilisé.
         const used = new Set(radicalMap.keys());
-    
+ 
         let index = 0;
-    
+ 
         while (true) {
             const candidate = this.indexToLetters(index);
             if (!used.has(candidate)) return candidate;
@@ -6684,13 +6780,13 @@ class Paths {
 
         let s = "";
         index += 1;
-    
+ 
         while (index > 0) {
             index--;
             s = String.fromCharCode(65 + (index % 26)) + s;
             index = Math.floor(index / 26);
         }
-    
+ 
         return s;
     }
 
@@ -6706,13 +6802,13 @@ class Paths {
     private static nextNumber(
         numberMap: Map<number, Path>
     ): number {
-    
+ 
         // Si un seul élément existe déjà (donc sans suffixe), donne à cet élément le suffixe "1"
         //  et au nouvel élément le suffixe "2".
         if (numberMap.size === 1 && numberMap.has(0)) {
-    
+ 
             const firstPath = numberMap.get(0)!;
-    
+ 
             numberMap.delete(0);
             numberMap.set(1, firstPath);
 
@@ -6722,12 +6818,12 @@ class Paths {
 
             return 2;
         }
-    
+ 
         // Si plusieurs éléments existent déjà (donc avec suffixes),
         //  cherche le premier suffixe numérique non utilisé.
         let n = 1;
         while (numberMap.has(n)) n++;
-    
+ 
         return n;
     }
 
@@ -6750,7 +6846,7 @@ class Paths {
         const m = key.match(/~([A-Z]+)/);
         return m ? m[1] : "";
     }
-    
+ 
     /**
      * Extrait le numéro de la clé d'un parcours
      *  (chaîne de la forme "#X" où est le numéro du suffixe numérique).
@@ -6778,12 +6874,12 @@ class Paths {
         letter: string,
         number: number
     ): string {
-    
+ 
         let key = radical;
-    
+ 
         if (letter) key += `~${letter}`;
         if (number > 0) key += `#${number}`;
-    
+ 
         return key;
     }
 
@@ -6800,17 +6896,17 @@ class Paths {
         radicalMap: Map<string, Map<number, Path>>,
         signature: string
     ): string | null {
-    
+ 
         for (const [letter, numberMap] of Array.from(radicalMap.entries())) {
-    
+ 
             // Récupère un seul Path (le premier)
             const firstPath = numberMap.values().next().value as Path;
-    
+ 
             if (firstPath.signature === signature) {
                 return letter;
             }
         }
-    
+ 
         return null;
     }
 
@@ -6837,18 +6933,20 @@ class Paths {
             return;
         }
 
+        const dataTable = Array.from(data.slice(1).entries());
+        const nbOfRows: number = dataTable.length;
         let excelRow: number = 0;
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
+            for (const [rowIndex, row] of dataTable) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
 
                 // Calcule le numéro de ligne Excel.
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
-                
+ 
                 // Récupère les champs.
                 const key = WorkbookService.getString(row, this.COL_KEY);
                 const parityLetter = WorkbookService.getString(row, this.COL_PARITY);
@@ -6886,7 +6984,7 @@ class Paths {
         } catch (e) {
             throw new Error(`Paths.load : ${e}`);
         }
-        
+ 
     }
 
     /**
@@ -6922,6 +7020,11 @@ class Paths {
              tableName,
              startCell
         );
+
+        // Trie le tableau selon la colonne des clés
+        table.getSort().apply([
+            { key: this.COL_KEY, ascending: true },
+        ]);
 
         Stops.print();
     }
@@ -7086,8 +7189,8 @@ class Trains {
         "Heure à la gare",
         "Voie Infra",
         "Voie à quai à la gare"
-    ]];          
-    private static readonly COL_IMPORT_DATE = 0;                // Colonne de la date                                  
+    ]]; 
+    private static readonly COL_IMPORT_DATE = 0;                // Colonne de la date 
     private static readonly COL_IMPORT_NUMBER = 3;              // Colonne du numéro de train
     private static readonly COL_IMPORT_MISSION_CODE = 4;        // Colonne de la date
     private static readonly COL_IMPORT_FROM = 5;                // Colonne du service
@@ -7099,7 +7202,7 @@ class Trains {
 
     // Constantes de classe
     public static readonly UNKNOWN_UNIT = "?";
-    
+ 
     // Map des trains indexées par abréviation
     public static readonly map: Map<string, Train> = new Map();
 
@@ -7318,18 +7421,20 @@ class Trains {
             return t;
         };
 
+        const dataTable = Array.from(data.slice(1).entries());
+        const nbOfRows: number = dataTable.length;
         let excelRow: number = 0;
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
+            for (const [rowIndex, row] of dataTable) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
 
                 // Calcule le numéro de ligne Excel.
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
-                
+ 
                 // Récupère les champs.
                 const key = WorkbookService.getString(row, this.COL_KEY);
                 const number = WorkbookService.getString(row, this.COL_NUMBER);
@@ -7424,18 +7529,20 @@ class Trains {
             return;
         }
 
+        const dataTable = Array.from(data.slice(1).entries());
+        const nbOfRows: number = dataTable.length;
         let excelRow: number = 0;
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
+            for (const [rowIndex, row] of dataTable) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
 
                 // Calcule le numéro de ligne Excel.
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
-                
+ 
                 // Récupère les champs.
 
                 // Saute les lignes avec le mauvais mode (ex : bus et non train)
@@ -7479,6 +7586,8 @@ class Trains {
                     units,
                     units
                 );
+
+                if ((rowIndex + 1) % 100 === 0 ) Log.info(rowIndex + 1);
             } 
 
         } catch (e) {
@@ -7538,6 +7647,7 @@ class TrainPath {
         if (!daysObj) {
             throw new Error(`Les jours sillon ${this.number} sont invalides.`);
         }
+        this.days = daysObj;
         this.services = (typeof services === "string")
             ? services.split(/[ +,:;]+/)
             : services;
@@ -7632,7 +7742,7 @@ class TrainPaths {
 
     // Constantes de classe
     public static readonly UNKNOWN_UNIT = "?";
-    
+ 
     // Map des sillons indexées par abréviation
     public static readonly map: Map<string, TrainPath> = new Map();
 
@@ -7791,18 +7901,20 @@ class TrainPaths {
             return t;
         };
 
+        const dataTable = Array.from(data.slice(1).entries());
+        const nbOfRows: number = dataTable.length;
         let excelRow: number = 0;
         try {
 
             // Parcourt les lignes (hors en-tête).
-            for (const [rowIndex, row] of Array.from(data.slice(1).entries())) {
+            for (const [rowIndex, row] of dataTable) {
 
                 // Vérifie si la ligne est vide.
                 if (row.length === 0) continue;
 
                 // Calcule le numéro de ligne Excel.
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
-                
+ 
                 // Récupère les champs.
                 const key = WorkbookService.getString(row, this.COL_KEY);
                 const number = WorkbookService.getString(row, this.COL_NUMBER);
@@ -8818,7 +8930,7 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
         simpleParity.includes("IP"),
         false
     );
-   
+ 
 
     /* ==========================================================
        8. invert()
@@ -9204,7 +9316,7 @@ function testStation(options: Partial<AssertDDOptions> = {}) {
         Stations.size,
         sizeAfterFirstLoad
     );
-    
+ 
     /* ==========================================================
        2. Accès getById() et get()
        ----------------------------------------------------------
@@ -9510,127 +9622,127 @@ function testConnection(options: Partial<AssertDDOptions> = {}) {
            Connections.size > 0,
            true
        );
-   
+ 
        const sizeAfterLoad = Connections.size;
-   
+ 
        Connections.load(false);
-   
+ 
        assert.check(
            "Connections.load(false) - pas de rechargement",
            Connections.size,
            sizeAfterLoad
        );
-   
+ 
        /* ==========================================================
           2. values() / accès
           ========================================================== */
-   
+ 
        const firstConnection = Connections.values()[0] as Connection;
-   
+ 
        assert.check(
            "Connections.values() retourne une Connection",
            firstConnection instanceof Connection,
            true
        );
-   
+ 
        /* ==========================================================
           3. has() / get()
           ========================================================== */
-   
+ 
        const from = firstConnection.from;
        const to = firstConnection.to;
-   
+ 
        assert.check(
            "Connections.has(from, to)",
            Connections.has(from, to),
            true
        );
-   
+ 
        const c = Connections.get(from, to);
-   
+ 
        assert.check(
            "Connections.get(from, to)",
            c === firstConnection,
            true
        );
-   
+ 
        /* ==========================================================
           4. Cohérence métier
           ========================================================== */
-   
+ 
        for (const connection of Connections.values()) {
-   
+ 
            assert.check(
                `${connection} : from instanceof StationWithParity`,
                connection.from instanceof StationWithParity,
                true
            );
-   
+ 
            assert.check(
                `${connection} : to instanceof StationWithParity`,
                connection.to instanceof StationWithParity,
                true
            );
-   
+ 
            assert.check(
                `${connection} : from ≠ to`,
                !connection.from.equalsTo(connection.to),
                true
            );
-   
+ 
            assert.check(
                `${connection} : temps > 0 sauf retournement`,
                connection.withTurnaround || connection.time.excelValue > 0,
                true
            );
-   
+ 
            assert.check(
                `${connection} : temps relatif`,
                connection.time.isRelative,
                true
            );
        }
-   
+ 
        /* ==========================================================
           5. resolveIds() (cas Station vs StationWithParity)
           ========================================================== */
-   
+ 
        const station = from.station; // supposé exister
-   
+ 
        assert.check(
            "has(Station, Station)",
            Connections.has(station, to.station),
            true
        );
-   
+ 
        assert.check(
            "get(Station, Station)",
            Connections.get(station, to.station) instanceof Connection,
            true
        );
-   
+ 
        /* ==========================================================
           6. print()
           ========================================================== */
-   
+ 
        let printOk = true;
-   
+ 
        try {
            Connections.print("testConnexions", "testConnexions", "A1");
        } catch {
            printOk = false;
        }
-   
+ 
        assert.check(
            'Connections.print() OK',
            printOk,
            true
        );
-   
+ 
        /* ==========================================================
           FIN
           ========================================================== */
-   
+ 
        assert.printSummary("testConnection");
 }
 
@@ -9760,12 +9872,19 @@ function testStop(options: Partial<AssertDDOptions> = {}) {
     );
 
     /* ==========================================================
-       8. equalsTo
+       8. equalsTo, includes
        ========================================================== */
 
     const stopSame = new Stop(
         "PZB_1",
         "PZB_2",
+        "08:00:00",
+        "08:02:00"
+    );
+
+    const stopWithoutParity = new Stop(
+        "PZB",
+        undefined,
         "08:00:00",
         "08:02:00"
     );
@@ -9785,6 +9904,18 @@ function testStop(options: Partial<AssertDDOptions> = {}) {
     assert.check(
         "Stop.equalsTo (différent)",
         stop.equalsTo(stopOther),
+        false
+    );
+
+    assert.check(
+        "Stop.includes (arrêt sans parité inclut l'arrêt avec parité)",
+        stopWithoutParity.includes(stop),
+        false
+    );
+
+    assert.check(
+        "Stop.includes (arrêt avec parité inclut l'arrêt sans parité)",
+        stop.includes(stopWithoutParity),
         false
     );
 
