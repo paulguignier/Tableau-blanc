@@ -15,3 +15,5 @@ ajout d'une méthode pour temps de réut, et savoir si RBT avant réut
 vérifier que lors de la lecture des horaires, ce n'est pas la valeur 0 qui est lue mais " quand la cellule est vide
 
 méthode mettoyage Paths non utilisés
+
+getFilteredTrains

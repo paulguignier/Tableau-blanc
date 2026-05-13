@@ -29,7 +29,7 @@ function main(workbook: ExcelScript.Workbook) {
 
     // Lance la fonction de tests.
     // Si les tests sont actifs, la suite du programme n'est pas exécuté. 
-    // if (runAllTests(testMode)) return;
+    if (runAllTests(testMode)) return;
 
     try {
         Log.info(`Chargement des paramètres`);
@@ -37,9 +37,9 @@ function main(workbook: ExcelScript.Workbook) {
         Connections.load();
 
  
-        Trains.import();
-        Trains.print();
-        Paths.print();
+        // Trains.import();
+        // Trains.print();
+        // Paths.print();
 
 
 
@@ -79,16 +79,16 @@ function runAllTests(testMode: boolean = false): boolean {
     Log.info(`Début des tests`);
 
     try {
-        // testWorkbookService({ printSuccess: false, printFailure: true });
-        // testDateTime({ printSuccess: false, printFailure: true });
-        // testDays({ printSuccess: false, printFailure: true });
-        // testParity({ printSuccess: false, printFailure: true });
-        // testTrainNumber({ printSuccess: false, printFailure: true });
-        // testStation({ printSuccess: false, printFailure: true });
-        // testStationWithParity({ printSuccess: false, printFailure: true });
-        // testConnection({ printSuccess: false, printFailure: true });
-        // testStop({ printSuccess: false, printFailure: true });
-        // testPath({ printSuccess: false, printFailure: true });
+        testWorkbookService({ printSuccess: false, printFailure: true });
+        testDateTime({ printSuccess: false, printFailure: true });
+        testDays({ printSuccess: false, printFailure: true });
+        testParity({ printSuccess: false, printFailure: true });
+        testTrainNumber({ printSuccess: false, printFailure: true });
+        testStation({ printSuccess: false, printFailure: true });
+        testStationWithParity({ printSuccess: false, printFailure: true });
+        testConnection({ printSuccess: false, printFailure: true });
+        testStop({ printSuccess: false, printFailure: true });
+        testPath({ printSuccess: false, printFailure: true });
 
     } catch (e) {
         Log.warn("Erreur lors des tests", e.message);
@@ -247,8 +247,8 @@ class Log {
 
 /*
  * Options de l'affichage des tests :
- *  - printSuccess: Afficher le message de succès,
- *  - printFailure: Afficher le message d'échec.
+ *  - printSuccess: afficher le message de succès,
+ *  - printFailure: afficher le message d'échec.
  */
 type AssertDDOptions = {
     printSuccess?: boolean;
@@ -260,12 +260,22 @@ type AssertDDOptions = {
  */
 class AssertDD {
 
-    private options: AssertDDOptions;
+    public static readonly THROWS = Symbol("ASSERT_THROWS");    // Constante indiquant 
+                                                                // qu'une erreur est attendue
 
-    private total = 0;
-    private success = 0;
-    private failure = 0;
+    public static completeTests = 0;    // Nombre total d'ensemble de tests complets.
+    public static incompleteTests = 0;  // Nombre total d'ensemble de tests incomplets.
 
+    private total = 0;                  // Décompte du nombre total de tests réalisés
+    private success = 0;                // Décompte du nombre total de tests réalisés avec succès
+    private failure = 0;                // Décompte du nombre total de tests en échec
+
+    private options: AssertDDOptions;   // Options d'affichage des messages de succès et d'échecs
+
+    /**
+     * Constructeur de la classe AssertDD.
+     * @param {AssertDDOptions} options - Options d'affichage des messages de succès et d'échecs
+     */
     constructor(options: AssertDDOptions = {}) {
         this.options = {
             printSuccess: options.printSuccess ?? true,
@@ -360,23 +370,22 @@ class WorkbookService {
      *  sinon lance une exception.
      * Si createIfMissing est vrai, crée la feuille si elle n'existe pas.
      * @param {string} sheetName - Nom de la feuille de calcul à chercher.
-     * @param {{failOnError?: boolean, createIfMissing?: boolean}} options - Options
-     *  pour la récupération de la feuille :
-     *   - createIfMissing : Si vrai, crée la feuille si elle n'existe pas (faux par défaut),
-     *   - failOnError : Si vrai (par défaut), lance une exception si la feuille n'existe pas.
+     * @param {boolean} createIfMissing - Si vrai, crée la feuille si elle n'existe pas (faux par défaut).
+     * @param {boolean} failOnError - Si vrai (par défaut), lance une exception si la feuille n'existe pas.
      * @returns {ExcelScript.Worksheet | null} - Feuille de calcul Excel correspondant au nom donné,
      *  ou null si elle n'existe pas.
      */
     public static getSheet(
-        sheetName: string,
-        options?: {
+        {
+            sheetName,
+            createIfMissing = false,
+            failOnError = true
+        }: {
+            sheetName: string,
             createIfMissing?: boolean;  // Faux par défaut
             failOnError?: boolean;      // Vrai par défaut
         }
     ): ExcelScript.Worksheet | null {
- 
-        const createIfMissing = options?.createIfMissing ?? false;
-        const failOnError = options?.failOnError ?? true;
  
         let sheet = WORKBOOK.getWorksheet(sheetName);
  
@@ -409,7 +418,7 @@ class WorkbookService {
         failOnError: boolean = true
     ): CellValue[][] {
 
-        const sheet = this.getSheet(sheetName, { failOnError });
+        const sheet = this.getSheet({ sheetName, failOnError });
 
         if (!sheet) return [];
 
@@ -441,7 +450,7 @@ class WorkbookService {
         tableName: string,
         failOnError: boolean = true
     ): ExcelScript.Table | null {
-        const sheet = this.getSheet(sheetName, { failOnError: false });
+        const sheet = this.getSheet({ sheetName, failOnError: false });
         if (!sheet) return null;
         const table = sheet.getTable(tableName);
         if (!table) {
@@ -695,7 +704,7 @@ class WorkbookService {
         }
 
         // Vérifie si un tableau avec le même nom existe déjà et le supprime si nécessaire.
-        const sheet = this.getSheet(sheetName, { createIfMissing: true, failOnError: false });
+        const sheet = this.getSheet({ sheetName, createIfMissing: true, failOnError: false });
         const existingTable = sheet.getTables().find(table => table.getName() === tableName);
         if (existingTable) existingTable.delete();
 
@@ -999,7 +1008,7 @@ class DateTime {
     private static readonly SHEET = "Param";        // Feuille contenant les paramètres globaux
     private static readonly TABLE = "Paramètres";   // Tableau contenant les paramètres globaux
     private static readonly ROW_ROLLOVER_HOUR = 4;  // Ligne contenant l'heure de changement de journée
-    private static readonly MIN_EXCEL_DATE = 2;     // Valeur minimale d'un temps incluant une date
+    private static readonly MIN_EXCEL_DATE = 2;     // Valeur minimale d'un temps absolu daté
 
     // Etat de chargement
     private static loaded = false;
@@ -1026,11 +1035,12 @@ class DateTime {
     private _computed = false;                      // Indique si les éléments de la date sont calculés
 
     // Valeurs des éléments
-    private _realDate: ExcelDate | undefined;       // Date réelle
-    private _adaptedDate: ExcelDate | undefined;    // Date adaptée si l'heure de la date est inférieure
-                                                    //  à l'heure de changement de jour
-
-    private _time: ExcelTime | undefined;           // Heure de la journée
+    private _realDate: ExcelDate | undefined;       // Date réelle (uniquement pour les temps absolus
+                                                    //  datés, donc avec excelValue >= MIN_EXCEL_DATE)
+    private _adaptedDate: ExcelDate | undefined;    // Date adaptée (jour suivant) si l'heure de la date
+                                                    //  est inférieure à l'heure de changement de jour
+    private _time: ExcelTime | undefined;           // Heure de la journée 
+                                                    //  (undefined si le temps n'est qu'une date)
 
     /**
      * Constructeur privé de l'objet DateTime.
@@ -1055,7 +1065,10 @@ class DateTime {
      *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
-        return this.excelValue.toString();
+        const format = this._realDate
+            ? DateTime.DATE_FORMAT_WITH_YEAR
+            : DateTime.TIME_FORMAT_WITH_SECONDS;
+        return this.format(format);
     }
 
     /**
@@ -1095,11 +1108,11 @@ class DateTime {
         if (typeof value === "string") {
             const trimmed = value.trim();
  
-            // 👉 cas nombre "simple"
+            // La chaine est un nombre simple
             if (/^-?\d+(?:[.,]\d+)?$/.test(trimmed)) {
                 v = Number(trimmed.replace(",", "."));
             } else {
-                // 👉 fallback parse complexe
+                // La chaine doit être analysée
                 const parsed = this.parseDateAndTime(trimmed, isRelative, adaptTime);
                 return parsed;
             }
@@ -1190,7 +1203,7 @@ class DateTime {
     /**
      * Renvoie l'heure correspondant au temps, adaptée ou non.
      * Si le temps est relatif, renvoie l'heure relative.
-     * Si le temps est absolu, renvoie la fraction d'une journée (tronquée modulo 1).
+     * Si le temps est absolu (daté ou non), renvoie la fraction d'une journée (tronquée modulo 1).
      * Si le temps est adapté, il est incrémenté de 1 (ex : 25h00).
      * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir l'heure adaptée ou non.
      * @returns {number}- L'heure correspondant au temps, adaptée ou non, ou 0 si le temps n'est pas défini.
@@ -1394,6 +1407,36 @@ class DateTime {
     }
 
     /**
+     * Compare le temps courant avec un autre temps.
+     * Les deux temps doivent avoir le même type (relatif ou absolu).
+     * Si un des temps au moins est absolu et non daté, seul l'horaire est comparé.
+     * @param {DateTime} other - Temps à comparer.
+     * @returns {number} - Différence entre les deux temps.
+     * @throws {Error} - Si les deux temps ont des types différents (relatif ou absolu).
+     */
+    public compareTo(other: DateTime): number {
+
+        if (!this._computed) this.compute();
+        if (!other._computed) other.compute();
+        if (this.isRelative !== other.isRelative) {
+            throw new Error(`Un temps relatif ne peut pas être comparé avec un temps absolu`);
+        }
+        if (
+            (!this._realDate && !other._time)
+                || (!this._time && !other._realDate)
+        ) {
+            throw new Error(`Un temps absolu non daté ne peut pas être comparé
+                avec un temps absolu sans horaire (avec uniquement une date).`);
+        }
+
+        const firstTime = (this._realDate && other._realDate) ? this.excelValue : this._time!.value;
+        const secondTime = (this._realDate && other._realDate) ? other.excelValue : other._time!.value;
+
+        if (Math.abs(firstTime - secondTime) < DateTime.MAX_GAP) return 0;
+        return firstTime - secondTime;
+    }
+
+    /**
      * Vérifie si le temps courant est égal à un autre temps.
      * @param {DateTime | null | undefined} other - Temps à comparer.
      * @returns {boolean} - Vrai si les deux temps sont égaux, faux sinon.
@@ -1418,19 +1461,6 @@ class DateTime {
         b?: DateTime
     ): boolean {
         return a === b || (!!a && !!b && a.equalsTo(b));
-    }
-
-    /**
-     * Compare le temps courant avec un autre temps.
-     * @param {DateTime} other - Temps à comparer.
-     * @returns {number} - Différence entre les deux temps.
-     * @throws {Error} - Si les deux temps ont des types différents (relatif ou absolu).
-     */
-    public compareTo(other: DateTime): number {
-        if (this.isRelative !== other.isRelative) {
-            throw new Error(`Un temps relatif ne peut pas être comparé avec un temps absolu`);
-        }
-        return this.excelValue - other.excelValue;
     }
  
     /**
@@ -2937,27 +2967,36 @@ class Parity {
 class TrainNumber {
 
     // Constantes de lecture de la base de données Excel
-    private static readonly W_SHEET = "Param";                          // Feuille contenant les motifs des trains W
+
+    private static readonly TRAIN_NUMBERS_PARAM_SHEET = "Param";        // Feuille contenant les modèles de numéros de trains
+                                                                        //  à charger comme paramètres
+    private static readonly COMMERCIAL_TABLE = "Commerciaux";           // Tableau contenant les motifs des trains commerciaux
     private static readonly W_TABLE = "W";                              // Tableau contenant les motifs des trains W
-    private static readonly MOUVEMENTS_SHEET = "Param";                 // Feuille contenant les motifs des évolutions
-    private static readonly MOUVEMENTS_TABLE = "Evolutions";             // Tableau contenant les motifs des évolutions
-    private static readonly TRAINS_4DIGIT_SHEET = "Param";              // Feuille contenant les motifs des trains abrégeables à 4 chiffres
+    private static readonly MOUVEMENTS_TABLE = "Evolutions";            // Tableau contenant les motifs des évolutions
     private static readonly TRAINS_4DIGIT_TABLE = "LigneC4chiffres";    // Tableau contenant les motifs des trains abrégeables à 4 chiffres
 
     // Indicateur de chargement
     private static loaded = false;
 
     // Regex globales
-    private static wRegex: RegExp;                                      // Regex des trains W
-    private static mouvementsRegex: RegExp;                             // Regex des évolutions
-    private static abbreviate4Regex: RegExp;                            // Regex des trains abrégeables à 4 chiffres
+    private static commercialRegex: RegExp;         // Regex des trains commerciaux
+    private static wRegex: RegExp;                  // Regex des trains W
+    private static mouvementsRegex: RegExp;         // Regex des évolutions
+    private static abbreviate4Regex: RegExp;        // Regex des trains abrégeables à 4 chiffres
 
     // Propriétés de l'objet TrainNumber
-    public readonly value: string;                  // Numéro de train avec parité (la double parité est marquée par ######/#)
+    public readonly value: string;                  // Numéro de train avec parité
+                                                    //  (la double parité est marquée par ######/#)
 
     // Cache interne
     private readonly variants: Set<string>;         // Toutes les variantes équivalentes
     private readonly variantsByParity: string[];    // Accès direct par parité
+    private _zone?: number | null;                  // Zone du train si train commercial
+                                                    //  (de 0 à 9 : 4ème chiffre du numéro du train)
+    private _battery?: number | null;               // Batterie du train si train commercial 
+                                                    //  (de 0 à 99 : 5ème et 6ème chiffres
+                                                    //  du numéro du train si le train a une parité double, 
+                                                    //  le 3ème chiffre donne la parité)
 
     /**
      * Constructeur privé de la classe TrainNumber.
@@ -3016,7 +3055,77 @@ class TrainNumber {
             ? this.variantsByParity[Parity.DOUBLE]
             : normalized;
     }
- 
+
+    /**
+     * Retourne la valeur de base du train (sans parité).
+     * @returns {string} - Valeur de base du train.
+     */
+    public get baseValue(): string {
+        return this.value.split('/')[0];
+    }
+
+    /**
+     * Indique si le train a une parité double.
+     * @returns {boolean} Vrai si le train a une parité double.
+     */
+    public get isDoubleParity(): boolean {
+        return this.value.includes("/");
+    }
+
+    /**
+     * Teste si le train est commercial.
+     * @returns {boolean} - Vrai si le train est commercial, faux sinon.
+     */
+    public get isCommercial(): boolean {
+        return TrainNumber.commercialRegex?.test(this.baseValue) ?? false;
+    }
+
+    /**
+     * Teste si le train est W (vide voyageur).
+     * @returns {boolean} - Vrai si le train est W, faux sinon.
+     */
+    public get isW(): boolean {
+        return TrainNumber.wRegex?.test(this.baseValue) ?? false;
+    }
+
+    /**
+     * Teste si le train est une évolution.
+     * @returns {boolean} - Vrai si le train est une évolution, faux sinon.
+     */
+    public get isMouvement(): boolean {
+        return TrainNumber.mouvementsRegex?.test(this.baseValue) ?? false;
+    }
+
+    /**
+     * Retourne la zone du train (de 0 à 9 : 4ème chiffre du numéro du train).
+     * Retourne null si le train n'est pas commercial.
+     * @returns {number | null} Zone du train.
+     */
+    public get zone(): number | null {
+        if (this._zone === undefined) {
+            this._zone = this.isCommercial
+                ? this.value.charCodeAt(3) - 48
+                : null;
+        }
+        return this._zone;
+    }
+
+    /**
+     * Retourne la batterie du train (de 0 à 99 : 5ème et 6ème chiffres du numéro du train)
+     * Si le train a une parité double, c'est le 3ème chiffre qui donne la parité.
+     * Retourne null si le train n'est pas commercial.
+     * @returns {number | null} Batterie du train.
+     */ 
+    public get battery(): number | null {
+        if (this._battery === undefined) {
+            this._battery = this.isCommercial
+                ? parseInt(this.value.slice(4, 6), 10)
+                    + (this.isDoubleParity ? parseInt(this.value[2], 10) % 2 : 0)
+                : null;
+        }
+        return this._battery;
+    }
+    
     /**
      * Retourne une représentation textuelle simple et stable de l'objet,
      *  utilisée implicitement dans les conversions string (ex: `${obj}`).
@@ -3125,33 +3234,13 @@ class TrainNumber {
         abbreviate: boolean = false,
         withoutDoubleParity: boolean = false
     ): string {
-        let result = this.value;
+        let result = withoutDoubleParity ? this.baseValue : this.value;
 
         if (abbreviate) {
             result = TrainNumber.abbreviate(result);
         }
  
-        if (withoutDoubleParity) {
-            result = result.split('/')[0];
-        }
- 
         return result;
-    }
-
-    /**
-     * Teste si le train est W (vide voyageur).
-     * @returns {boolean} - Vrai si le train est W, faux sinon.
-     */
-    public isW(): boolean {
-        return TrainNumber.wRegex?.test(this.value) ?? false;
-    }
-
-    /**
-     * Teste si le train est une évolution.
-     * @returns {boolean} - Vrai si le train est une évolution, faux sinon.
-     */
-    public isMouvement(): boolean {
-        return TrainNumber.mouvementsRegex?.test(this.value) ?? false;
     }
  
     /**
@@ -3192,20 +3281,26 @@ class TrainNumber {
                 : /^$/;
         };
 
-        const Wdata = WorkbookService.getDataFromTable(
-            this.W_SHEET,
+        const commercialData = WorkbookService.getDataFromTable(
+            this.TRAIN_NUMBERS_PARAM_SHEET,
+            this.COMMERCIAL_TABLE
+        );
+        this.commercialRegex = dataToRegex(commercialData);
+
+        const wData = WorkbookService.getDataFromTable(
+            this.TRAIN_NUMBERS_PARAM_SHEET,
             this.W_TABLE
         );
-        this.wRegex = dataToRegex(Wdata);
+        this.wRegex = dataToRegex(wData);
 
         const mouvementsData = WorkbookService.getDataFromTable(
-            this.MOUVEMENTS_SHEET,
+            this.TRAIN_NUMBERS_PARAM_SHEET,
             this.MOUVEMENTS_TABLE
         );
         this.mouvementsRegex = dataToRegex(mouvementsData);
 
         const abbreviate4Data = WorkbookService.getDataFromTable(
-            this.TRAINS_4DIGIT_SHEET,
+            this.TRAIN_NUMBERS_PARAM_SHEET,
             this.TRAINS_4DIGIT_TABLE
         );
         this.abbreviate4Regex = dataToRegex(abbreviate4Data);
@@ -4869,8 +4964,8 @@ class Stop {
      *  et préfère l'heure de départ ou de passage. Si faux (par défaut),
      *  c'est d'abord l'heure d'arrivée qui est prise en compte.
      * @param {DateTime} [reference] - Heure de référence pour les heures relatives.
-     * @returns {DateTime | undefined} - Heure la plus petite, ou undefined si
-     *  l'heure d'arrivée est lue et que noReadingArrivalTime est faux.
+     * @returns {DateTime | undefined} - Heure la plus petite à l'arrêt,
+     *  ou undefined si aucune heure n'est lue.
      */
     public getTime(ignoreArrival: boolean = false, reference?: DateTime): DateTime | undefined {
         let time = this._arrivalTime;
@@ -5679,14 +5774,27 @@ class Path {
 
     /**
      * Retourne l'arrêt du parcours associé à une gare.
+     * Si un nombre est donné, il d'agit du numéro d'ordre
+     *  (à partir de 0, ou négatif pour un décompte à partir du terminus)
      * Si la gare a une parité définie, renvoie l'arrêt correspondant.
      * Sinon, cherche l'arrêt dans le sens pair, puis dans le sens impair.
      * Si les deux arrêts sont trouvés, renvoie le premier arrêt chronologique.
      * Sinon, renvoie l'arrêt trouvé, ou undefined si aucun arrêt n'est trouvé.
-     * @param {StationWithParity | Station | string} station - La gare à chercher
+     * @param {StationWithParity | Station | string | number} station - La gare à chercher.
      * @returns {Stop | undefined} - L'arrêt trouvé, ou undefined si aucun arrêt n'est trouvé.
      */
-    public getStop(station: StationWithParity | Station | string): Stop | undefined {
+    public getStop(station: StationWithParity | Station | string | number): Stop | undefined {
+
+        // Recherche par le numéro d'ordre (à partir de 0,
+        //  ou négatif pour un décompte à partir du terminus)
+        if (typeof station === "number") {
+
+            const index = station >= 0
+                ? station
+                : this.stops.length + station;
+        
+            return this.stops[index];
+        }
 
         // Recherche rapide par clé
         if (typeof station === "string" && this._stopsIndex.has(station)) {
@@ -7095,20 +7203,6 @@ class Train {
     }
 
     /**
-     * Retourne les trains précédents correspondants aux clés en paramètres.
-     */
-    public get previous(): (Train | undefined)[] {
-        return this.previousKeys.map(key => Train.from(key));
-    }
-
-    /**
-     * Retourne les réutilisations (trains suivants) correspondants aux clés en paramètres.
-     */
-    public get reuse(): (Train | undefined)[] {
-        return this.reusesKeys.map(key => Train.from(key));
-    }
-
-    /**
      * Retourne une représentation textuelle simple et stable de l'objet,
      *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
@@ -7139,6 +7233,52 @@ class Train {
      */
     public buildKey(): string {
         return `${this.date.format('yyyy-MM-dd')}_${this.number.format()}`;
+    }
+
+    /**
+     * Retourne les trains précédents correspondants aux clés en paramètres.
+     */
+    public previous(): (Train | undefined)[] {
+        return this.previousKeys.map(key => Train.from(key));
+    }
+
+    /**
+     * Retourne les réutilisations (trains suivants) correspondants aux clés en paramètres.
+     */
+    public reuse(): (Train | undefined)[] {
+        return this.reusesKeys.map(key => Train.from(key));
+    }
+
+    /**
+     * Retourne l'arrêt associé à une gare.
+     * Si un nombre est donné, il d'agit du numéro d'ordre de l'arrêt.
+     *  (à partir de 0, ou négatif pour un décompte à partir du terminus)
+     * Si la gare a une parité définie, renvoie l'arrêt correspondant.
+     * Sinon, cherche l'arrêt dans le sens pair, puis dans le sens impair.
+     * Si les deux arrêts sont trouvés, renvoie le premier arrêt chronologique.
+     * Sinon, renvoie l'arrêt trouvé, ou undefined si aucun arrêt n'est trouvé.
+     * @param {StationWithParity | Station | string | number} station - La gare à chercher.
+     * @returns {Stop | undefined} - L'arrêt trouvé, ou undefined si aucun arrêt n'est trouvé.
+     */
+    public getStop(stop: Station | StationWithParity | string | number): Stop | undefined {
+        return this.path.getStop(stop);
+    }
+
+    /**
+     * Renvoie la plus petite des heures d'arrivée, de départ ou de passage à l'arrêt indiqué.
+     * Si ignoreArrival est vrai, lit plutôt l'heure de départ ou de passage.
+     * @param {Stop | Station | StationWithParity | string | number} stop - L'arrêt à chercher.
+     * @param {boolean} [ignoreArrival=false] - Si vrai, ignore l'heure d'arrivée
+     *  et préfère l'heure de départ ou de passage. Si faux (par défaut),
+     *  c'est d'abord l'heure d'arrivée qui est prise en compte.
+     * @returns {DateTime | undefined} - Heure la plus petite à l'arrêt,
+     *  ou undefined si aucune heure n'est lue.
+     */
+    public getTimeAt(stop: Stop | Station | StationWithParity | string | number, ignoreArrival: boolean = false): DateTime | undefined {
+        if (stop instanceof Stop) {
+            return stop.getTime(ignoreArrival, this.date);
+        }
+        return this.getStop(stop)?.getTime(ignoreArrival, this.date);
     }
 }
 
@@ -7230,6 +7370,103 @@ class Trains {
      */
     public static get(key: string): Train | undefined {
         return this.map.get(key);
+    }
+
+    /**
+     * Renvoie une liste de trains correspondant aux critères donnés :
+     *  - Numéros de train
+     *  - Dates de circulation (adaptées ou non)
+     *  - Gare de départ
+     *  - Gare d'arrivée
+     *  - Gares intermédiaires et intervalle d'heure de passage (origine et terminus compris)
+     *  - Zones
+     *  - Batteries
+     * @returns {Train[]} - Liste des trains correspondant aux critères.
+     */
+    public static find(
+        {
+            numbers = [],
+            dates = [],
+            adaptedTime = true,
+            from,
+            to,
+            via = [],
+            dateFrom,
+            dateTo,
+            zones = [],
+            batteries = []
+        }: {
+            numbers?: (TrainNumber | string)[];
+            dates?: DateTime[];
+            adaptedTime?: boolean;
+            from?: StationWithParity | Station | string;
+            to?: StationWithParity | Station | string;
+            via?: (StationWithParity | Station | string)[];
+            dateFrom?: DateTime;
+            dateTo?: DateTime;
+            zones?: (number)[];
+            batteries?: (number)[];
+        }
+    ): Train[] {
+   
+        const result: Train[] = [];
+    
+        // Conversion des dates en format Excel (entier)
+        const datesValues = dates
+            .map(d => {
+                const date = d.getDate(adaptedTime);
+                if (!!d && date === 0) {
+                    Log.warn(`Les dates du filtre des trains doivent être absolues et non nulles.`
+                        + ` La date ${d} ne sera donc pas prise en compte`);
+                }
+                return date;
+            })
+            .filter(d => d!== 0);
+        const dateFromValue = dateFrom?.getDate(adaptedTime);
+        if (!!dateFrom && dateFromValue === 0) {
+            Log.warn(`Les dates du filtre des trains doivent être absolues et non nulles.`
+                + ` La date ${dateFrom} ne sera donc pas prise en compte`);
+        }
+        const dateToValue = dateTo?.getDate(adaptedTime);
+        if (!!dateFrom && dateFromValue === 0) {
+            Log.warn(`Les dates du filtre des trains doivent être absolues et non nulles.`
+                + ` La date ${dateTo} ne sera donc pas prise en compte`);
+        }
+    
+        // Vérifie les conditions ci-dessous pour chaque train
+        for (const train of this.values()) {
+    
+            // Numéros de train
+            if (numbers.length > 0) {
+                if (!numbers.some(n => train.number.includes(n))) continue;
+            }
+    
+            // Dates exactes
+            if (datesValues.length > 0) {
+                if (!datesValues.includes(train.date.getDate(adaptedTime))) continue;
+            }
+
+            // Arrêt de départ et/ou d'arrivée
+            const fromStop = from ? train.path.getStop(from) : undefined;
+            if (from && fromStop !== train.path.origin) continue;
+            const toStop = to ? train.path.getStop(to) : undefined;
+            if (to && toStop !== train.path.destination) continue;
+
+            // Arrêts du train (départ, arrivée, gares intermédiaires)
+            //  avec passage dans l'intervalle de dates
+            // via.forEach(s => {
+            //     const stop = train.path.getStop(s);
+            //     if (!stop) continue;
+            //     const arrivalTime = stop!.getTime(false, train.date);
+            //     if (arrivalTime && dateToValue && arrivalTime.compareTo(dateTo!) < 0) continue;
+            //     const departureTime = stop!.getTime(true, train.date);
+            //     if (departureTime && dateFromValue && departureTime.compareTo(dateFrom!) < 0) continue;
+            // })
+    
+            result.push(train);
+        }
+    
+        return result;
     }
 
     /**
@@ -7703,6 +7940,15 @@ class TrainPath {
         return TrainPaths.get(value!);
     }
 
+    public static fromTrain(
+        train: Train | undefined
+    ): TrainPath | undefined {
+        if (train == null) return undefined;
+
+        if (value instanceof TrainPath) return value;
+        return TrainPaths.get(value!);
+    }
+
     /**
      * Construit la clé du sillon qui est composée du premier service rattaché
      *  suivi du numéro de sillon et du groupe de jours de circulation.
@@ -7771,6 +8017,22 @@ class TrainPaths {
     public static get(key: string): TrainPath | undefined {
         return this.map.get(key);
     }
+
+    // public static getFrom(
+    //     numbers: TrainNumber[],
+    //     days: Days,
+    //     services: string[],
+    //     from: StationWithParity | Station | string,
+    //     to: StationWithParity | Station | string,
+    //     via: (StationWithParity | Station | string)[]
+    // ): TrainPath | undefined {
+    //     this.values.forEach(trainPath => {
+    //         if (numbers.length > 0) {
+    //             if 
+    //         }
+    //     })
+    //     return this.map.get(key);
+    // }
 
     /**
      * Ajoute un sillon dans la base de données, référencé par sa clé.
@@ -7996,11 +8258,11 @@ function testWorkbookService(options: Partial<AssertDDOptions> = {}) {
     const testTableName = "testTable";
 
     // 1️⃣ Création feuille
-    let sheet = WorkbookService.getSheet(testSheetName, { createIfMissing: true });
+    let sheet = WorkbookService.getSheet({ sheetName: testSheetName, createIfMissing: true });
     assert.check("Création feuille", sheet.getName(), testSheetName);
 
     // 2️⃣ Récup feuille existante
-    const sheet2 = WorkbookService.getSheet(testSheetName);
+    const sheet2 = WorkbookService.getSheet({ sheetName: testSheetName });
     assert.check("Récup feuille", sheet2.getName(), testSheetName);
 
     // 3️⃣ checkCellName OK
@@ -8058,10 +8320,10 @@ function testWorkbookService(options: Partial<AssertDDOptions> = {}) {
     assert.check("getRequired KO déclenche erreur", errorCount, 3);
 
     // 7️⃣ Suppression feuille
-    WorkbookService.getSheet(testSheetName)?.delete();
+    WorkbookService.getSheet({ sheetName: testSheetName })?.delete();
     assert.check(
         "Suppression feuille",
-        WorkbookService.getSheet(testSheetName, { failOnError: false }),
+        WorkbookService.getSheet({ sheetName: testSheetName, failOnError: false }),
         null
     );
 
@@ -8283,11 +8545,23 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
         true
     );
 
-    assert.check(
-        'compareTo',
-        abs.compareTo(DateTime.from(45830 + 10/24)!),
-        0
-    );
+    const compareToTests = [
+        { a: DateTime.from(45830 + 10/24), b: DateTime.from(45830 + 10/24), expected: 0 },
+        { a: DateTime.from(45830 + 10/24), b: DateTime.from(45830 + 1/24), expected: 1 },
+        { a: DateTime.from(45830 + 10/24), b: DateTime.from(45831), expected: -1 },
+        { a: DateTime.from(45830 + 10/24), b: DateTime.from(10/24), expected: 0 },
+        { a: DateTime.from(45830), b: DateTime.from(10/24), expected: 1 },
+        { a: DateTime.from(1/24, true), b: DateTime.from(10/24, true), expected: -1 },
+    ];
+
+    const getSign = (v: number) => v > 0 ? 1 : v < 0 ? -1 : 0;
+    compareToTests.forEach((t, index) => {
+        assert.check(
+            `compareTo test #${index + 1}`,
+            getSign(t.a!.compareTo(t.b!)) ,
+            t.expected
+        );
+    });
 
     /* ==========================================================
     9. equalsOrUndefined()
@@ -9188,7 +9462,44 @@ function testTrainNumber(options: Partial<AssertDDOptions> = {}) {
     });
 
     // ------------------------------------------------------------
-    // isW()
+    // isDoubleParity
+    // ------------------------------------------------------------
+
+    const doubleParityTests = [
+        { value: "146491", expected: false },
+        { value: "146490/1", expected: true },
+    ];
+
+    doubleParityTests.forEach(t => {
+        const tn = TrainNumber.from(t.value);
+
+        assert.check(
+            `doubleParity(${t.value})`,
+            tn.isDoubleParity,
+            t.expected
+        );
+    });
+
+    // ------------------------------------------------------------
+    // isCommercial
+    // ------------------------------------------------------------
+
+    const commercialTests = [
+        { value: 147490, expected: true },
+        { value: 146490, expected: false },
+        { value: "E46490", expected: false }
+    ];
+
+    commercialTests.forEach(t => {
+        const tn = TrainNumber.from(t.value);
+        assert.check(`isCommercial(${t.value})`,
+             tn.isCommercial,
+             t.expected
+        );
+    });
+
+    // ------------------------------------------------------------
+    // isW
     // ------------------------------------------------------------
 
     const wTests = [
@@ -9199,11 +9510,14 @@ function testTrainNumber(options: Partial<AssertDDOptions> = {}) {
 
     wTests.forEach(t => {
         const tn = TrainNumber.from(t.value);
-        assert.check(`isW(${t.value})`, tn.isW(), t.expected);
+        assert.check(`isW(${t.value})`,
+            tn.isW,
+            t.expected
+        );
     });
 
     // ------------------------------------------------------------
-    // isMouvement()
+    // isMouvement
     // ------------------------------------------------------------
 
     const mouvementTests = [
@@ -9213,7 +9527,46 @@ function testTrainNumber(options: Partial<AssertDDOptions> = {}) {
 
     mouvementTests.forEach(t => {
         const tn = TrainNumber.from(t.value);
-        assert.check(`isMouvement(${t.value})`, tn.isMouvement(), t.expected);
+        assert.check(`isMouvement(${t.value})`, tn.isMouvement, t.expected);
+    });
+
+    // ------------------------------------------------------------
+    // zone
+    // ------------------------------------------------------------
+
+    const zoneTests = [
+        { value: 147490, expected: 4 },
+        { value: 146490, expected: null }
+    ];
+
+    zoneTests.forEach(t => {
+        const tn = TrainNumber.from(t.value);
+
+        assert.check(
+            `zone(${t.value})`,
+            tn.zone,
+            t.expected
+        );
+    });
+
+    // ------------------------------------------------------------
+    // battery
+    // ------------------------------------------------------------
+
+    const batteryTests = [
+        { value: 147490, expected: 90 },
+        { value: "147490/1", expected: 91 },
+        { value: 146490, expected: null }
+    ];
+
+    batteryTests.forEach(t => {
+        const tn = TrainNumber.from(t.value);
+
+        assert.check(
+            `battery(${t.value})`,
+            tn.battery,
+            t.expected
+        );
     });
 
     // ------------------------------------------------------------
@@ -10034,6 +10387,13 @@ function testPath(options: Partial<AssertDDOptions> = {}) {
     /* ==========================================================
        5. getStop (direct + parents)
        ========================================================== */
+
+    const stopFromNumber = path.getStop(-1);
+    assert.check(
+        "getStop number",
+        stopFromNumber instanceof Stop,
+        true
+    );
 
     const stopFromString = path.getStop("PZB");
     assert.check(
