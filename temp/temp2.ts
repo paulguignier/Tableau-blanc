@@ -13,7 +13,9 @@
 var WORKBOOK: ExcelScript.Workbook;     // Classeur principal
 var CONSOLE: Console;                   // Console pour l'affichage de messages
 
-function main(workbook: ExcelScript.Workbook) {
+function main(
+    workbook: ExcelScript.Workbook
+) {
     WORKBOOK = workbook;
     CONSOLE = console;
     const sheet = WORKBOOK.getActiveWorksheet();
@@ -22,14 +24,15 @@ function main(workbook: ExcelScript.Workbook) {
     Log.configure({
         debug: true,
         info: true,
-        warn: true
+        warn: true,
+        bufferize: false
     });
 
 
 
     // Lance la fonction de tests.
     // Si les tests sont actifs, la suite du programme n'est pas exécuté. 
-    // if (runAllTests(testMode)) return;
+    if (runAllTests(testMode)) return;
 
     try {
         Log.info(`Chargement des paramètres`);
@@ -37,9 +40,9 @@ function main(workbook: ExcelScript.Workbook) {
         Connections.load();
 
  
-        Trains.import();
-        Trains.print();
-        Paths.print();
+        // Trains.import();
+        // Trains.print();
+        // Paths.print();
 
 
 
@@ -58,6 +61,7 @@ function main(workbook: ExcelScript.Workbook) {
     } catch (e) {
         Log.warn(`${e.message}`);
     }
+    Log.flush();
 }
 
 /**
@@ -68,7 +72,9 @@ function main(workbook: ExcelScript.Workbook) {
  *  puis le programme est interrompu. Si faux (par défaut), le programme continue normalement.
  * @returns {boolean} Vrai si les tests sont actifs, faux sinon.
  */
-function runAllTests(testMode: boolean = false): boolean {
+function runAllTests(
+    testMode: boolean = false
+): boolean {
 
     if (!testMode) return false;
 
@@ -84,19 +90,22 @@ function runAllTests(testMode: boolean = false): boolean {
         // testDays({ printSuccess: false, printFailure: true });
         // testParity({ printSuccess: false, printFailure: true });
         // testTrainNumber({ printSuccess: false, printFailure: true });
-        // testStation({ printSuccess: false, printFailure: true });
-        // testStationWithParity({ printSuccess: false, printFailure: true });
-        // testConnection({ printSuccess: false, printFailure: true });
+        // testStation({ printSuccess: false, printFailure: true, catchErrors: false });
+        // testStationWithParity({ printSuccess: false, printFailure: true, catchErrors: false });
+        // testConnection({ printSuccess: false, printFailure: true, catchErrors: false });
         // testStop({ printSuccess: false, printFailure: true });
-        // testPath({ printSuccess: false, printFailure: true });
+        testPath({ printSuccess: true, printFailure: true });
 
     } catch (e) {
         Log.warn("Erreur lors des tests", e.message);
     }
 
+    AssertDD.printGlobalSummary();
+
     Log.info(`Fin des tests`);
     Log.info(`-------------`);
     Log.info(`Fin des tests`);
+    Log.flush();
     return true;
 
  
@@ -126,20 +135,27 @@ function runAllTests(testMode: boolean = false): boolean {
     // return true;
 }
 
-/* 
- * Options de l'affichage des logs
- *  - debug: Afficher les messages de debug
- *  - info: Afficher les messages d'information
- *  - warn: Afficher les messages d'avertissement
+/**
+ * Type LogOptions comprenant les options de l'affichage des logs.
+ * - debug : affiche les messages de debug.
+ * - info  : affiche les messages d'information.
+ * - warn  : affiche les messages d'avertissement.
+ * - bufferize : stocke les logs avant affichage console.
  */
 type LogOptions = {
+
     debug: boolean;
     info: boolean;
     warn: boolean;
-}
+    bufferize: boolean;
+};
 
 /*
- * Classe Logs contenant les trois types de messages du console, et leurs options d'affichage.
+ * Classe Log centralisant tous les affichages console, permettant :
+ *  - le filtrage par niveau,
+ *  - le buffering,
+ *  - le flush manuel,
+ *  - le formatage homogène.
  */
 class Log {
 
@@ -147,9 +163,13 @@ class Log {
     private static options: LogOptions = {  // Options de l'affichage des logs
         debug: true,                        //  Remontée des messages de debug
         info: true,                         //  Remontée des messages d'information
-        warn: true                          //  Remontée des messages d'avertissement
+        warn: true,                         //  Remontée des messages d'avertissement
+        bufferize: true                     //  Stockage des logs avant affichage console
     }; 
- 
+
+    // Tableau de stockage des logs
+    private static buffer: unknown[][] = [];
+
     /**
      * Vérifie si une valeur est concatenable (null, undefined, string, number, boolean).
      * @param {unknown} value - Valeur à vérifier.
@@ -157,53 +177,73 @@ class Log {
      */
     private static isConcatable(value: unknown): boolean {
         return (
-            value === null ||
-            value === undefined ||
-            typeof value === "string" ||
-            typeof value === "number" ||
-            typeof value === "boolean" ||
-            typeof value === "bigint" ||
-            value instanceof Date
+            value === null
+            || value === undefined
+            || typeof value === "string"
+            || typeof value === "number"
+            || typeof value === "boolean"
+            || typeof value === "bigint"
+            || value instanceof Date
         );
     }
 
     /**
-     * Méthode interne qui écrit un message dans la console.
-     * Elle prend en paramètre le niveau du message (debug, info, warn) et
-     *  un tableau d'arguments qui peuvent être des strings, des numbers,
-     *  des booleans, des null, des undefined, des objets.
-     * Les arguments concaténables sont transformés en string et ajoutés au buffer.
-     * Les objets sont ajoutés au tableau output sans modification.
-     * Lorsque le buffer contient un objet, il est flush (vide) pour laisser place à l'objet.
-     * Enfin, le tableau output est passé à CONSOLE.log pour afficher le message.
-     * @param {string} level - Niveau du message (debug, info, warn)
-     * @param {unknown[]} args - Tableau des arguments à afficher
+     * Transforme les arguments en tableau propre à afficher.
+     * Les primitives sont concaténées ensemble.
+     * Les objets restent séparés.
      */
-    private static log(level: string, args: unknown[]): void {
+    private static buildOutput(
+        prefix: string | undefined,
+        args: unknown[]
+    ): unknown[] {
 
         const output: unknown[] = [];
-        let buffer = `[${level}]`;
+        let buffer = prefix !== undefined
+            ? `[${prefix}]`
+            : "";
  
-        args.forEach(arg => {
+        for (const arg of args) {
+
             if (this.isConcatable(arg)) {
-                buffer += " " + String(arg);
-            } else {
-                // On flush le buffer texte avant l'objet
-                if (buffer.trim() !== "") {
-                    output.push(buffer);
-                    buffer = "";
-                }
-                output.push(arg);
+                buffer += (buffer.length > 0 ? " " : "")
+                    + String(arg);
+                continue;
             }
-        });
+
+            // Flush texte avant objet
+            if (buffer.trim() !== "") {
+                output.push(buffer);
+                buffer = "";
+            }
+
+            output.push(arg);
+        }
  
         // Flush final
         if (buffer.trim() !== "") {
             output.push(buffer);
         }
  
-        CONSOLE.log(...output);
+        return output;
     } 
+
+    /**
+     * Écrit un message dans le buffer ou directement dans la console.
+     */
+    private static write(
+        prefix: string | undefined,
+        args: unknown[]
+    ): void {
+
+        const output = this.buildOutput(prefix, args);
+
+        if (this.options.bufferize) {
+            this.buffer.push(output);
+            return;
+        }
+
+        CONSOLE.log(...output);
+    }
  
     /**
      * Configure les options de l'affichage des logs.
@@ -212,129 +252,481 @@ class Log {
      *  - info: Afficher les messages d'information,
      *  - warn: Afficher les messages d'avertissement.
      */
-    public static configure(options: Partial<LogOptions>) {
+    public static configure(
+        options: Partial<LogOptions>
+    ): void {
         Object.assign(this.options, options);
     }
 
     /**
-     * Envoie un message au console avec le niveau "DEBUG".
-     * @param {...unknown[]} args - Arguments à passer au console.log.
+     * Affiche tous les logs bufferisés dans l'ordre.
      */
-    public static debug(...args: unknown[]): void {
+    public static flush(): void {
+
+        for (const output of this.buffer) {
+            CONSOLE.log(...output);
+        }
+
+        this.buffer = [];
+    }
+
+    /**
+     * Vide le buffer sans affichage.
+     */
+    public static clear(): void {
+        this.buffer = [];
+    }
+
+    /**
+     * Message DEBUG.
+     * @param {...unknown[]} args - Arguments à afficher.
+     */
+    public static debug(
+        ...args: unknown[]
+    ): void {
         if (!this.options.debug) return;
-        this.log("DEBUG", args);
+        this.write("DEBUG", args);
     }
  
     /**
-     * Envoie un message au console avec le niveau "INFO".
-     * @param {...unknown[]} args - Arguments à passer au console.log.
+     * Message INFO.
+     * @param {...unknown[]} args - Arguments à afficher.
      */
-    public static info(...args: unknown[]): void {
+    public static info(
+        ...args: unknown[]
+    ): void {
         if (!this.options.info) return;
-        this.log("INFO", args);
+        this.write("INFO", args);
     }
  
     /**
-     * Envoie un message au console avec le niveau "WARN".
-     * @param {...unknown[]} args - Arguments à passer au console.log.
+     * Message WARN.
+     * @param {...unknown[]} args - Arguments à afficher.
      */
-    public static warn(...args: unknown[]): void {
+    public static warn(
+        ...args: unknown[]
+    ): void {
         if (!this.options.warn) return;
-        this.log("WARN", args);
+        this.write("WARN", args);
+    }
+
+    /**
+     * Affichage brut sans préfixe.
+     */
+    public static print(
+        ...args: unknown[]
+    ): void {
+        this.write(undefined, args);
     }
  
 }
 
-/*
- * Options de l'affichage des tests :
- *  - printSuccess: Afficher le message de succès,
- *  - printFailure: Afficher le message d'échec.
+/**
+ * Type AssertDDOptions comprenant les options de comportement et d'affichage des tests.
+ * - printSuccess : affiche les tests réussis.
+ * - printFailure : affiche les tests échoués.
+ * - catchErrors : intercepte les erreurs déclenchées durant les tests afin de continuer
+ *    l'exécution des test suivants. Désactiver cette option améliore les performances,
+ *    mais toute erreur interrompra immédiatement l'exécution.
  */
 type AssertDDOptions = {
-    printSuccess?: boolean;
-    printFailure?: boolean;
+
+    printSuccess?: boolean;     // Afficher le message de succès
+    printFailure?: boolean;     // Afficher le message d'échec
+    catchErrors?: boolean;      // Intercepte les erreurs durant les tests,
+                                //  à désactiver pour de meilleures performances
 }
+
+/**
+ * Type AssertDDOptions pour inclure au choix une valeur statique ou une fonction dynamique au test.
+ */
+type AssertDDValue<T, TResult> = 
+    TResult | ((value: T, index: number) => TResult);
+
+/**
+ * Type AssertDDOptions pour configurer de manière dynamique la suite de tests data-driven.
+ *
+ * Chaque propriété peut :
+ * - être une valeur fixe,
+ * - ou être générée dynamiquement à partir de l'élément testé.
+ *
+ * Les propriétés présentes directement dans un élément du tableau
+ * sont prioritaires sur celles définies dans cette configuration.
+ */
+type AssertDDConfig<T> = {
+
+    label?: AssertDDValue<T, string>;       // Description du test affichée dans les logs,
+    actual?: unknown | (() => unknown);     // Valeur réelle obtenue
+    expected?: AssertDDValue<T, unknown>;   // Valeur attendue
+    category?: AssertDDValue<T, string>;    // Catégorie logique du test
+    example?: AssertDDValue<T, string>;     // Exemple ou contexte supplémentaire affiché en cas d'échec
+    skip?: AssertDDValue<T, boolean>;       // Ignore le test
+    only?: AssertDDValue<T, boolean>;       // Si un test au moins contient only,
+                                            //  seuls les test avec only vont s'exécuter
+    timeout?: AssertDDValue<T, number>;     // Timeout maximal théorique du test en millisecondes.
+
+    beforeEach?: (value: T, index: number) => void; // Fonction exécutée avant chaque test 
+                                                    //  ex : - reset d'état,
+                                                    //       - préparation de mocks,
+                                                    //       - création d'objets temporaires
+
+    afterEach?: (value: T, index: number) => void;  // Fonction exécutée après chaque test,
+                                                    //  même en cas d'erreur
+                                                    //   ex : - nettoyage,
+                                                    //        - suppression de données temporaires,
+                                                    //        - fermeture de ressources    
+};
+
+/**
+ * Type AssertDDCheck représentant un test unitaire concret déjà résolu.
+ * - label : description du test affichée dans les logs,
+ * - actual : valeur réelle obtenue, ou fonction à exécuter dynamiquement,
+ * - expected : valeur attendue, ou AssertDD.THROWS lorsqu'une erreur est attendue,
+ * - category : catégorie logique du test,
+ * - example : exemple ou contexte supplémentaire affiché en cas d'échec
+ * - skip : indique si le test doit être sauté;
+ * - only : indique si le test doit seulement s'exécuter si un test au moins contient only;
+ * - timeout : timeout maximaltheid du test en millisecondes.
+ * - si un test au moins contient only, seuls les test avec only vont s'exécuter,
+ */
+type AssertDDCheck = {
+
+    label: string;
+    actual: unknown | (() => unknown);
+    expected: unknown;
+    category?: string;
+    example?: string;
+    skip?: boolean;
+    only?: boolean;
+    timeout?: number;
+};
+
+/**
+ * Entrée utilisateur d'un test data-driven.
+ * Chaque entrée peut :
+ *  - contenir ses propres données métier,
+ *  - et éventuellement surcharger la configuration globale.
+ */
+type AssertDDEntry<T = unknown> =
+    T & Partial<AssertDDCheck>;
 
 /* 
  * Classe AssertDD contenant les options et les fonctions de tests Data-Driven.
  */
 class AssertDD {
 
-    private options: AssertDDOptions;
+    public static readonly THROWS = Symbol("ASSERT_THROWS");    // Constante indiquant 
+                                                                // qu'une erreur est attendue
 
-    private total = 0;
-    private success = 0;
-    private failure = 0;
+    public static successfulSuites = 0;     // Nombre total d'ensemble de tests complets.
+    public static failedSuites = 0;         // Nombre total d'ensemble de tests incomplets.
 
-    constructor(options: AssertDDOptions = {}) {
+    private total = 0;                      // Décompte du nombre total de tests réalisés
+    private success = 0;                    // Décompte du nombre total de tests réalisés avec succès
+    private failure = 0;                    // Décompte du nombre total de tests en échec
+    private skipped = 0;                    // Décompte du nombre total de tests sautés
+    private startTime: number;              // Date de commencement des tests
+
+    private options: AssertDDOptions;       // Options d'affichage des messages de succès et d'échecs
+
+    /**
+     * Constructeur de la classe AssertDD.
+     * @param {AssertDDOptions} options - Options d'affichage des messages de succès et d'échecs
+     */
+    constructor(
+        options: AssertDDOptions = {}
+    ) {
+        this.startTime = Date.now();
         this.options = {
             printSuccess: options.printSuccess ?? true,
-            printFailure: options.printFailure ?? true
+            printFailure: options.printFailure ?? true,
+            catchErrors: options.catchErrors ?? true
         };
     }
 
     /**
-     * Réalise le test et l'imprime avec un symbole de réussite (✔) ou d'échec (✘).
-     * @param {string} label - Nom du test.
-     * @param {T} actual - Valeur actuelle obtenue.
-     * @param {T} expected - Valeur attendue.
-     * @param {AssertDDOptions} options - Options d'affichage des succès et des échecs.
+     * Résout une propriété dynamique :
+     * - priorité à la valeur locale,
+     * - sinon valeur du config,
+     * - sinon fallback.
      */
-    public check<T>(
-        label: string,
-        actual: T,
-        expected: T,
-        options: AssertDDOptions = {}
-    ): boolean {
+    private resolveProperty<T, TResult>(
+        localValue: AssertDDValue<T, TResult> | undefined,
+        configValue: AssertDDValue<T, TResult> | undefined,
+        value: T,
+        index: number,
+        fallback: TResult
+    ): TResult {
 
-        const printSuccess = options.printSuccess ?? this.options.printSuccess;
-        const printFailure = options.printFailure ?? this.options.printFailure;
+        const source = localValue !== undefined
+            ? localValue
+            : configValue;
 
-        const ok = expected === actual;
-
-        this.total++;
-        ok ? this.success++ : this.failure++;
-
-        if (ok) {
-            if (printSuccess) {
-                CONSOLE.log(`✔ ${label} | obtenu: ${expected}`);
-            }
-        } else {
-            if (printFailure) {
-                CONSOLE.log(
-                    `✘ ${label} | attendu: ${expected} | obtenu: ${actual}`
-                );
-            }
+        if (source === undefined) {
+            return fallback;
         }
 
-        return ok;
+        return typeof source === "function"
+            ? (
+                source as (
+                    value: T,
+                    index: number
+                ) => TResult
+            )(value, index)
+
+            : source;
     }
 
     /**
-     * Vérifie que la fonction fn lance une erreur.
-     * @param {string} desc - Nom du test.
-     * @param {() => void} fn - Fonction à tester.
-     */
-    public throws(desc: string, fn: () => void) {
-        let thrown = false;
-        try {
-            fn();
-        } catch {
-            thrown = true;
+     * Exécute une suite de tests data-driven,
+     *  imprime le résultat avec un symbole de réussite (✔) ou d'échec (✘).
+     * Chaque entrée peut :
+     *  - contenir des données métier,
+     *  - définir directement certaines propriétés du test,
+     *  - ou utiliser les valeurs/fonctions du config comme fallback.
+     * Priorité de résolution :
+     *  1. propriété présente dans l'entrée,
+     *  2. propriété présente dans config,
+     *  3. fallback interne.
+     * @param {AssertDDEntry<T>[]} values - Entrées de chacun des tests.
+     * @param {AssertDDConfig<T>} [config={}] - Configuration générale des tests.
+     * @param {AssertDDOptions} options - Options d'affichage des succès et des échecs.
+    */
+    public check<T>(
+        values: AssertDDEntry<T>[],
+        config: AssertDDConfig<T> = {},
+        options?: AssertDDOptions
+    ): boolean {
+
+        // Prend en compte les options d'exécution
+        const printSuccess = options?.printSuccess ?? this.options.printSuccess;
+        const printFailure = options?.printFailure ?? this.options.printFailure;
+        const catchErrors = options?.catchErrors ?? this.options.catchErrors;
+
+        // Génère les tests à partir des valeurs et de la configuration
+        let checks: AssertDDCheck[] = values.map((entry, index): AssertDDCheck => ({
+            label: this.resolveProperty(
+                entry.label,
+                config.label,
+                entry,
+                index,
+                `Test #${index + 1}`
+            ),
+            actual: () => this.resolveProperty(
+                entry.actual,
+                config.actual,
+                entry,
+                index,
+                undefined
+            ),
+            expected: this.resolveProperty(
+                entry.expected,
+                config.expected,
+                entry,
+                index,
+                (entry as { expected?: unknown; }).expected ?? true
+            ),
+            category: this.resolveProperty(
+                entry.category,
+                config.category,
+                entry,
+                index,
+                undefined
+            ),
+            example: this.resolveProperty(
+                entry.example,
+                config.example,
+                entry,
+                index,
+                undefined
+            ),
+            skip: this.resolveProperty(
+                entry.skip,
+                config.skip,
+                entry,
+                index,
+                false
+            ),
+            only: this.resolveProperty(
+                entry.only,
+                config.only,
+                entry,
+                index,
+                false
+            ),
+            timeout: this.resolveProperty(
+                entry.timeout,
+                config.timeout,
+                entry,
+                index,
+                undefined
+            )
+        }));
+
+        // Filtre les tests si l'option "only" est activée
+        const hasOnly = checks.some(check => check.only);
+        if (hasOnly) {
+            checks = checks.filter(
+                check => check.only
+                
+            );
         }
-        this.check(desc, thrown, true);
+
+        // Exécute les tests et affiche les résultats
+        let globalSuccess = true;
+        for (const [index, check] of Array.from(checks.entries())) {
+
+            const entry = values[index];
+            
+            // Saute le test si l'option "skip" est activée
+            if (check.skip) {
+                this.skipped++;
+                continue;
+            }
+
+            // Exécute le test
+            const run = () => {
+                const start = Date.now();
+                const actualValue = typeof check.actual === "function"
+                    ? (check.actual as () => unknown)()
+                    : check.actual;
+                const elapsed = Date.now() - start;
+                const ok = actualValue === check.expected;
+                this.total++;
+
+                // Si le timeout est dépassé, le test est considéré comme échoué
+                if (check.timeout !== undefined && elapsed > check.timeout) {
+                    this.failure++;
+                    globalSuccess = false;
+                    if (printFailure) {
+                        Log.print(`✘ ${check.label}`
+                            + ` | timeout dépassé`
+                            + ` (${elapsed}ms > ${check.timeout}ms)`
+                        );
+                    }
+                    return;
+                }
+
+                // Test réussi
+                if (ok) {
+                    this.success++;
+                    if (printSuccess) {
+                        Log.print(`✔ ${check.label}`);
+                    }
+                    return;
+                }
+
+                // Test échoué
+                this.failure++;
+                globalSuccess = false;
+                if (printFailure) {
+
+                    let message = `✘ ${check.label}`
+                        + ` | attendu: ${String(check.expected)}`
+                        + ` | obtenu: ${String(actualValue)}`;
+
+                    if (check.category) {
+                        message += ` | catégorie: ${check.category}`;
+                    }
+                
+                    if (check.example) {
+                        message += ` | exemple: ${check.example}`;
+                    }
+
+                    Log.print(message);
+                }
+            };
+
+            // Exécute les tests sans récupération des erreurs
+            if (!catchErrors) {
+                config.beforeEach?.(entry, index);
+                run();
+                config.afterEach?.(entry, index);
+                continue;
+            }
+
+            // Exécute les tests avec récupération des erreurs
+            try {
+                config.beforeEach?.(entry, index);
+                run();
+            } catch (error) {
+
+                const ok = check.expected === AssertDD.THROWS;
+                this.total++;
+                if (ok) {
+
+                    this.success++;
+
+                    if (printSuccess) {
+                        Log.print(`✔ ${check.label}`);
+                    }
+
+                } else {
+
+                    this.failure++;
+                    globalSuccess = false;
+
+                    if (printFailure) {
+                        Log.print(
+                            `✘ ${check.label}`
+                            + ` | erreur inattendue: ${error}`
+                        );
+                    }
+                }
+                
+            } finally {
+                config.afterEach?.(entry, index);
+            }
+        };
+
+        return globalSuccess;
     }
 
     /**
      * Imprime le resultat des tests.
      * @param {string} [title="Résultats des tests"] - Titre du test.
      */
-    public printSummary(title: string = "Résultats des tests", reset: boolean = true): void {
-        CONSOLE.log(
-            `${title} : ${this.success} / ${this.total} réussis`
+    public printSummary(
+        title: string = "Résultats des tests",
+        reset: boolean = true
+    ): void {
+
+        const success = this.failure === 0;
+        const elapsed = Date.now() - this.startTime;
+
+        if (success) {
+            AssertDD.successfulSuites++;
+        } else {
+            AssertDD.failedSuites++;
+        }
+
+        Log.print(
+            `${title} : `
+            + `${this.success} / ${this.total} réussis\n`
             + ` (échecs : ${this.failure})`
+            + ` (ignorés : ${this.skipped})`
+            + ` en : ${Math.round(elapsed / 1000)} s)`
         );
-        if (reset) this.reset();
+
+        if (reset) {
+            this.reset();
+        }
+    }
+
+    /**
+     * Imprime le résultat global de toutes les suites exécutées.
+     */
+    public static printGlobalSummary(): void {
+
+        const total =
+            AssertDD.successfulSuites
+            + AssertDD.failedSuites;
+
+        Log.print(
+            `Suites globales : `
+            + `${AssertDD.successfulSuites} réussies / ${total}\n`
+            + ` (échecs : ${AssertDD.failedSuites})`
+        );
     }
 
     /**
@@ -347,7 +739,10 @@ class AssertDD {
     }
 }
 
-type CellValue = string | number | boolean;
+/**
+ * Types des valeurs contenues dans une cellule de feuille de calcul Excel.
+ */
+type CellValue = string | number | boolean | undefined;
 
 /*
  * Classe utilitaire WorkbookService de manipulation des feuilles de calcul Excel.
@@ -360,23 +755,22 @@ class WorkbookService {
      *  sinon lance une exception.
      * Si createIfMissing est vrai, crée la feuille si elle n'existe pas.
      * @param {string} sheetName - Nom de la feuille de calcul à chercher.
-     * @param {{failOnError?: boolean, createIfMissing?: boolean}} options - Options
-     *  pour la récupération de la feuille :
-     *   - createIfMissing : Si vrai, crée la feuille si elle n'existe pas (faux par défaut),
-     *   - failOnError : Si vrai (par défaut), lance une exception si la feuille n'existe pas.
+     * @param {boolean} createIfMissing - Si vrai, crée la feuille si elle n'existe pas (faux par défaut).
+     * @param {boolean} failOnError - Si vrai (par défaut), lance une exception si la feuille n'existe pas.
      * @returns {ExcelScript.Worksheet | null} - Feuille de calcul Excel correspondant au nom donné,
      *  ou null si elle n'existe pas.
      */
     public static getSheet(
-        sheetName: string,
-        options?: {
-            createIfMissing?: boolean;  // Faux par défaut
-            failOnError?: boolean;      // Vrai par défaut
+        {
+            sheetName,
+            createIfMissing = false,
+            failOnError = true
+        }: {
+            sheetName: string,
+            createIfMissing?: boolean;
+            failOnError?: boolean;
         }
     ): ExcelScript.Worksheet | null {
- 
-        const createIfMissing = options?.createIfMissing ?? false;
-        const failOnError = options?.failOnError ?? true;
  
         let sheet = WORKBOOK.getWorksheet(sheetName);
  
@@ -405,11 +799,16 @@ class WorkbookService {
      * @returns {CellValue[][]} - Données de la feuille.
      */
     public static getDataFromSheet(
-        sheetName: string,
-        failOnError: boolean = true
+        {
+            sheetName,
+            failOnError = true
+        }: {
+            sheetName: string,
+            failOnError?: boolean;
+        }
     ): CellValue[][] {
 
-        const sheet = this.getSheet(sheetName, { failOnError });
+        const sheet = this.getSheet({ sheetName, failOnError });
 
         if (!sheet) return [];
 
@@ -437,11 +836,17 @@ class WorkbookService {
      *  ou null si il n'existe pas.
      */
     public static getTable(
-        sheetName: string,
-        tableName: string,
-        failOnError: boolean = true
+        {
+            sheetName,
+            tableName,
+            failOnError = true
+        }: {
+            sheetName: string,
+            tableName: string,
+            failOnError?: boolean;
+        }
     ): ExcelScript.Table | null {
-        const sheet = this.getSheet(sheetName, { failOnError: false });
+        const sheet = this.getSheet({ sheetName, failOnError: false });
         if (!sheet) return null;
         const table = sheet.getTable(tableName);
         if (!table) {
@@ -466,11 +871,17 @@ class WorkbookService {
      *  correspondant au nom donné, ou null si il n'existe pas.
      */
     public static getDataFromTable(
-        sheetName: string,
-        tableName: string,
-        failOnError: boolean = true
+        {
+            sheetName,
+            tableName,
+            failOnError = true
+        }: {
+            sheetName: string,
+            tableName: string,
+            failOnError?: boolean;
+        }
     ): CellValue[][] {
-        const table = this.getTable(sheetName, tableName, failOnError);
+        const table = this.getTable({ sheetName, tableName, failOnError });
         if (!table) return [];
         return table.getRange().getValues();
     }
@@ -485,7 +896,10 @@ class WorkbookService {
      * @returns {string | undefined} - Valeur de la cellule sous forme de chaîne,
      *  ou undefined si elle est null ou undefined.
      */
-    public static getStringOrUndefined(row: unknown[], col: number): string | undefined {
+    public static getStringOrUndefined(
+        row: unknown[],
+        col: number
+    ): string | undefined {
         const v = row[col];
         if (v === undefined || v === null) return undefined;
         return String(v).trim() || undefined;
@@ -503,7 +917,10 @@ class WorkbookService {
      * @returns {number | undefined} - Valeur de la cellule sous forme de nombre,
      *  ou undefined si la conversion échoue.
      */
-    public static getNumberOrUndefined(row: unknown[], col: number): number | undefined {
+    public static getNumberOrUndefined(
+        row: unknown[],
+        col: number
+    ): number | undefined {
         const v = row[col];
         if (typeof v === "number") return v;
         if (typeof v === "string") {
@@ -528,7 +945,10 @@ class WorkbookService {
      * @returns {boolean | undefined} - Valeur de la cellule sous forme de booléen,
      *  ou undefined si la conversion échoue.
      */
-    public static getBooleanOrUndefined(row: unknown[], col: number): boolean | undefined {
+    public static getBooleanOrUndefined(
+        row: unknown[],
+        col: number
+    ): boolean | undefined {
         const v = row[col];
         if (typeof v === "boolean") return v;
         if (typeof v === "number") return v !== 0;
@@ -547,7 +967,11 @@ class WorkbookService {
      * @param {string} [defaultValue=""] - Valeur par défaut.
      * @returns {string} - Valeur de la cellule sous forme de chaîne.
      **/
-    public static getString(row: unknown[], col: number, defaultValue: string = ""): string {
+    public static getString(
+        row: unknown[],
+        col: number,
+        defaultValue: string = ""
+    ): string {
         return this.getStringOrUndefined(row, col) ?? defaultValue;
     }
 
@@ -559,7 +983,11 @@ class WorkbookService {
      * @param {number} [defaultValue=0] - Valeur par défaut.
      * @returns {number} - Valeur de la cellule sous forme de nombre.
      **/
-    public static getNumber(row: unknown[], col: number, defaultValue: number = 0): number {
+    public static getNumber(
+        row: unknown[],
+        col: number,
+        defaultValue: number = 0
+    ): number {
         return this.getNumberOrUndefined(row, col) ?? defaultValue;
     }
 
@@ -571,7 +999,11 @@ class WorkbookService {
      * @param {boolean} [defaultValue=false] - Valeur par défaut.
      * @returns {boolean} - Valeur de la cellule sous forme de booléen.
      **/
-    public static getBoolean(row: unknown[], col: number, defaultValue: boolean = false): boolean {
+    public static getBoolean(
+        row: unknown[],
+        col: number,
+        defaultValue: boolean = false
+    ): boolean {
         return this.getBooleanOrUndefined(row, col) ?? defaultValue;
     }
 
@@ -583,7 +1015,11 @@ class WorkbookService {
      * @param {string} [errorMessage] - Message d'erreur personnalisé.
      * @returns {string} - Valeur de la cellule sous forme de chaîne.
      **/
-    public static getRequiredString(row: unknown[], col: number, errorMessage?: string): string {
+    public static getRequiredString(
+        row: unknown[],
+        col: number,
+        errorMessage?: string
+    ): string {
         const value = this.getStringOrUndefined(row, col);
         if (value === undefined) {
             throw new Error(errorMessage
@@ -601,7 +1037,11 @@ class WorkbookService {
      * @param {string} [errorMessage] - Message d'erreur personnalisé.
      * @returns {number} - Valeur de la cellule sous forme de nombre.
      **/
-    public static getRequiredNumber(row: unknown[], col: number, errorMessage?: string): number {
+    public static getRequiredNumber(
+        row: unknown[],
+        col: number,
+        errorMessage?: string
+    ): number {
         const value = this.getNumberOrUndefined(row, col);
         if (value === undefined) {
             throw new Error(errorMessage
@@ -619,7 +1059,10 @@ class WorkbookService {
      * @param {string} [errorMessage] - Message d'erreur personnalisé.
      * @returns {boolean} - Valeur de la cellule sous forme de booléen.
      **/
-    public static getRequiredBoolean(row: unknown[], col: number, errorMessage?: string): boolean {
+    public static getRequiredBoolean(row: unknown[],
+        col: number,
+        errorMessage?: string
+    ): boolean {
         const value = this.getBooleanOrUndefined(row, col);
         if (value === undefined) {
             throw new Error(errorMessage
@@ -639,7 +1082,10 @@ class WorkbookService {
      *  si l'adresse est invalide. Si faux, renvoie une chaîne vide.
      * @returns {string} - Adresse de cellule si elle est valide, une chaîne vide sinon.
      */
-    public static checkCellName(cellName: string, failOnError: boolean = true): string {
+    public static checkCellName(
+        cellName: string,
+        failOnError: boolean = true
+    ): string {
         // Convertit startCell en majuscules pour éviter les problèmes de casse.
         cellName = cellName.toUpperCase();
 
@@ -670,12 +1116,21 @@ class WorkbookService {
      * @returns {ExcelScript.Table | null} - Tableau Excel créé, ou null si une erreur survient.
      */
     public static printTable(
-        headers: string[][],
-        data: CellValue[][],
-        sheetName: string,
-        tableName: string,
-        startCell: string = "A1",
-        failOnError: boolean = true
+        {
+            headers,
+            data,
+            sheetName,
+            tableName,
+            startCell = "A1",
+            failOnError = true
+        }: {
+            headers: string[][],
+            data: CellValue[][],
+            sheetName: string,
+            tableName: string,
+            startCell?: string,
+            failOnError?: boolean
+        }
     ): ExcelScript.Table | null {
 
         // Combine les en-têtes et les données.
@@ -695,7 +1150,7 @@ class WorkbookService {
         }
 
         // Vérifie si un tableau avec le même nom existe déjà et le supprime si nécessaire.
-        const sheet = this.getSheet(sheetName, { createIfMissing: true, failOnError: false });
+        const sheet = this.getSheet({ sheetName, createIfMissing: true, failOnError: false });
         const existingTable = sheet.getTables().find(table => table.getName() === tableName);
         if (existingTable) existingTable.delete();
 
@@ -748,7 +1203,9 @@ class Params {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase: boolean = false): void {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.loaded && !erase) return;
@@ -760,7 +1217,10 @@ class Params {
         TrainNumber.load(erase);
 
         // Charge les autres paramètres.
-        const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
+        const data = WorkbookService.getDataFromTable({
+            sheetName: this.SHEET,
+            tableName: this.TABLE
+        });
 
         this.maxConnectionNumber = WorkbookService.getNumber(data[this.ROW_MAX_CONNEXIONS_NUMBER], 1) ?? 6;
         const turnaroundTime = WorkbookService.getNumber(data[this.ROW_TURNAROUND_TIME], 1) ?? 10;
@@ -801,7 +1261,9 @@ class ExcelDate {
      * @param {number} excelValue - Valeur Excel du jour, qui représente le nombre de jours
      *  écoulés depuis le 30 décembre 1899.
      */
-    constructor(excelValue: number) {
+    constructor(
+        excelValue: number
+    ) {
 
         this.value = Math.floor(excelValue);
 
@@ -828,7 +1290,9 @@ class ExcelDate {
      * @param {string} value - Chaîne à parser.
      * @returns {number | undefined} - Valeur Excel correspondante, ou undefined si la date est incorrecte.
      */
-    public static parseDate(value: string): number | undefined {
+    public static parseDate(
+        value: string
+    ): number | undefined {
 
         const separatorRegex = /[/\-]/; // Séparateur : / ou -
         const parts = value.split(separatorRegex);
@@ -877,7 +1341,9 @@ class ExcelDate {
      * @param {string} value - Valeur Excel de la date.
      * @returns {boolean} - Vrai si la date est un jour férié, faux sinon.
      */
-    public static getHolidays(year: number): Set<number> {
+    public static getHolidays(
+        year: number
+    ): Set<number> {
  
         if (this.holidayCache.has(year)) {
             return this.holidayCache.get(year)!;
@@ -951,7 +1417,9 @@ class ExcelTime {
      * Constructeur de l'objet ExcelTime.
      * @param {number} excelValue - Valeur Excel du temps, dont la fraction de jour représente l'heure.
      */
-    constructor(excelValue: number) {
+    constructor(
+        excelValue: number
+    ) {
         this.value = excelValue;
         const abs = Math.abs(this.value);
         const totalSeconds = Math.round(abs * 86400);
@@ -966,7 +1434,9 @@ class ExcelTime {
      * @param {string} value - Chaîne à parser.
      * @returns {number | undefined} - Valeur Excel correspondante, ou undefined si l'heure est incorrecte.
      */
-    public static parseTime(value: string): number | undefined {
+    public static parseTime(
+        value: string
+    ): number | undefined {
         const separatorRegex = /[^\d]/; // Toute caractère ou chaine de caractère non numérique
                                         //  est considérée comme un séparateur (ex : 'h', 'min' ...)
         const parts = value.split(separatorRegex).filter((t) => Boolean(t));
@@ -999,7 +1469,25 @@ class DateTime {
     private static readonly SHEET = "Param";        // Feuille contenant les paramètres globaux
     private static readonly TABLE = "Paramètres";   // Tableau contenant les paramètres globaux
     private static readonly ROW_ROLLOVER_HOUR = 4;  // Ligne contenant l'heure de changement de journée
-    private static readonly MIN_EXCEL_DATE = 2;     // Valeur minimale d'un temps incluant une date
+    private static readonly MIN_EXCEL_DATE = 2;     // Valeur minimale d'un temps absolu daté
+    private static readonly FORMAT_TOKENS = [
+        "yyyy",
+        "dddd",
+        "ddd",
+        "yy",
+        "mm",
+        "dd",
+        "hh",
+        "nn",
+        "ss",
+        "m",
+        "d",
+        "h",
+        "n",
+        "s"
+    ] as const;                                     // Tokens de formatage de date et heure
+    private static readonly FORMAT_REGEX =
+        new RegExp(DateTime.FORMAT_TOKENS.join("|"), "g");    // Regex des tokens de formatage
 
     // Etat de chargement
     private static loaded = false;
@@ -1023,14 +1511,18 @@ class DateTime {
                                                     //  à partir du 01/01/1900 00:00:00
     public readonly isRelative: boolean = false;    // Indique si le temps est relatif
                                                     //  (différence entre 2 horaires)
-    private _computed = false;                      // Indique si les éléments de la date sont calculés
+    private _computed: boolean = false;             // Indique si les éléments de la date sont calculés
+    private _toString?: string;                     // Cache de la représentation textuelle de l'objet
+    private _formats: Map<string, string> =
+        new Map<string, string>();                  // Cache des formats de la représentation textuelle
 
     // Valeurs des éléments
-    private _realDate: ExcelDate | undefined;       // Date réelle
-    private _adaptedDate: ExcelDate | undefined;    // Date adaptée si l'heure de la date est inférieure
-                                                    //  à l'heure de changement de jour
-
-    private _time: ExcelTime | undefined;           // Heure de la journée
+    private _realDate: ExcelDate | undefined;       // Date réelle (uniquement pour les temps absolus
+                                                    //  datés, donc avec excelValue >= MIN_EXCEL_DATE)
+    private _adaptedDate: ExcelDate | undefined;    // Date adaptée (jour suivant) si l'heure de la date
+                                                    //  est inférieure à l'heure de changement de jour
+    private _time: ExcelTime | undefined;           // Heure de la journée 
+                                                    //  (undefined si le temps n'est qu'une date)
 
     /**
      * Constructeur privé de l'objet DateTime.
@@ -1045,7 +1537,17 @@ class DateTime {
      *  Si le temps est daté, il sera adapté dans la méthode compute.
      *  Si le temps est relatif, il ne peut pas être adapté.
      */
-    private constructor(excelValue: number = 0, isRelative: boolean = false, adaptTime: boolean = true) {
+    private constructor(
+        {
+            excelValue = 0,
+            isRelative = false,
+            adaptTime = true
+        }: {
+            excelValue?: number,
+            isRelative?: boolean,
+            adaptTime?: boolean
+        }
+    ) {
         this.isRelative = isRelative;
         this.excelValue = (!isRelative && adaptTime) ? DateTime.adaptTime(excelValue) : excelValue;
     }
@@ -1055,7 +1557,16 @@ class DateTime {
      *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
     public toString(): string {
-        return this.excelValue.toString();
+
+        if (!this._computed) this.compute();
+
+        if (!this._toString) {
+            const format: string[] = [];
+            if (this._realDate) format.push(this.format(DateTime.DATE_FORMAT_WITH_YEAR));
+            if (this._time) format.push(this.format(DateTime.TIME_FORMAT_WITH_SECONDS));
+            this._toString = this.format(format.join(' '));
+        }
+        return this._toString;
     }
 
     /**
@@ -1095,11 +1606,11 @@ class DateTime {
         if (typeof value === "string") {
             const trimmed = value.trim();
  
-            // 👉 cas nombre "simple"
+            // La chaine est un nombre simple
             if (/^-?\d+(?:[.,]\d+)?$/.test(trimmed)) {
                 v = Number(trimmed.replace(",", "."));
             } else {
-                // 👉 fallback parse complexe
+                // La chaine doit être analysée
                 const parsed = this.parseDateAndTime(trimmed, isRelative, adaptTime);
                 return parsed;
             }
@@ -1112,7 +1623,11 @@ class DateTime {
         // Un temps absolu doit être >= 0
         if (!isRelative && v < 0) return undefined;
  
-        return new DateTime(v, isRelative ?? false, adaptTime);
+        return new DateTime({
+            excelValue: v,
+            isRelative: isRelative ?? false,
+            adaptTime
+        });
     } 
 
     /**
@@ -1121,7 +1636,9 @@ class DateTime {
      * @returns {ExcelDate | undefined} - L'objet ExcelDate correspondant au temps adapté ou non,
      *  ou undefined si le temps n'est pas défini.
      */
-    private getDateObj(adapted: boolean): ExcelDate | undefined {
+    private getDateObj(
+        adapted: boolean
+    ): ExcelDate | undefined {
         return (adapted && this._adaptedDate) ? this._adaptedDate : this._realDate;
     }
 
@@ -1131,7 +1648,9 @@ class DateTime {
      *  de la date adaptée ou non.
      * @returns {number} - La valeur Excel de la date, adaptée ou non, ou 0 si le temps n'est pas défini.
      */
-    public getDate(adaptedValue: boolean = true): number {
+    public getDate(
+        adaptedValue: boolean = true
+    ): number {
         if (!this._computed) this.compute();
         const dateObj = this.getDateObj(adaptedValue);
         return dateObj?.value ?? 0;
@@ -1143,7 +1662,9 @@ class DateTime {
      *  de la date adaptée ou non.
      * @returns {number} - L'année de la date, adaptée ou non, ou 0 si le temps n'est pas défini.
      */
-    public getYear(adaptedValue: boolean = true): number {
+    public getYear(
+        adaptedValue: boolean = true
+    ): number {
         if (!this._computed) this.compute();
         const dateObj = this.getDateObj(adaptedValue);
         return dateObj?.year ?? 0;
@@ -1155,7 +1676,9 @@ class DateTime {
      *  de la date adaptée ou non.
      * @returns {number} - Le mois de la date, adapté ou non, ou 0 si le temps n'est pas défini.
      */
-    public getMonth(adaptedValue: boolean = true): number {
+    public getMonth(
+        adaptedValue: boolean = true
+    ): number {
         if (!this._computed) this.compute();
         const dateObj = this.getDateObj(adaptedValue);
         return dateObj?.month ?? 0;
@@ -1167,7 +1690,9 @@ class DateTime {
      *  de la date adaptée ou non.
      * @returns {number} - Le jour du mois de la date, adapté ou non, ou 0 si le temps n'est pas défini.
      */
-    public getDay(adaptedValue: boolean = true): number {
+    public getDay(
+        adaptedValue: boolean = true
+    ): number {
         if (!this._computed) this.compute();
         const dateObj = this.getDateObj(adaptedValue);
         return dateObj?.day ?? 0;
@@ -1181,7 +1706,10 @@ class DateTime {
      * @returns {Day | undefined} - Le jour de la semaine correspondant à la date,
      *  adapté ou non, ou undefined si le temps n'est pas défini.
      */
-    public getDayOfWeek(adaptedValue: boolean = true, withHolidays: boolean = true): Day | undefined {
+    public getDayOfWeek(
+        adaptedValue: boolean = true,
+        withHolidays: boolean = true
+    ): Day | undefined {
         if (!this._computed) this.compute();
         const dateObj = this.getDateObj(adaptedValue);
         return dateObj?.isHoliday && withHolidays ? Day.HOLIDAY : dateObj?.dayOfWeek;
@@ -1190,12 +1718,14 @@ class DateTime {
     /**
      * Renvoie l'heure correspondant au temps, adaptée ou non.
      * Si le temps est relatif, renvoie l'heure relative.
-     * Si le temps est absolu, renvoie la fraction d'une journée (tronquée modulo 1).
+     * Si le temps est absolu (daté ou non), renvoie la fraction d'une journée (tronquée modulo 1).
      * Si le temps est adapté, il est incrémenté de 1 (ex : 25h00).
      * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir l'heure adaptée ou non.
      * @returns {number}- L'heure correspondant au temps, adaptée ou non, ou 0 si le temps n'est pas défini.
      */
-    public getTime(adaptedValue: boolean = true): number {
+    public getTime(
+        adaptedValue: boolean = true
+    ): number {
         if (!this._computed) this.compute();
         const timeObj = this._time;
         if (!timeObj) return 0;
@@ -1216,7 +1746,9 @@ class DateTime {
      * @returns {number} - Le nombre d'heures correspondant au temps, adapté ou non,
      *  ou 0 si le temps n'est pas défini.
      */
-    public getHours(adaptedValue: boolean = false): number {
+    public getHours(
+        adaptedValue: boolean = false
+    ): number {
         if (!this._computed) this.compute();
         const timeObj = this._time;
         if (!timeObj) return 0;
@@ -1251,7 +1783,9 @@ class DateTime {
      * @param {boolean} [adaptedValue=true] - Indique si l'on souhaite avoir la date adaptée ou non.
      * @returns {boolean} - Vrai si la date est un jour férié, faux sinon ou si la date n'est pas définie.
      */
-    public isHoliday(adaptedValue: boolean = true): boolean {
+    public isHoliday(
+        adaptedValue: boolean = true
+    ): boolean {
         if (!this._computed) this.compute();
         return this.getDateObj(adaptedValue)?.isHoliday ?? false;
     }
@@ -1317,8 +1851,12 @@ class DateTime {
         }
  
         const result = (date ?? 0) + (time ?? 0);
- 
-        return new DateTime(result, isRelative, adaptTime);
+
+        return new DateTime({
+            excelValue: result,
+            isRelative,
+            adaptTime
+        });
     }
 
     /**
@@ -1364,12 +1902,14 @@ class DateTime {
      * @param {DateTime} reference - Référence à utiliser pour résoudre le temps courant.
      * @returns {DateTime} - Nouvel objet DateTime égal au temps courant résolu par rapport à la référence.
      */
-    public resolveAgainst(reference: DateTime): DateTime {
+    public resolveAgainst(
+        reference: DateTime
+    ): DateTime {
         if (this.isRelative) {
-            return new DateTime(
-                reference.excelValue + this.excelValue,
-                reference.isRelative
-            );
+            return new DateTime({
+                excelValue: reference.excelValue + this.excelValue,
+                isRelative: reference.isRelative
+            });
         }
 
         return this;
@@ -1382,15 +1922,49 @@ class DateTime {
      * @returns {DateTime} - Nouvel objet DateTime égal au temps courant relatif par rapport à la référence.
      * @throws {Error} - Si l'un des deux temps est relatif.
      */
-    public relativeTo(reference: DateTime): DateTime {
+    public relativeTo(
+        reference: DateTime
+    ): DateTime {
         if (this.isRelative || reference.isRelative) {
             throw new Error(`Les deux temps doivent être absolus`);
         }
 
-        return new DateTime(
-            this.excelValue - reference.excelValue,
-            true
-        );
+        return new DateTime({
+            excelValue: this.excelValue - reference.excelValue,
+            isRelative: true
+        });
+    }
+
+    /**
+     * Compare le temps courant avec un autre temps.
+     * Les deux temps doivent avoir le même type (relatif ou absolu).
+     * Si un des temps au moins est absolu et non daté, seul l'horaire est comparé.
+     * @param {DateTime} other - Temps à comparer.
+     * @returns {number} - Différence entre les deux temps.
+     * @throws {Error} - Si les deux temps ont des types différents (relatif ou absolu).
+     */
+    public compareTo(
+        other: DateTime
+    ): number {
+
+        if (!this._computed) this.compute();
+        if (!other._computed) other.compute();
+        if (this.isRelative !== other.isRelative) {
+            throw new Error(`Un temps relatif ne peut pas être comparé avec un temps absolu`);
+        }
+        if (
+            (!this._realDate && !other._time)
+                || (!this._time && !other._realDate)
+        ) {
+            throw new Error(`Un temps absolu non daté ne peut pas être comparé
+                avec un temps absolu sans horaire (avec uniquement une date).`);
+        }
+
+        const firstTime = (this._realDate && other._realDate) ? this.excelValue : this._time!.value;
+        const secondTime = (this._realDate && other._realDate) ? other.excelValue : other._time!.value;
+
+        if (Math.abs(firstTime - secondTime) < DateTime.MAX_GAP) return 0;
+        return firstTime - secondTime;
     }
 
     /**
@@ -1398,7 +1972,9 @@ class DateTime {
      * @param {DateTime | null | undefined} other - Temps à comparer.
      * @returns {boolean} - Vrai si les deux temps sont égaux, faux sinon.
      */
-    public equalsTo(other: DateTime | null | undefined): boolean {
+    public equalsTo(
+        other: DateTime | null | undefined
+    ): boolean {
         return (
             !! other &&
             this.isRelative === other.isRelative &&
@@ -1419,19 +1995,6 @@ class DateTime {
     ): boolean {
         return a === b || (!!a && !!b && a.equalsTo(b));
     }
-
-    /**
-     * Compare le temps courant avec un autre temps.
-     * @param {DateTime} other - Temps à comparer.
-     * @returns {number} - Différence entre les deux temps.
-     * @throws {Error} - Si les deux temps ont des types différents (relatif ou absolu).
-     */
-    public compareTo(other: DateTime): number {
-        if (this.isRelative !== other.isRelative) {
-            throw new Error(`Un temps relatif ne peut pas être comparé avec un temps absolu`);
-        }
-        return this.excelValue - other.excelValue;
-    }
  
     /**
      * Ajoute un temps relatif à un autre temps relatif.
@@ -1439,15 +2002,17 @@ class DateTime {
      * @returns {DateTime} - Nouvel objet DateTime égal à la somme des deux temps relatifs.
      * @throws {Error} - Si l'un des deux temps n'est pas relatif.
      */
-    public add(other: DateTime): DateTime {
+    public add(
+        other: DateTime
+    ): DateTime {
         if (!this.isRelative || !other.isRelative) {
             throw new Error(`L'addition n'est possible qu'entre temps relatifs`);
         }
 
-        return new DateTime(
-            this.excelValue + other.excelValue,
-            true
-        );
+        return new DateTime({
+            excelValue: this.excelValue + other.excelValue,
+            isRelative: true
+        });
     }
 
     /**
@@ -1456,15 +2021,17 @@ class DateTime {
      * @returns {DateTime} - Nouvel objet DateTime égal à la différence entre les deux temps relatifs.
      * @throws {Error} - Si l'un des deux temps n'est pas relatif.
      */
-    public subtract(other: DateTime): DateTime {
+    public subtract(
+        other: DateTime
+    ): DateTime {
         if (!this.isRelative || !other.isRelative) {
             throw new Error(`La soustraction n'est possible qu'entre temps relatifs`);
         }
 
-        return new DateTime(
-            this.excelValue - other.excelValue,
-            true
-        );
+        return new DateTime({
+            excelValue: this.excelValue - other.excelValue,
+            isRelative: true
+        });
     }
 
     /**
@@ -1476,58 +2043,53 @@ class DateTime {
      *  les jours fériés.
      * @returns {string} - Date ou heure formattée.
      */
-    public format(format: string, adaptTime: boolean = true, withHolidays: boolean = true): string {
+    public format(
+        format: string,
+        adaptTime: boolean = true,
+        withHolidays: boolean = true
+    ): string {
+    
+        const key = `${format}|${adaptTime ? 1 : 0}|${withHolidays ? 1 : 0}`;
+    
+        const cached = this._formats.get(key);
+        if (cached !== undefined) return cached;
+    
         this.compute();
-        let prefix = "";
-        if (this.excelValue < 0) prefix = "-";
+    
+        const prefix = this.excelValue < 0 ? "-" : "";
         const pad = (v: number) => v.toString().padStart(2, "0");
- 
+    
         const tokens: Record<string, string> = {
-        // Année
-        "yyyy": this.getYear(adaptTime).toString(),
-        "yy": pad(this.getYear(adaptTime) % 100),
-        // Mois
-        "mm": pad(this.getMonth(adaptTime)),
-        "m": this.getMonth(adaptTime).toString(),
-        // Jour
-        "dd": pad(this.getDay(adaptTime)),
-        "d": this.getDay(adaptTime).toString(),
-        // Jour de semaine
-        "dddd": this.getDayOfWeek(adaptTime, withHolidays)?.fullName ?? "",
-        "ddd": this.getDayOfWeek(adaptTime, withHolidays)?.abreviation ?? "",
-        // Heure
-        "hh": pad(this.getHours(adaptTime)),
-        "h": this.getHours().toString(),
-        // Minute
-        "nn": pad(this.getMinutes()),
-        "n": this.getMinutes().toString(),
-        // Seconde
-        "ss": pad(this.getSeconds()),
-        "s": this.getSeconds().toString(),
+            // Année
+            yyyy: this.getYear(adaptTime).toString(),
+            yy: pad(this.getYear(adaptTime) % 100),
+            // Mois
+            mm: pad(this.getMonth(adaptTime)),
+            m: this.getMonth(adaptTime).toString(),
+            // Jour
+            dd: pad(this.getDay(adaptTime)),
+            d: this.getDay(adaptTime).toString(),
+            // Jour de la semaine
+            dddd: this.getDayOfWeek(adaptTime, withHolidays)?.fullName ?? "",
+            ddd: this.getDayOfWeek(adaptTime, withHolidays)?.abreviation ?? "",
+            // Heure
+            hh: pad(this.getHours(adaptTime)),
+            h: this.getHours(adaptTime).toString(),
+            // Minute
+            nn: pad(this.getMinutes()),
+            n: this.getMinutes().toString(),
+            // Seconde
+            ss: pad(this.getSeconds()),
+            s: this.getSeconds().toString(),
         };
-
-        // Crée les clés temporaires.
-        const tempMap: Record<string, string> = {};
-        let i = 0;
-        let tempFormat = format.toLowerCase();
-
-        Object.keys(tokens)
-            .sort((a, b) => b.length - a.length)
-            .forEach(token => {
-                const tempKey = `__TOKEN${i}__`;
-                const re = new RegExp(token, "g");
-                tempFormat = tempFormat.replace(re, tempKey);
-                tempMap[tempKey] = tokens[token];
-                i++;
-            });
-
-        // Remplace toutes les clés temporaires par les valeurs réelles.
-        for (const key in tempMap) {
-            const val = tempMap[key];
-            tempFormat = tempFormat.replace(new RegExp(key, "g"), val);
-        }
- 
-        return prefix + tempFormat;
+    
+        const result = prefix + format
+            .toLowerCase()
+            .replace(DateTime.FORMAT_REGEX, t => tokens[t]);
+    
+        this._formats.set(key, result);
+    
+        return result;
     }
 
     /**
@@ -1539,7 +2101,9 @@ class DateTime {
      * @param {number} time - Heure à ajuster.
      * @returns {number} - Heure ajustée.
      */
-    public static adaptTime(time: number): number {
+    public static adaptTime(
+        time: number
+    ): number {
         return (time < this.rolloverHour) ? time + 1 : time;
     }
  
@@ -1548,13 +2112,18 @@ class DateTime {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase: boolean = false): void {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.loaded && !erase) return;
 
         // Charge la base de données.
-        const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
+        const data = WorkbookService.getDataFromTable({
+            sheetName: this.SHEET,
+            tableName: this.TABLE
+        });
 
         // Extrait les valeurs.
         this.rolloverHour = (WorkbookService.getNumber(data[this.ROW_ROLLOVER_HOUR], 1) ?? 0) % 1;
@@ -1629,7 +2198,8 @@ class Day {
      * @returns {Days | undefined} - Instance de Day correspondante.
      */
     public static from(
-        value: Day | number | string | null | undefined): Day | undefined {
+        value: Day | number | string | null | undefined
+    ): Day | undefined {
  
         if (value == null || value === '') return undefined;
         if (value instanceof Day) return value;
@@ -1650,7 +2220,9 @@ class Day {
      * @returns {number} - Index du jour correspondant.
      * @throws {Error} - Si le masque est invalide.
      */
-    private static maskToIndex(mask: number): number {
+    private static maskToIndex(
+        mask: number
+    ): number {
         const index = Math.log2(mask);
  
         if (!Number.isInteger(index) || index < 0 || index > 7) {
@@ -1683,7 +2255,9 @@ class Day {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase: boolean = false): void {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.loaded) {
@@ -1843,15 +2417,15 @@ class Days {
      * @returns {Days | undefined} - Instance de Days correspondante.
      */
     public static from(
-        value: Days | number | string | null | undefined): Days | undefined {
+        value: Days | number | string | null | undefined
+    ): Days | undefined {
  
         if (value == null || value === '') return undefined;
         if (value instanceof Days) return value;
 
         const code = String(value);
-        if (this.has(code)) {
-            return this.get(code);
-        }
+        const existing = this.get(code);
+        if (existing) return existing;
 
         // Analyse de la chaine de caractères pour trouver le ou les jours correspondants.
         const numbers = this.extractFromString(code);
@@ -1876,7 +2450,9 @@ class Days {
      * @param {number} value - Masque de bits correspondant au groupe de jours.
      * @returns {Days | undefined} - Instance de Days correspondante.
      */
-    public static fromMask(mask: number): Days | undefined{
+    public static fromMask(
+        mask: number
+    ): Days | undefined{
         if (mask <= 0 || mask >= 256) return undefined
         return this.masksList[mask] ?? this.create(this.maskToNumbers(mask));
     }
@@ -1887,7 +2463,9 @@ class Days {
      * @param {number[]} numbers - Tableau de numéros de jours.
      * @returns {number} - Masque de bits correspondant aux numéros de jours.
      */
-    private static numbersToMask(numbers: number[]): number {
+    private static numbersToMask(
+        numbers: number[]
+    ): number {
         return numbers.reduce((mask, n) => mask | (1 << (n - 1)), 0);
     }
 
@@ -1898,7 +2476,9 @@ class Days {
      * @param {number} mask - Masque de bits correspondant aux numéros de jours.
      * @returns {number[]} - Tableau de numéros de jours correspondant au masque de bits.
      */
-    private static maskToNumbers(mask: number): number[] {
+    private static maskToNumbers(
+        mask: number
+    ): number[] {
         const result: number[] = [];
         for (let i = 0; i < 8; i++) {
             if (mask & (1 << i)) {
@@ -1913,7 +2493,9 @@ class Days {
      * @param {Day | number | string} day - Jour de la semaine (1 : lundi, 2 : mardi, ..., 7 : dimanche, 8 : férie)
      * @returns {boolean} - Vrai si le groupe de jours contient le jour, faux sinon.
      */
-    public contains(day: Day | number | string): boolean {
+    public contains(
+        day: Day | number | string
+    ): boolean {
         const dayObj = Day.from(day);
         return (this.mask & dayObj!.mask) !== 0;
     }
@@ -1924,7 +2506,9 @@ class Days {
      * @param {Days} other - Autre groupe de jours.
      * @returns {boolean} - Vrai si le groupe de jours contient au moins un jour commun, faux sinon.
      */
-    public intersects(other: Days): boolean {
+    public intersects(
+        other: Days
+    ): boolean {
         return (this.mask & other.mask) !== 0;
     }
 
@@ -1980,7 +2564,10 @@ class Days {
      * @returns {Days | undefined} - Différence entre les deux groupes de jours,
      *  ou undefined si les deux groupes sont undefined.
      */
-    public static difference(days1: Days, days2: Days): Days | undefined {
+    public static difference(
+        days1: Days,
+        days2: Days
+    ): Days | undefined {
         const mask = days1.mask & ~days2.mask;
         return Days.fromMask(mask);
     }
@@ -1992,7 +2579,9 @@ class Days {
      * @param {string} numbersString - Chaîne de caractères contenant des chiffres.
      * @returns {string} - Chaîne de caractères contenant les chiffres triés.
      */
-    private static cleanAndSortNumbers(numbersString: string): number[] {
+    private static cleanAndSortNumbers(
+        numbersString: string
+    ): number[] {
         return Array.from(new Set(
             numbersString
                 .replace(/[^1-8]/g, '')     // Supprime les caractères non numériques
@@ -2010,7 +2599,9 @@ class Days {
      *  séparés ou non par de la ponctuation  (ex : "lundi;me7").
      * @returns {number[]} - Tableau trié de numéros de jours (sans doublons), ex : [1, 3].
      */
-    public static extractFromString(value: string): number[] {
+    public static extractFromString(
+        value: string
+    ): number[] {
 
         let processed = String(value).toUpperCase();
 
@@ -2032,7 +2623,9 @@ class Days {
      * @returns {string} - Liste des groupes de jours correspondants,
      *  triée par leur premier numéro de jour.
      */
-    private static optimiseMask(mask: number): Days[] {
+    private static optimiseMask(
+        mask: number
+    ): Days[] {
 
         let remaining = mask;
         let result: Days[] = [];
@@ -2058,7 +2651,9 @@ class Days {
      * @param {string | number} value - Masque, nom ou code alphanumérique du groupe de jours.
      * @returns {boolean} - Vrai si le groupe de jours est présent, faux sinon.
      */
-    public static has(value: string | number): boolean {
+    public static has(
+        value: string | number
+    ): boolean {
         return (typeof value === 'number')
             ? value >= 0 && value < this.masksList.length && !!this.masksList[value]
             : this.mapByString.has(value);
@@ -2071,7 +2666,9 @@ class Days {
      * @returns {Days | undefined} - Instance de Days correspondante,
      *  ou undefined si le groupe de jours n'existe pas.
      */
-    public static get(value: string | number): Days | undefined {
+    public static get(
+        value: string | number
+    ): Days | undefined {
         return (typeof value === 'number')
             ? this.masksList[value]
             : this.mapByString.get(value);
@@ -2102,9 +2699,8 @@ class Days {
  
         // Vérifie que le groupe de jour n'existe pas déjà.
         const mask = this.numbersToMask(numbers);
-        if (this.has(mask)) {
-            return this.get(mask)!;
-        }
+        const existing = this.get(mask);
+        if (existing) return existing;
 
         // Si toutes les valeurs sont fournies (chargement depuis les paramètres),
         //  récupère toutes les valeurs.
@@ -2166,7 +2762,9 @@ class Days {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase: boolean = false): void {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.loaded) {
@@ -2175,7 +2773,10 @@ class Days {
         }
 
         // Charge la base de données.
-        const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
+        const data = WorkbookService.getDataFromTable({
+            sheetName: this.SHEET,
+            tableName: this.TABLE
+        });
 
         const dataTable = Array.from(data.slice(1).entries());
         const nbOfRows: number = dataTable.length;
@@ -2306,13 +2907,16 @@ class DaysValues {
     // Propriétés de l'objet Days
  
     public readonly days: Days;                             // Groupe de jours total concerné
-    private entries: { days: Days, value: string }[] = [];  // Liste de règles (Days → valeur)
+    private _entries: { days: Days, value: string }[] = []; // Liste de règles (Days → valeur)
+    private _toString? : string;                            // Cache de la représentation textuelle de l'objet
 
     /**
      * Constructeur de la classe DaysValues.
      * @param {Days} days - Groupe de jours total concerné.
      */
-    constructor(days: Days) {
+    constructor(
+        days: Days
+    ) {
         this.days = days;
     }
 
@@ -2326,18 +2930,16 @@ class DaysValues {
      * @returns {string} - La représentation textuelle de l'objet.
      */
     public toString(): string {
-
-        if (this.entries.length === 0) return "";
-
-        // Cas uniforme
-        if (this.entries.length === 1 &&
-            this.entries[0].days.mask === this.days.mask) {
-            return this.entries[0].value;
+        
+        if (this._toString === undefined) {
+            const entries = this._entries;
+            this._toString =
+                entries.length === 0 ? ""
+                : entries.length === 1 && entries[0].days.mask === this.days.mask
+                    ? entries[0].value
+                    : entries.map(e => `${e.days.numbersString}: ${e.value}`).join(", ");
         }
-
-        return this.entries
-            .map(e => `${e.days.numbersString}: ${e.value}`)
-            .join(", ");
+        return this._toString;
     }
 
     /**
@@ -2349,7 +2951,10 @@ class DaysValues {
      * @param {string} input - Chaîne de valeurs.
      * @returns {DaysValues} - L'objet DaysValues créé.
      */ 
-    public static from(days: Days, input: string): DaysValues {
+    public static from(
+        days: Days,
+        input: string
+    ): DaysValues {
 
         const dv = new DaysValues(days);
 
@@ -2388,9 +2993,11 @@ class DaysValues {
      * @param {Day} day - Jour de la semaine.
      * @returns {string} - Valeur associée.
      */
-    public get(day: Day): string {
+    public get(
+        day: Day
+    ): string {
 
-        for (const entry of this.entries) {
+        for (const entry of this._entries) {
             if (entry.days.contains(day)) {
                 return entry.value;
             }
@@ -2406,14 +3013,17 @@ class DaysValues {
      * @param {Days} days - Groupe de jours total concerné.
      * @param {string} value - Valeur associée.
      */
-    public set(days: Days, value: string): void {
+    public set(
+        days: Days,
+        value: string
+    ): void {
 
         // Restreint le groupe de jours à affecter au périmètre autorisé
         const validDays = Days.intersection(days, this.days);
         if (!validDays || validDays.mask === 0) return;
 
         // Supprime les parties déjà couvertes dans les autres sous-groupes de jours (valeur modifiée)
-        this.entries = this.entries
+        this._entries = this._entries
             .map(e => {
                 const remaining = Days.difference(e.days, validDays);
                 return remaining ? { days: remaining, value: e.value } : null;
@@ -2421,9 +3031,10 @@ class DaysValues {
             .filter(e => e !== null)
 
         // Ajoute la nouvelle valeur
-        this.entries.push({ days: validDays, value });
+        this._entries.push({ days: validDays, value });
 
         this.merge();
+        this._toString = undefined
     }
 
     /**
@@ -2435,20 +3046,20 @@ class DaysValues {
         const map = new Map<string, number>();
 
         // Regroupe par valeur
-        for (const e of this.entries) {
+        for (const e of this._entries) {
             const prev = map.get(e.value) ?? 0;
             map.set(e.value, prev | e.days.mask);
         }
 
-        // Reconstruit entries
-        this.entries = [];
+        // Reconstruit _entries
+        this._entries = [];
         for (const [value, mask] of Array.from(map.entries())) {
-            this.entries.push({
+            this._entries.push({
                 days: Days.get(mask)!,
                 value
             });
         }
-        this.entries.sort((a, b) => 
+        this._entries.sort((a, b) => 
             a.days.numbersString.localeCompare(b.days.numbersString));
     }
 
@@ -2459,7 +3070,7 @@ class DaysValues {
     public isComplete(): boolean {
 
         let mask = 0;
-        for (const e of this.entries) {
+        for (const e of this._entries) {
             mask |= e.days.mask;
         }
 
@@ -2471,18 +3082,21 @@ class DaysValues {
      * Pour chaque jour non couvert par une règle, ajoute une entrée avec la valeur par défaut.
      * @param {string} defaultValue - Valeur associée aux jours non couverts.
      */
-    public fillGaps(defaultValue: string): void {
+    public fillGaps(
+        defaultValue: string
+    ): void {
 
         let covered = 0;
-        for (const e of this.entries) covered |= e.days.mask;
+        for (const e of this._entries) covered |= e.days.mask;
         const missingMask = this.days.mask & ~covered;
 
         if (missingMask) {
-            this.entries.push({
+            this._entries.push({
                 days: Days.fromMask(missingMask)!,
                 value: defaultValue
             });
             this.merge();
+            this._toString = undefined;
         }
     }
 
@@ -2492,7 +3106,9 @@ class DaysValues {
      * @param {DaysValues} other - L'objet DaysValues à comparer.
      * @returns {boolean} - Vrai si les deux objets sont égaux, faux sinon.
      */
-    public equals(other: DaysValues): boolean {
+    public equals(
+        other: DaysValues
+    ): boolean {
 
         return this.toString() === other.toString();
     }
@@ -2519,11 +3135,13 @@ class Parity {
     public static readonly EVEN: number = 2;        // Parité paire
     public static readonly DOUBLE: number = 3;      // Parité double
 
-    // Map des parités possibles
-    private static pool: (Parity | undefined)[][] = [
-        [],                                         // pool[0] : doubleAllowed = false
-        []                                          // pool[1] : doubleAllowed = true
-    ];
+    // Tableau des parités possibles (pool[parity][doubleAllowed])
+    private static pool: {
+        [key: number]: {
+            standard: Parity;
+            double: Parity;
+        };
+    } = {};
 
     // Map des lettres et nombres désignants les parités
     private static letters: Map<number, string> = new Map();
@@ -2539,12 +3157,12 @@ class Parity {
     /**
      * Constructeur privé de la classe Parity.
      * @param {number} - value Valeur de parité.
-     * @param {boolean} [doubleParityAllowed=false] - Si vrai, la double parité est autorisée.
+     * @param {boolean} [doubleParityAllowed] - Si vrai, la double parité est autorisée.
      *  Si faux (par défaut), la double parité est impossible.
      */
     private constructor(
         value: number,
-        doubleParityAllowed: boolean = false
+        doubleParityAllowed: boolean
     ) {
         this.value = value;
         this.doubleParityAllowed = doubleParityAllowed;
@@ -2559,24 +3177,20 @@ class Parity {
     }
 
     /**
-     * Retourne une instance de Parity qui correspond à la valeur de parité spécifiée.
-     * Si l'instance n'existe pas, la crée et la stocke pour future utilisation.
-     * @param {number} - value Valeur de parité.
+     * Retourne l'instance de Parity qui correspond à la valeur de parité spécifiée.
+     * @param {number} [value] - Valeur de parité.
      * @param {boolean} [doubleParityAllowed=false] - Si vrai, la double parité est autorisée.
      *  Si faux (par défaut), la double parité est impossible.
      * @returns {Parity} - Instance de Parity correspondante.
      */
-    private static getOrCreate(value: number, doubleParityAllowed: boolean): Parity {
-        if (value < 0 || value > 3) {
-            value = this.UNDEFINED;
-        }
-        const i = doubleParityAllowed ? 1 : 0;
-        let p = this.pool[i][value];
-        if (!p) {
-            p = new Parity(value, doubleParityAllowed);
-            this.pool[i][value] = p;
-        }
-        return p;
+    private static get(
+        value: number, doubleParityAllowed: boolean
+    ): Parity {
+        return this.pool[value]?.[
+            doubleParityAllowed ? "double" : "standard"
+        ] ?? this.pool[this.UNDEFINED][
+            doubleParityAllowed ? "double" : "standard"
+        ];
     }
 
     /**
@@ -2595,11 +3209,11 @@ class Parity {
     ): Parity {
         if (value instanceof Parity) {
             if (value.doubleParityAllowed === doubleParityAllowed) return value;
-            return this.getOrCreate(value.value, doubleParityAllowed);
+            return this.get(value.value, doubleParityAllowed);
         }
  
         const normalized = this.normalize(value, doubleParityAllowed);
-        return this.getOrCreate(normalized, doubleParityAllowed);
+        return this.get(normalized, doubleParityAllowed);
     } 
 
     /**
@@ -2675,42 +3289,47 @@ class Parity {
     }
 
     /**
-     * Crée une parité qui n'a pas de valeur définie.
+     * Renvoie l'objet Parité qui n'a pas de valeur définie.
      * @param {boolean} [doubleParityAllowed=false] - Si vrai, la parité
      *  accepte les parités doubles, sinon elle les refuse.
      * @returns {Parity} - Parité sans valeur définie.
      */
-    public static undefined(doubleParityAllowed: boolean = false): Parity {
-        return this.getOrCreate(this.UNDEFINED, doubleParityAllowed);
+    public static undefined(
+        doubleParityAllowed: boolean = false
+    ): Parity {
+        return this.get(this.UNDEFINED, doubleParityAllowed);
     }
 
     /**
-     * Crée une parité qui correspond à une parité impaire.
+     * Renvoie l'objet Parité qui correspond à une parité impaire.
      * @param {boolean} [doubleParityAllowed=false] - Si vrai, la parité
      *  accepte les parités doubles, sinon elle les refuse.
      * @returns {Parity} - Parité impaire.
      */
-    public static odd(doubleParityAllowed: boolean = false): Parity {
-        return this.getOrCreate(this.ODD, doubleParityAllowed);
+    public static odd(
+        doubleParityAllowed: boolean = false
+    ): Parity {
+        return this.get(this.ODD, doubleParityAllowed);
     }
 
     /**
-     * Crée une parité qui correspond à une parité paire.
+     * Renvoie l'objet Parité qui correspond à une parité paire.
      * @param {boolean} [doubleParityAllowed=false] - Si vrai, la parité
      *  accepte les parités doubles, sinon elle les refuse.
      * @returns {Parity} - Parité paire.
      */
-    public static even(doubleParityAllowed: boolean = false): Parity {
-        return this.getOrCreate(this.EVEN, doubleParityAllowed);
+    public static even(
+        doubleParityAllowed: boolean = false
+    ): Parity {
+        return this.get(this.EVEN, doubleParityAllowed);
     }
 
     /**
-     * Crée une parité qui correspond à une parité double.
-     * Elle est représentée par le chiffre -2.
+     * Renvoie l'objet Parité qui correspond à une parité double.
      * @returns {Parity} - Parité double.
      */
     public static double(): Parity {
-        return this.getOrCreate(this.DOUBLE, true);
+        return this.get(this.DOUBLE, true);
     }
 
     /**
@@ -2718,7 +3337,9 @@ class Parity {
      * @param {number} parity - Autre valeur de parité à comparer.
      * @returns {boolean} - Vrai si les deux parités sont identiques, faux sinon.
      */
-    public is(parity: number): boolean {
+    public is(
+        parity: number
+    ): boolean {
         return this.value === parity;
     }
 
@@ -2735,7 +3356,9 @@ class Parity {
      * @param {Parity | undefined} other - Autre variable de parité à comparer.
      * @returns {boolean} - Vrai si les deux parités sont opposées, faux sinon.
      */
-    public isOpposedTo(other: Parity | undefined): boolean {
+    public isOpposedTo(
+        other: Parity | undefined
+    ): boolean {
         return !!other
             && (this.value === Parity.ODD && other.value === Parity.EVEN
                 || this.value === Parity.EVEN && other.value === Parity.ODD);
@@ -2746,7 +3369,9 @@ class Parity {
      * @param {Parity | undefined} other - Autre variable de parité à comparer.
      * @returns {boolean} - Vrai si les deux parités sont identiques, faux sinon.
      */
-    public equalsTo(other: Parity | undefined): boolean {
+    public equalsTo(
+        other: Parity | undefined
+    ): boolean {
         return this === other;
     }
 
@@ -2755,7 +3380,9 @@ class Parity {
      * @param {Parity | number | null | undefined} other - Autre valeur de parité à inclure.
      * @returns {boolean} - Vrai si la parité inclut la valeur de parité, faux sinon.
      */
-    public includes(other: string | number | Parity | null | undefined): boolean {
+    public includes(
+        other: string | number | Parity | null | undefined
+    ): boolean {
         const requested = Parity.from(other, this.doubleParityAllowed);
  
         // undefined n'inclut rien
@@ -2803,7 +3430,9 @@ class Parity {
      * @param {Parity} other - Parité à combiner avec la parité actuelle.
      * @returns {Parity} - Parité combinée.
      */
-    public combineWith(other: Parity): Parity {
+    public combineWith(
+        other: Parity
+    ): Parity {
 
         if (!this.doubleParityAllowed) throw new Error(`Il n'est pas possible de combiner une`
             + ` parité à une autre si celle de départ n'autorise pas les parités doubles.`
@@ -2825,7 +3454,9 @@ class Parity {
      * @param {number} parity - Valeur de la parité.
      * @returns {number} - Chiffre de parité correspondante, ou 0 si la parité est undefined.
      */
-    public static digit(parity: number): number {
+    public static digit(
+        parity: number
+    ): number {
         return this.digits.get(parity) ?? 0;
     }
 
@@ -2843,7 +3474,9 @@ class Parity {
      * @param {number} parity - Valeur de la parité.
      * @returns {string} - Lettre de parité correspondante, ou une chaîne vide si la parité est undefined.
      */
-    public static letter(parity: number): string {
+    public static letter(
+        parity: number
+    ): string {
         return this.letters.get(parity) ?? "";
     }
 
@@ -2874,7 +3507,10 @@ class Parity {
      * @returns {boolean} - Vrai si la chaîne de caractères contient la lettre de parité,
      *  faux sinon.
      */
-    public static containsParityLetter(string: string, parity: number): boolean {
+    public static containsParityLetter(
+        string: string,
+        parity: number
+    ): boolean {
         switch (parity) {
             case this.ODD:
                 return string.toUpperCase().includes(this.letter(this.ODD)!);
@@ -2893,7 +3529,9 @@ class Parity {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase: boolean = false): void {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.loaded) {
@@ -2902,8 +3540,22 @@ class Parity {
             this.digits.clear();
         }
 
+        // Crée le tableau des parités possibles
+        for(const parity of [this.UNDEFINED, this.ODD, this.EVEN, this.DOUBLE]) {
+            this.pool[parity] = {
+                standard: parity === this.DOUBLE
+                    ? this.pool[this.UNDEFINED].standard
+                    : new Parity(parity, false),
+            
+                double: new Parity(parity, true)
+            };
+        }
+
         // Charge la base de données.
-        const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
+        const data = WorkbookService.getDataFromTable({
+            sheetName: this.SHEET,
+            tableName: this.TABLE
+        });
 
         const getParityLetter = (
             row: number,
@@ -2937,27 +3589,36 @@ class Parity {
 class TrainNumber {
 
     // Constantes de lecture de la base de données Excel
-    private static readonly W_SHEET = "Param";                          // Feuille contenant les motifs des trains W
+
+    private static readonly TRAIN_NUMBERS_PARAM_SHEET = "Param";        // Feuille contenant les modèles de numéros de trains
+                                                                        //  à charger comme paramètres
+    private static readonly COMMERCIAL_TABLE = "Commerciaux";           // Tableau contenant les motifs des trains commerciaux
     private static readonly W_TABLE = "W";                              // Tableau contenant les motifs des trains W
-    private static readonly MOUVEMENTS_SHEET = "Param";                 // Feuille contenant les motifs des évolutions
-    private static readonly MOUVEMENTS_TABLE = "Evolutions";             // Tableau contenant les motifs des évolutions
-    private static readonly TRAINS_4DIGIT_SHEET = "Param";              // Feuille contenant les motifs des trains abrégeables à 4 chiffres
+    private static readonly MOUVEMENTS_TABLE = "Evolutions";            // Tableau contenant les motifs des évolutions
     private static readonly TRAINS_4DIGIT_TABLE = "LigneC4chiffres";    // Tableau contenant les motifs des trains abrégeables à 4 chiffres
 
     // Indicateur de chargement
     private static loaded = false;
 
     // Regex globales
-    private static wRegex: RegExp;                                      // Regex des trains W
-    private static mouvementsRegex: RegExp;                             // Regex des évolutions
-    private static abbreviate4Regex: RegExp;                            // Regex des trains abrégeables à 4 chiffres
+    private static commercialRegex: RegExp;         // Regex des trains commerciaux
+    private static wRegex: RegExp;                  // Regex des trains W
+    private static mouvementsRegex: RegExp;         // Regex des évolutions
+    private static abbreviate4Regex: RegExp;        // Regex des trains abrégeables à 4 chiffres
 
     // Propriétés de l'objet TrainNumber
-    public readonly value: string;                  // Numéro de train avec parité (la double parité est marquée par ######/#)
+    public readonly value: string;                  // Numéro de train avec parité
+                                                    //  (la double parité est marquée par ######/#)
 
     // Cache interne
     private readonly variants: Set<string>;         // Toutes les variantes équivalentes
     private readonly variantsByParity: string[];    // Accès direct par parité
+    private _zone?: number | null;                  // Zone du train si train commercial
+                                                    //  (de 0 à 9 : 4ème chiffre du numéro du train)
+    private _battery?: number | null;               // Batterie du train si train commercial 
+                                                    //  (de 0 à 99 : 5ème et 6ème chiffres
+                                                    //  du numéro du train si le train a une parité double, 
+                                                    //  le 3ème chiffre donne la parité)
 
     /**
      * Constructeur privé de la classe TrainNumber.
@@ -3016,7 +3677,77 @@ class TrainNumber {
             ? this.variantsByParity[Parity.DOUBLE]
             : normalized;
     }
- 
+
+    /**
+     * Retourne la valeur de base du train (sans parité).
+     * @returns {string} - Valeur de base du train.
+     */
+    public get baseValue(): string {
+        return this.value.split('/')[0];
+    }
+
+    /**
+     * Indique si le train a une parité double.
+     * @returns {boolean} Vrai si le train a une parité double.
+     */
+    public get isDoubleParity(): boolean {
+        return this.value.includes("/");
+    }
+
+    /**
+     * Teste si le train est commercial.
+     * @returns {boolean} - Vrai si le train est commercial, faux sinon.
+     */
+    public get isCommercial(): boolean {
+        return TrainNumber.commercialRegex?.test(this.baseValue) ?? false;
+    }
+
+    /**
+     * Teste si le train est W (vide voyageur).
+     * @returns {boolean} - Vrai si le train est W, faux sinon.
+     */
+    public get isW(): boolean {
+        return TrainNumber.wRegex?.test(this.baseValue) ?? false;
+    }
+
+    /**
+     * Teste si le train est une évolution.
+     * @returns {boolean} - Vrai si le train est une évolution, faux sinon.
+     */
+    public get isMouvement(): boolean {
+        return TrainNumber.mouvementsRegex?.test(this.baseValue) ?? false;
+    }
+
+    /**
+     * Retourne la zone du train (de 0 à 9 : 4ème chiffre du numéro du train).
+     * Retourne null si le train n'est pas commercial.
+     * @returns {number | null} Zone du train.
+     */
+    public get zone(): number | null {
+        if (this._zone === undefined) {
+            this._zone = this.isCommercial
+                ? this.value.charCodeAt(3) - 48
+                : null;
+        }
+        return this._zone;
+    }
+
+    /**
+     * Retourne la batterie du train (de 0 à 99 : 5ème et 6ème chiffres du numéro du train)
+     * Si le train a une parité double, c'est le 3ème chiffre qui donne la parité.
+     * Retourne null si le train n'est pas commercial.
+     * @returns {number | null} Batterie du train.
+     */ 
+    public get battery(): number | null {
+        if (this._battery === undefined) {
+            this._battery = this.isCommercial
+                ? parseInt(this.value.slice(4, 6), 10)
+                    + (this.isDoubleParity ? parseInt(this.value[2], 10) % 2 : 0)
+                : null;
+        }
+        return this._battery;
+    }
+    
     /**
      * Retourne une représentation textuelle simple et stable de l'objet,
      *  utilisée implicitement dans les conversions string (ex: `${obj}`).
@@ -3051,7 +3782,9 @@ class TrainNumber {
      * @param {string} value - Numéro de train à normaliser.
      * @returns {string} - Numéro de train normalisé.
      */
-    private static normalize(value: string): string {
+    private static normalize(
+        value: string
+    ): string {
         return value
             .split("/")[0]
             .toUpperCase()
@@ -3063,7 +3796,9 @@ class TrainNumber {
      * @param {string} value - Numéro de train à vérifier.
      * @returns {boolean} - Vrai si le numéro de train est valide, faux sinon.
      */
-    private static isValidTrainNumber(value: string): boolean {
+    private static isValidTrainNumber(
+        value: string
+    ): boolean {
         if (!value) return false;
         const lastChar = value.slice(-1);
         return /^[0-9]$/.test(lastChar);
@@ -3077,7 +3812,9 @@ class TrainNumber {
      * Si le numéro de train ne correspond pas, il est renvoyé inchangé.
      * @returns {string} - Numéro de train abrégé de 6 à 4 chiffres s'il est abrégeable.
      */
-    private static abbreviate(value: string): string {
+    private static abbreviate(
+        value: string
+    ): string {
         return this.abbreviate4Regex?.test(value.split("/")[0])
             ? value.substring(2)
             : value;
@@ -3086,7 +3823,9 @@ class TrainNumber {
     /**
      * Teste si une valeur correspond à ce train (toutes formes confondues).
      */
-    public includes(value: TrainNumber | string | number | null | undefined): boolean {
+    public includes(
+        value: TrainNumber | string | number | null | undefined
+    ): boolean {
 
         if (value == null) return false;
 
@@ -3104,8 +3843,10 @@ class TrainNumber {
      *  Si faux, le numéro du train n'est pas abrégé.
      * @returns {string} Numéro du train adapté
      */
-    public adaptWithParity(parityValue: number, abbreviateTo4Digits: boolean = false): string {
-
+    public adaptWithParity(
+        parityValue: number,
+        abbreviateTo4Digits: boolean = false
+    ): string {
         const adaptedValue = this.variantsByParity[parityValue] ?? this.value;
         return abbreviateTo4Digits? TrainNumber.abbreviate(adaptedValue) : adaptedValue;
     }
@@ -3125,33 +3866,13 @@ class TrainNumber {
         abbreviate: boolean = false,
         withoutDoubleParity: boolean = false
     ): string {
-        let result = this.value;
+        let result = withoutDoubleParity ? this.baseValue : this.value;
 
         if (abbreviate) {
             result = TrainNumber.abbreviate(result);
         }
  
-        if (withoutDoubleParity) {
-            result = result.split('/')[0];
-        }
- 
         return result;
-    }
-
-    /**
-     * Teste si le train est W (vide voyageur).
-     * @returns {boolean} - Vrai si le train est W, faux sinon.
-     */
-    public isW(): boolean {
-        return TrainNumber.wRegex?.test(this.value) ?? false;
-    }
-
-    /**
-     * Teste si le train est une évolution.
-     * @returns {boolean} - Vrai si le train est une évolution, faux sinon.
-     */
-    public isMouvement(): boolean {
-        return TrainNumber.mouvementsRegex?.test(this.value) ?? false;
     }
  
     /**
@@ -3161,7 +3882,9 @@ class TrainNumber {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase: boolean = false): void {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si les tables à charger existent déjà.
         if (this.loaded && !erase) return;
@@ -3192,22 +3915,28 @@ class TrainNumber {
                 : /^$/;
         };
 
-        const Wdata = WorkbookService.getDataFromTable(
-            this.W_SHEET,
-            this.W_TABLE
-        );
-        this.wRegex = dataToRegex(Wdata);
+        const commercialData = WorkbookService.getDataFromTable({
+            sheetName: this.TRAIN_NUMBERS_PARAM_SHEET,
+            tableName: this.COMMERCIAL_TABLE
+        });
+        this.commercialRegex = dataToRegex(commercialData);
 
-        const mouvementsData = WorkbookService.getDataFromTable(
-            this.MOUVEMENTS_SHEET,
-            this.MOUVEMENTS_TABLE
-        );
+        const wData = WorkbookService.getDataFromTable({
+            sheetName: this.TRAIN_NUMBERS_PARAM_SHEET,
+            tableName: this.W_TABLE
+        });
+        this.wRegex = dataToRegex(wData);
+
+        const mouvementsData = WorkbookService.getDataFromTable({
+            sheetName: this.TRAIN_NUMBERS_PARAM_SHEET,
+            tableName: this.MOUVEMENTS_TABLE
+        });
         this.mouvementsRegex = dataToRegex(mouvementsData);
 
-        const abbreviate4Data = WorkbookService.getDataFromTable(
-            this.TRAINS_4DIGIT_SHEET,
-            this.TRAINS_4DIGIT_TABLE
-        );
+        const abbreviate4Data = WorkbookService.getDataFromTable({
+            sheetName: this.TRAIN_NUMBERS_PARAM_SHEET,
+            tableName: this.TRAINS_4DIGIT_TABLE
+        });
         this.abbreviate4Regex = dataToRegex(abbreviate4Data);
     }
 }
@@ -3238,12 +3967,21 @@ class Station {
      * @param {boolean} reverseLineDirection - Parité de la ligne inversée sur cette gare.
      */
     constructor(
-        id: number,
-        abbreviation: string,
-        name: string,
-        referenceStation: Station | null,
-        turnaround: Parity | string | number,
-        reverseLineDirection: boolean,
+        {
+            id,
+            abbreviation,
+            name,
+            referenceStation,
+            turnaround,
+            reverseLineDirection
+        }: {
+            id: number,
+            abbreviation: string,
+            name: string,
+            referenceStation: Station | null,
+            turnaround: Parity | string | number,
+            reverseLineDirection: boolean
+        }
     ) {
         this.id = id;
         if (!abbreviation) {
@@ -3311,7 +4049,9 @@ class Stations {
      * @param {string} value - Abréviation ou nom de la gare.
      * @returns {boolean} - Vrai si la gare est présente, faux sinon.
      */
-    public static has(value: string): boolean {
+    public static has(
+        value: string
+    ): boolean {
         return value in this.abbrMap || value in this.nameMap;
     }
 
@@ -3320,7 +4060,9 @@ class Stations {
      * @param {number} id - ID de la gare.
      * @returns {Station} - Gare correspondante.
      */
-    public static getById(id: number): Station {
+    public static getById(
+        id: number
+    ): Station {
         const s = this.list[id];
         if (!s) throw new Error(`Gare : ID ${id} inconnue`);
         return s;
@@ -3331,7 +4073,9 @@ class Stations {
      * @param {string} value - Abréviation ou nom de la gare.
      * @returns {Station | undefined} - Gare correspondante, ou undefined si non trouvée.
      */
-    public static get(value: string): Station | undefined {
+    public static get(
+        value: string
+    ): Station | undefined {
 
         let adaptedValue = value;
 
@@ -3375,14 +4119,14 @@ class Stations {
         const id = this.list.length;
 
         // Instancie la nouvelle gare.
-        const station = new Station(
-            id,
+        const station = new Station({
+            id: id,
             abbreviation,
             name,
-            null,
+            referenceStation: null,
             turnaround,
             reverseLineDirection
-        );
+        });
 
         // Ajoute la gare à la base de données.
         this.list.push(station);
@@ -3416,7 +4160,9 @@ class Stations {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase: boolean = false): void {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.size > 0) {
@@ -3425,7 +4171,10 @@ class Stations {
         }
 
         // Charge la base de données.
-        const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
+        const data = WorkbookService.getDataFromTable({
+            sheetName: this.SHEET,
+            tableName: this.TABLE
+        });
         if (!data || data.length <= 1) {
             Log.warn(`Stations.load : aucune donnée trouvée dans la table.`);
             return;
@@ -3507,13 +4256,13 @@ class Stations {
             ]);
 
         // Imprime le tableau.
-        WorkbookService.printTable(
-            this.HEADERS, 
+        WorkbookService.printTable({
+            headers: this.HEADERS, 
             data,
             sheetName, 
             tableName, 
             startCell
-        );
+        });
     }
 }
 
@@ -3538,11 +4287,22 @@ class StationWithParity {
      * Constructeur d'une gare avec parité.
      * @param {number} id - Identifiant unique.
      * @param {Station} station - Gare (objet Station).
-     * @param {Parity} parity - Parité associée à la gare.
+     * @param {Parity | string | number} parity - Parité associée à la gare.
      */
-    constructor(id: number, station: Station, parity: Parity) {
+    constructor(
+        {
+            id,
+            station,
+            parity
+        }: {
+            id: number;
+            station: Station;
+            parity: Parity | string | number;
+        }
+    ) {
         this.id = id;
-        this.key = StationWithParity.keyOf(station, parity); 
+        const parityObj = Parity.from(parity, false);
+        this.key = StationWithParity.keyOf(station, parityObj); 
     }
  
     /**
@@ -3643,7 +4403,9 @@ class StationWithParity {
      * @param {Parity} parity - La parité à transformer.
      * @returns {number} - Valeur unique de la parité. pour le calcul.
      */
-    public static parityValue(parity: Parity): number {
+    public static parityValue(
+        parity: Parity
+    ): number {
         switch (parity.value) {
             case Parity.ODD: return this.ODD;
             case Parity.EVEN: return this.EVEN;
@@ -3722,7 +4484,9 @@ class StationWithParity {
      * @param other - Autre objet StationWithParity à comparer.
      * @returns {boolean} - Vrai si les deux objets ont la même gare, faux sinon.
      */
-    public hasSameStationTo(other: StationWithParity | null | undefined): boolean {
+    public hasSameStationTo(
+        other: StationWithParity | null | undefined
+    ): boolean {
         return !!other && Math.floor(this.id / 3) === Math.floor(other.id / 3);
     }
  
@@ -3733,7 +4497,9 @@ class StationWithParity {
      * @param other - Autre objet StationWithParity qui doit être inclus ou non.
      * @returns {boolean} - Vrai si l'objet inclut l'autre, faux sinon.
      */
-    public includes(other: StationWithParity | null | undefined): boolean {
+    public includes(
+        other: StationWithParity | null | undefined
+    ): boolean {
         return !!other
             && this.expandWithChildren().includes(other);
     }
@@ -3743,7 +4509,9 @@ class StationWithParity {
      * @param other - Autre objet StationWithParity à comparer.
      * @returns {boolean} - Vrai si les deux objets sont identiques, faux sinon.
      */
-    public equalsTo(other: StationWithParity | null | undefined): boolean {
+    public equalsTo(
+        other: StationWithParity | null | undefined
+    ): boolean {
         return this === other;
     }
 
@@ -3755,7 +4523,10 @@ class StationWithParity {
      * @param {Parity} parity - Parité.
      * @returns {string} - Chaîne représentant l'objet StationWithParity.
      */
-    private static keyOf(station: Station, parity: Parity): string {
+    private static keyOf(
+        station: Station,
+        parity: Parity
+    ): string {
         return parity.isDefined() 
             ? `${station.abbreviation}_${parity.printDigit()}` 
             : `${station.abbreviation}`;
@@ -3769,7 +4540,9 @@ class StationWithParity {
      * @param {Set<number>} [visited=new Set<number>()] - Ensemble des gares déjà visitées.
      * @returns {StationWithParity[]} - Tableau contenant toutes les gares visitées.
      */
-    public expandWithChildren(visited: Set<number> = new Set<number>()): StationWithParity[] {
+    public expandWithChildren(
+        visited: Set<number> = new Set<number>()
+    ): StationWithParity[] {
 
         if (this._expandedCache) return this._expandedCache;
 
@@ -3843,7 +4616,9 @@ class StationsWithParity {
      * @param {string} key - Clé de la gare avec parité.
      * @returns {boolean} - Vrai si la gare est présente, faux sinon.
      */
-    public static hasKey(key: string): boolean {
+    public static hasKey(
+        key: string
+    ): boolean {
         return key in this.keyMap;
     }
 
@@ -3852,7 +4627,9 @@ class StationsWithParity {
      * @param {number} id - ID de la gare avec parité.
      * @returns {StationWithParity} - Gare correspondant si elle existe, undefined sinon.
      */
-    public static getById(id: number): StationWithParity {
+    public static getById(
+        id: number
+    ): StationWithParity {
         const s = this.list[id];
         if (!s) throw new Error(`Gare avec parité : ID ${id} inconnue`);
         return s;
@@ -3863,7 +4640,9 @@ class StationsWithParity {
      * @param {string} key - Clé de la gare avec parité.
      * @returns {StationWithParity | undefined} - Gare correspondant si elle existe, undefined sinon.
      */
-    public static getByKey(key: string): StationWithParity | undefined {
+    public static getByKey(
+        key: string
+    ): StationWithParity | undefined {
         return this.keyMap[key];
     }
  
@@ -3897,7 +4676,7 @@ class StationsWithParity {
     ): void {
         const parityObj = Parity.from(parity, false);
         const id = station.id * 3 + StationWithParity.parityValue(parityObj);
-        const swp = new StationWithParity(id, station, parityObj);
+        const swp = new StationWithParity({ id, station, parity });
         if (this.hasKey(swp.key)) {
             throw new Error(`La gare avec parité ${swp} est déjà présente`
                 + ` dans la base de données.`);
@@ -3929,7 +4708,9 @@ class StationsWithParity {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
     */
-    public static load(erase: boolean = false): void {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.size > 0) {
@@ -3986,11 +4767,19 @@ class Connection {
      * @param {boolean} [changeParity=false] - Indique si la connexion implique un changement de parité.
      */
     constructor(
-        from: StationWithParity,
-        to: StationWithParity,
-        time: DateTime | number | string = Connection.DEFAULT_CONNECTION_TIME,
-        withMovement: boolean = false,
-        changeParity: boolean = false
+        {
+            from,
+            to,
+            time = Connection.DEFAULT_CONNECTION_TIME,
+            withMovement = false,
+            changeParity = false
+        }: {
+            from: StationWithParity,
+            to: StationWithParity,
+            time?: DateTime | number | string,
+            withMovement?: boolean,
+            changeParity?: boolean
+        }
     ) {
         if (from.equalsTo(to)) {
             throw new Error(
@@ -4028,7 +4817,9 @@ class Connection {
      * @param {DateTime | number | string} value - Nouveau temps de trajet de la connexion.
      * @throws {Error} - Si le temps de trajet est inférieur ou égal à 0 ou n'est pas relatif.
      */
-    public set time(value: DateTime | number | string) {
+    public set time(
+        value: DateTime | number | string
+    ) {
         const timeObj = DateTime.from(value, true);
         if (!timeObj) {
             throw new Error(
@@ -4180,7 +4971,9 @@ class Connections {
      * @param {number} id - Identifiant de la station.
      * @returns {Connection[]} - Voisins de la station.
      */
-    public static getNeighbors(id: number): Connection[] {
+    public static getNeighbors(
+        id: number
+    ): Connection[] {
         return this.list[id] ?? [];
     }
 
@@ -4204,13 +4997,13 @@ class Connections {
 
         const fromObj = StationWithParity.from(from)!;
         const toObj = StationWithParity.from(to)!;
-        const connection = new Connection(
-            fromObj,
-            toObj,
+        const connection = new Connection({
+            from: fromObj,
+            to: toObj,
             time,
             withMovement,
             changeParity
-        );
+        });
 
         const fromId = connection.from.id;
         const toId = connection.to.id;
@@ -4257,7 +5050,9 @@ class Connections {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase: boolean = false): void {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.size > 0) {
@@ -4269,7 +5064,10 @@ class Connections {
         StationsWithParity.load(); 
 
         // Charge la base de données.
-        const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
+        const data = WorkbookService.getDataFromTable({
+            sheetName: this.SHEET,
+            tableName: this.TABLE
+        });
         if (!data || data.length <= 1) {
             Log.warn(`Connections.load : aucune donnée trouvée dans la table.`);
             return;
@@ -4342,13 +5140,13 @@ class Connections {
             ]);
 
         // Imprime le tableau.
-        const table = WorkbookService.printTable(
-            this.HEADERS,
+        const table = WorkbookService.printTable({
+            headers: this.HEADERS, 
             data,
-            sheetName,
-            tableName,
+            sheetName, 
+            tableName, 
             startCell
-        );
+        });
 
         // Met les durées de parcours au format "hh:mm:ss".
         table.getRange()
@@ -4387,10 +5185,12 @@ class Connections {
         for (const variantGroup of firstGroup) {
             for (const stationId of variantGroup) {
                 queue.push(new State(
-                    stationId,
-                    0,
-                    1,
-                    0
+                    {
+                        stationId,
+                        cost: 0,
+                        groupIndex: 1,
+                        visitedMask: 0
+                    }
                 ));
             }
         }
@@ -4502,12 +5302,14 @@ class Connections {
  
             // Ajoute le nouvel état.
             result.push(new State(
-                nextStationId,
-                nextCost,
-                nextGroup,
-                nextMask,
-                state,
-                connection
+                {
+                    stationId: nextStationId,
+                    cost: nextCost,
+                    groupIndex: nextGroup,
+                    visitedMask: nextMask,
+                    previous: state,
+                    via: connection
+                }
             ));
         }
 
@@ -4520,7 +5322,9 @@ class Connections {
      *  le temps de parcours des connexions entre ces gares peut être calculé.
      * @param {Path[] | string} paths - Liste des parcours de trains.
      */
-    public static saveConnectionsTimes(paths: Path[] | string) {
+    public static saveConnectionsTimes(
+        paths: Path[] | string
+    ) {
         const pathsList = (typeof paths === "string")
             ? paths.split(";").map(key => Paths.get(key)!)
             : paths;
@@ -4551,7 +5355,7 @@ class State {
     public readonly cost: number;           // Coût du chemin
     public readonly groupIndex: number;     // Index du groupe de gares
     public readonly visitedMask: number;    // Masque des gares visitées
-    public readonly prev?: State;           // Etat précedent
+    public readonly previous?: State;       // Etat précedent
     public readonly via?: Connection;       // Connection ajoutée
 
     /**
@@ -4560,23 +5364,33 @@ class State {
      * @param {number} cost - Coût du chemin.
      * @param {number} groupIndex - Index du groupe de gares.
      * @param {number} visitedMask - Masque des gares visitées.
-     * @param {State} prev - Etat précédent.
+     * @param {State} previous - Etat précédent.
      * @param {Connection} via - Connection ajoutée.
      */
     public constructor(
-        stationId: number,
-        cost: number,
-        groupIndex: number,
-        visitedMask: number,
-        prev?: State,
-        via?: Connection
+        {
+            stationId,
+            cost,
+            groupIndex,
+            visitedMask,
+            previous,
+            via
+        }: {
+            stationId: number,
+            cost: number,
+            groupIndex: number,
+            visitedMask: number,
+            previous?: State,
+            via?: Connection
+        }
+
     ) {
-        this.stationId = stationId;
-        this.cost = cost;
-        this.groupIndex = groupIndex;
-        this.visitedMask = visitedMask;
-        this.prev = prev;
-        this.via = via;
+        this.stationId = stationId,
+        this.cost = cost,
+        this.groupIndex = groupIndex,
+        this.visitedMask = visitedMask,
+        this.previous = previous,
+        this.via = via
     }
 
     /**
@@ -4636,13 +5450,23 @@ class Stop {
      * @param {string[] | string} [tracks=[]] - Voies de l'arrêt.
      */
     constructor(
-        station : StationWithParity | Station | string,
-        stationAfterTurnaround?: StationWithParity | string,
-        arrivalTime?: DateTime | number | string,
-        departureTime?: DateTime | number | string,
-        passageTime?: DateTime | number | string,
-        areRelativeTimes?: boolean,
-        tracks: string[] | string = [],
+        {
+            station,
+            stationAfterTurnaround,
+            arrivalTime,
+            departureTime,
+            passageTime,
+            areRelativeTimes,
+            tracks = []
+        }: {
+            station: StationWithParity | Station | string,
+            stationAfterTurnaround?: StationWithParity | string,
+            arrivalTime?: DateTime | number | string,
+            departureTime?: DateTime | number | string,
+            passageTime?: DateTime | number | string,
+            areRelativeTimes?: boolean,
+            tracks?: string[] | string
+        }
     ) {
         // Détermine la gare d'arrêt
         const stationObj = StationWithParity.from(station)
@@ -4727,7 +5551,9 @@ class Stop {
      * Modifie le tableau des voies de l'arrêt.
      * @param {string[]} tracks - Tableau des voies de l'arrêt.
      */
-    public set tracks(value: string[]) {
+    public set tracks(
+        value: string[]
+    ) {
         this._tracks = value;
     }
 
@@ -4748,7 +5574,9 @@ class Stop {
      *  le départ se fait arès le temps de retournement.
      * @param {StationWithParity | string | undefined} value - Gare après rebroussement.
      */
-    public set stationAfterTurnaround(value: StationWithParity | string | undefined) {
+    public set stationAfterTurnaround(
+        value: StationWithParity | string | undefined
+    ) {
         this._withTurnaround = this.canTurnaroundTo(value);
         if (!!this._passageTime) {
             this.setTimes(
@@ -4773,7 +5601,9 @@ class Stop {
      * @param {StationWithParity | string} - stationAfterTurnaround Gare après rebroussement.
      * @returns {boolean} - Vrai si le rebroussement est possible, faux sinon.
      */
-    private canTurnaroundTo(stationAfterTurnaround : StationWithParity | string | undefined): boolean {
+    private canTurnaroundTo(
+        stationAfterTurnaround : StationWithParity | string | undefined
+    ): boolean {
 
         // Vérifie si la gare après rebroussement demandée est connue.
         const stationAfterTurnaroundObj = StationWithParity.from(stationAfterTurnaround);
@@ -4855,7 +5685,9 @@ class Stop {
      * @param {string} tracksString - Chaîne de caractères contenant la liste de voies.
      * @returns {string[]} - Tableau de chaînes de caractères correspondant à la liste de voies.
      */
-    private static getTracksFromString(tracksString: string): string[] {
+    private static getTracksFromString(
+        tracksString: string
+    ): string[] {
         return tracksString
             .split(";")
             .map((t) => t.trim())
@@ -4869,10 +5701,13 @@ class Stop {
      *  et préfère l'heure de départ ou de passage. Si faux (par défaut),
      *  c'est d'abord l'heure d'arrivée qui est prise en compte.
      * @param {DateTime} [reference] - Heure de référence pour les heures relatives.
-     * @returns {DateTime | undefined} - Heure la plus petite, ou undefined si
-     *  l'heure d'arrivée est lue et que noReadingArrivalTime est faux.
+     * @returns {DateTime | undefined} - Heure la plus petite à l'arrêt,
+     *  ou undefined si aucune heure n'est lue.
      */
-    public getTime(ignoreArrival: boolean = false, reference?: DateTime): DateTime | undefined {
+    public getTime(
+        ignoreArrival: boolean = false,
+        reference?: DateTime
+    ): DateTime | undefined {
         let time = this._arrivalTime;
 
         if (ignoreArrival || !this._arrivalTime) {
@@ -4898,7 +5733,10 @@ class Stop {
      * Cependant pas d'erreur levée si le temps de référence et toutes les heures sont déjà relatives.
      * @param {DateTime} reference - Référence à utiliser pour convertir les heures.
      */
-    public convertToRelativeTime(reference: DateTime, throwErrorIfAlreadyRelative: boolean = false): void {
+    public convertToRelativeTime(
+        reference: DateTime,
+        throwErrorIfAlreadyRelative: boolean = false
+    ): void {
  
         // Temps de référence déjà relatif : pas de conversion possible.
         // Vérifie simplement que les temps soient déjà relatifs.
@@ -4957,7 +5795,9 @@ class Stop {
      * @param {Stop | null | undefined} other - Autre arrêt à comparer.
      * @returns {boolean} - Vrai si les arrêts sont égaux, faux sinon.
      */
-    public equalsTo(other: Stop | null | undefined): boolean {
+    public equalsTo(
+        other: Stop | null | undefined
+    ): boolean {
         return (
             !! other &&
             this.station.equalsTo(other.station) &&
@@ -4975,7 +5815,9 @@ class Stop {
      * @param {Stop | null | undefined} other - Autre arrêt à comparer.
      * @returns {boolean} - Vrai si les arrêts sont égaux, faux sinon.
      */
-    public includes(other: Stop | null | undefined): boolean {
+    public includes(
+        other: Stop | null | undefined
+    ): boolean {
         return (
             !! other &&
             this.station.includes(other.station) &&
@@ -4991,7 +5833,9 @@ class Stop {
      * Si la voie n'est pas déjà dans la liste des voies, l'ajoute et trie la liste.
      * @param {string} track - Voie à ajouter.
      */
-    public addTrack(track: string): void {
+    public addTrack(
+        track: string
+    ): void {
         if (!this._tracks.includes(track)) {
             this._tracks.push(track);
             this._tracks.sort();
@@ -5059,7 +5903,10 @@ class Stops {
     public static load(): void {
 
         // Charge la base de données.
-        const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
+        const data = WorkbookService.getDataFromTable({
+            sheetName: this.SHEET,
+            tableName: this.TABLE
+        });
         if (!data || data.length <= 1) {
             Log.warn(`Stops.load : aucune donnée trouvée dans la table.`);
             return;
@@ -5103,15 +5950,15 @@ class Stops {
                 const tracks = WorkbookService.getString(row, this.COL_TRACK);
 
                 // Instancie l'objet Stop.
-                const stop = new Stop(
+                const stop = new Stop({
                     station,
                     stationAfterTurnaround,
                     arrivalTime,
                     departureTime,
                     passageTime,
-                    true,
+                    areRelativeTimes: true,
                     tracks
-                );
+                });
 
                 // Ajoute l'arrêt au parcours.
                 path.stops.push(stop);
@@ -5153,13 +6000,13 @@ class Stops {
         }
 
         // Imprime le tableau.
-        const table = WorkbookService.printTable(
-            this.HEADERS,
+        const table = WorkbookService.printTable({
+            headers: this.HEADERS, 
             data,
-            sheetName,
-            tableName,
+            sheetName, 
+            tableName, 
             startCell
-        );
+        });
 
         // Trie le tableau selon la colonne des clés
         table.getSort().apply([
@@ -5188,7 +6035,10 @@ class Stops {
     public static import(): void {
 
         // Charge la base de données.
-        const data = WorkbookService.getDataFromTable(this.IMPORT_SHEET, this.IMPORT_TABLE);
+        const data = WorkbookService.getDataFromTable({
+            sheetName: this.IMPORT_SHEET,
+            tableName: this.IMPORT_TABLE
+        });
         if (!data || data.length <= 1) {
             Log.warn(`Stops.load : aucune donnée trouvée dans la table.`);
             return;
@@ -5223,15 +6073,15 @@ class Stops {
                 const tracks = WorkbookService.getString(row, this.COL_IMPORT_TRACK);
 
                 // Instancie l'objet Stop.
-                const stop = new Stop(
+                const stop = new Stop({
                     station,
-                    "",
+                    stationAfterTurnaround: "",
                     arrivalTime,
                     departureTime,
                     passageTime,
-                    false,
+                    areRelativeTimes: false,
                     tracks
-                );
+                });
             } 
 
         } catch (e) {
@@ -5424,8 +6274,22 @@ class Path {
         const arrivalTimeObj = DateTime.from(arrivalTime, areRelativeTimes);
         if (!arrivalTimeObj) throw new Error(`Heure d'arrivée ${arrivalTime} incorrecte.`);
 
-        const s1 = new Stop(fromObj, undefined, undefined, departureTimeObj, undefined, areRelativeTimes); 
-        const s2 = new Stop(toObj, undefined, arrivalTimeObj, undefined, undefined, areRelativeTimes);
+        const s1 = new Stop({
+            station: fromObj,
+            stationAfterTurnaround: undefined,
+            arrivalTime: undefined,
+            departureTime: departureTimeObj,
+            passageTime: undefined,
+            areRelativeTimes
+        });
+        const s2 = new Stop({
+            station: toObj,
+            stationAfterTurnaround: undefined,
+            arrivalTime: arrivalTimeObj,
+            departureTime: undefined,
+            passageTime: undefined,
+            areRelativeTimes
+        });
         const stops = [s1, s2];
  
         const path = Paths.create(
@@ -5481,7 +6345,11 @@ class Path {
      * @throws {Error} - Si les trains du parcours sont déjà passé par l'arrêt
      *  et que erase est faux.
      */
-    public addStop(stop: Stop, finalize: boolean = true, erase: boolean = false): void {
+    public addStop(
+        stop: Stop,
+        finalize: boolean = true,
+        erase: boolean = false
+    ): void {
 
         const hasDefinedParity = stop.station.parity.isDefined();
 
@@ -5541,7 +6409,9 @@ class Path {
     /**
      * Supprime un arrêt du parcours.
      */
-    private removeStop(station: Station | StationWithParity | string): void {
+    private removeStop(
+        station: Station | StationWithParity | string
+    ): void {
         const existing = this.getStop(station);
         if (!existing) return;
  
@@ -5555,7 +6425,9 @@ class Path {
      * @param {Stop} stop - Arrêts à vérifier.
      * @returns {boolean} - Vrai si l'arrêts est inclus dans la signature, faux sinon.
      */
-    private isStopInSignature(stop: Stop): boolean {
+    private isStopInSignature(
+        stop: Stop
+    ): boolean {
         if (!this._signature) return false;
         return this.routeStations.some(group =>
             group.some(station => stop.station.includes(station))
@@ -5679,14 +6551,29 @@ class Path {
 
     /**
      * Retourne l'arrêt du parcours associé à une gare.
+     * Si un nombre est donné, il d'agit du numéro d'ordre
+     *  (à partir de 0, ou négatif pour un décompte à partir du terminus)
      * Si la gare a une parité définie, renvoie l'arrêt correspondant.
      * Sinon, cherche l'arrêt dans le sens pair, puis dans le sens impair.
      * Si les deux arrêts sont trouvés, renvoie le premier arrêt chronologique.
      * Sinon, renvoie l'arrêt trouvé, ou undefined si aucun arrêt n'est trouvé.
-     * @param {StationWithParity | Station | string} station - La gare à chercher
+     * @param {StationWithParity | Station | string | number} station - La gare à chercher.
      * @returns {Stop | undefined} - L'arrêt trouvé, ou undefined si aucun arrêt n'est trouvé.
      */
-    public getStop(station: StationWithParity | Station | string): Stop | undefined {
+    public getStop(
+        station: StationWithParity | Station | string | number
+    ): Stop | undefined {
+
+        // Recherche par le numéro d'ordre (à partir de 0,
+        //  ou négatif pour un décompte à partir du terminus)
+        if (typeof station === "number") {
+
+            const index = station >= 0
+                ? station
+                : this.stops.length + station;
+        
+            return this.stops[index];
+        }
 
         // Recherche rapide par clé
         if (typeof station === "string" && this._stopsIndex.has(station)) {
@@ -5796,7 +6683,6 @@ class Path {
      * Supprime également les valeurs de firstStop et lastStop.
      */
     public eraseStops() {
-
         this.stops = [];
         this.stopsChecked = 0;
         this._stopsIndex.clear();
@@ -6286,7 +7172,9 @@ class Path {
      *  et les horaires d'arrivée et de départ des arrêts.
      * @param {Connection[]} connections - Liste des connexions entre les arrêts.
      */
-    public buildStopsFromConnections(connections: Connection[]): void {
+    public buildStopsFromConnections(
+        connections: Connection[]
+    ): void {
 
         const newStops: Stop[] = [];
 
@@ -6307,15 +7195,15 @@ class Path {
             throw new Error(`Le premier arrêt calculé ne correspond pas au premier arrêt de la signature.`);
         }
         const areRelativeTimes = firstExisting.departureTime?.isRelative;
-        const firstStop = new Stop(
-            firstConnection.from,
-            undefined,
-            undefined,
-            firstExisting.departureTime,
-            undefined,
+        const firstStop = new Stop({
+            station: firstConnection.from,
+            stationAfterTurnaround: undefined,
+            arrivalTime: undefined,
+            departureTime: firstExisting.departureTime,
+            passageTime: undefined,
             areRelativeTimes,
-            firstExisting.tracks
-        );
+            tracks: firstExisting.tracks
+        });
         newStops.push(firstStop);
         let lastStop = firstStop;
 
@@ -6386,13 +7274,14 @@ class Path {
  
                     // Calcule l'heure de passage.
                     const interpolated = startTime.excelValue + elapsed;
-                    lastStop = new Stop(
-                        bc.to,
-                        undefined,
-                        undefined,
-                        undefined,
-                        interpolated,
-                        areRelativeTimes); 
+                    lastStop = new Stop({
+                        station: bc.to,
+                        stationAfterTurnaround: undefined,
+                        arrivalTime: undefined,
+                        departureTime: undefined,
+                        passageTime: interpolated,
+                        areRelativeTimes
+                    }); 
                     newStops.push(lastStop);
                 }
 
@@ -6473,7 +7362,9 @@ class Paths {
      * @param {string} key - Clé du parcours.
      * @returns {boolean} - Vrai si le parcours est présent, faux sinon.
      */
-    public static has(key: string): boolean {
+    public static has(
+        key: string
+    ): boolean {
         return this.map.has(key);
     }
 
@@ -6482,7 +7373,9 @@ class Paths {
      * @param {string} key - Clé du parcours.
      * @returns {Path | undefined} - Parcours correspondant, ou undefined si la clé n'existe pas.
      */
-    public static get(key: string): Path | undefined {
+    public static get(
+        key: string
+    ): Path | undefined {
         return this.map.get(key);
     }
 
@@ -6492,7 +7385,9 @@ class Paths {
      * @param {Path} path - Parcours à enregistrer.
      * @throws {Error} - Si le parcours est déjà présent dans la base de données.
      */
-    private static set(path: Path): void {
+    private static set(
+        path: Path
+    ): void {
         if (this.has(path.key)) {
             throw new Error(`Le parcours ${path} est déjà présent`
                 + ` dans la base de données.`);
@@ -6580,7 +7475,9 @@ class Paths {
      * @param {Path} path - Parcours à insérer.
      * @returns {Path} - Parcours inséré avec sa clé.
      */
-    private static insert(path: Path): Path {
+    private static insert(
+        path: Path
+    ): Path {
 
         // Clé existante : met à jour la structure des parcours.
         // Si un parcours avec la même clé est déjà présent dans la base de données, une erreur est levée.
@@ -6681,7 +7578,9 @@ class Paths {
      * Si le parcours n'existe pas, cette fonction ne fait rien.
      * @param {Path} path - Le parcours à supprimer.
      */
-    public static delete(path: Path): void {
+    public static delete(
+        path: Path
+    ): void {
 
         // Supprime l'objet Path de la base de données, indexé par sa clé.
         this.map.delete(path.key);
@@ -6776,7 +7675,9 @@ class Paths {
      * @param {number} index - L'index à convertir.
      * @returns {string} - Chaîne de lettres correspondante.
      */
-    private static indexToLetters(index: number): string {
+    private static indexToLetters(
+        index: number
+    ): string {
 
         let s = "";
         index += 1;
@@ -6833,7 +7734,9 @@ class Paths {
      * @param {string} key - Clé du parcours.
      * @returns {string} - Radical de la clé (ou une chaîne vide si la clé n'a pas de radical).
      */
-    private static extractRadical(key: string): string {
+    private static extractRadical(
+        key: string
+    ): string {
         return key.split("~")[0].split("#")[0];
     }
 
@@ -6842,7 +7745,9 @@ class Paths {
      * @param {string} key - Clé du parcours.
      * @returns {string} - Lettre du suffixe (ou une chaîne vide si la clé n'a pas de suffixe lettre).
      */
-    private static extractLetter(key: string): string {
+    private static extractLetter(
+        key: string
+    ): string {
         const m = key.match(/~([A-Z]+)/);
         return m ? m[1] : "";
     }
@@ -6853,7 +7758,9 @@ class Paths {
      * @param {string} key - Clé du parcours.
      * @returns {number} - Numéro du suffixe numérique (ou 0 si la clé n'a pas de suffixe numérique).
      */
-    private static extractNumber(key: string): number {
+    private static extractNumber(
+        key: string
+    ): number {
         const m = key.match(/#(\d+)/);
         return m ? Number(m[1]) : 0;
     }
@@ -6915,7 +7822,9 @@ class Paths {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase: boolean = false) {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.size > 0) {
@@ -6927,7 +7836,10 @@ class Paths {
         Connections.load();
 
         // Charge la base de données.
-        const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
+        const data = WorkbookService.getDataFromTable({
+            sheetName: this.SHEET,
+            tableName: this.TABLE
+        });
         if (!data || data.length <= 1) {
             Log.warn(`Paths.load : aucune donnée trouvée dans la table.`);
             return;
@@ -7013,13 +7925,13 @@ class Paths {
             ]);
 
         // Imprime le tableau.
-        const table = WorkbookService.printTable(
-            this.HEADERS,
-             data,
-             sheetName,
-             tableName,
-             startCell
-        );
+        const table = WorkbookService.printTable({
+            headers: this.HEADERS, 
+            data,
+            sheetName, 
+            tableName, 
+            startCell
+        });
 
         // Trie le tableau selon la colonne des clés
         table.getSort().apply([
@@ -7095,20 +8007,6 @@ class Train {
     }
 
     /**
-     * Retourne les trains précédents correspondants aux clés en paramètres.
-     */
-    public get previous(): (Train | undefined)[] {
-        return this.previousKeys.map(key => Train.from(key));
-    }
-
-    /**
-     * Retourne les réutilisations (trains suivants) correspondants aux clés en paramètres.
-     */
-    public get reuse(): (Train | undefined)[] {
-        return this.reusesKeys.map(key => Train.from(key));
-    }
-
-    /**
      * Retourne une représentation textuelle simple et stable de l'objet,
      *  utilisée implicitement dans les conversions string (ex: `${obj}`).
      */
@@ -7139,6 +8037,57 @@ class Train {
      */
     public buildKey(): string {
         return `${this.date.format('yyyy-MM-dd')}_${this.number.format()}`;
+    }
+
+    /**
+     * Retourne les trains précédents correspondants aux clés en paramètres.
+     */
+    public previous(): (Train | undefined)[] {
+        return this.previousKeys.map(key => Train.from(key));
+    }
+
+    /**
+     * Retourne les réutilisations (trains suivants) correspondants aux clés en paramètres.
+     */
+    public reuse(): (Train | undefined)[] {
+        return this.reusesKeys.map(key => Train.from(key));
+    }
+
+    /**
+     * Retourne l'arrêt associé à une gare.
+     * Si un nombre est donné, il d'agit du numéro d'ordre de l'arrêt.
+     *  (à partir de 0, ou négatif pour un décompte à partir du terminus)
+     * Si la gare a une parité définie, renvoie l'arrêt correspondant.
+     * Sinon, cherche l'arrêt dans le sens pair, puis dans le sens impair.
+     * Si les deux arrêts sont trouvés, renvoie le premier arrêt chronologique.
+     * Sinon, renvoie l'arrêt trouvé, ou undefined si aucun arrêt n'est trouvé.
+     * @param {StationWithParity | Station | string | number} station - La gare à chercher.
+     * @returns {Stop | undefined} - L'arrêt trouvé, ou undefined si aucun arrêt n'est trouvé.
+     */
+    public getStop(
+        stop: Station | StationWithParity | string | number
+    ): Stop | undefined {
+        return this.path.getStop(stop);
+    }
+
+    /**
+     * Renvoie la plus petite des heures d'arrivée, de départ ou de passage à l'arrêt indiqué.
+     * Si ignoreArrival est vrai, lit plutôt l'heure de départ ou de passage.
+     * @param {Stop | Station | StationWithParity | string | number} stop - L'arrêt à chercher.
+     * @param {boolean} [ignoreArrival=false] - Si vrai, ignore l'heure d'arrivée
+     *  et préfère l'heure de départ ou de passage. Si faux (par défaut),
+     *  c'est d'abord l'heure d'arrivée qui est prise en compte.
+     * @returns {DateTime | undefined} - Heure la plus petite à l'arrêt,
+     *  ou undefined si aucune heure n'est lue.
+     */
+    public getTimeAt(
+        stop: Stop | Station | StationWithParity | string | number,
+        ignoreArrival: boolean = false
+    ): DateTime | undefined {
+        if (stop instanceof Stop) {
+            return stop.getTime(ignoreArrival, this.date);
+        }
+        return this.getStop(stop)?.getTime(ignoreArrival, this.date);
     }
 }
 
@@ -7219,7 +8168,9 @@ class Trains {
      * @param {string} key - Clé du train.
      * @returns {boolean} - Vrai si le train gare est présent, faux sinon.
      */
-    public static has(key: string): boolean {
+    public static has(
+        key: string
+    ): boolean {
         return this.map.has(key);
     }
 
@@ -7228,8 +8179,107 @@ class Trains {
      * @param {string} key - Clé du train.
      * @returns {Train | undefined} - Train correspondant, ou undefined si non trouvé.
      */
-    public static get(key: string): Train | undefined {
+    public static get(
+        key: string
+    ): Train | undefined {
         return this.map.get(key);
+    }
+
+    /**
+     * Renvoie une liste de trains correspondant aux critères donnés :
+     *  - Numéros de train
+     *  - Dates de circulation (adaptées ou non)
+     *  - Gare de départ
+     *  - Gare d'arrivée
+     *  - Gares intermédiaires et intervalle d'heure de passage (origine et terminus compris)
+     *  - Zones
+     *  - Batteries
+     * @returns {Train[]} - Liste des trains correspondant aux critères.
+     */
+    public static find(
+        {
+            numbers = [],
+            dates = [],
+            adaptedTime = true,
+            from,
+            to,
+            via = [],
+            dateFrom,
+            dateTo,
+            zones = [],
+            batteries = []
+        }: {
+            numbers?: (TrainNumber | string)[];
+            dates?: DateTime[];
+            adaptedTime?: boolean;
+            from?: StationWithParity | Station | string;
+            to?: StationWithParity | Station | string;
+            via?: (StationWithParity | Station | string)[];
+            dateFrom?: DateTime;
+            dateTo?: DateTime;
+            zones?: (number)[];
+            batteries?: (number)[];
+        }
+    ): Train[] {
+   
+        const result: Train[] = [];
+    
+        // Conversion des dates en format Excel (entier)
+        const datesValues = dates
+            .map(d => {
+                const date = d.getDate(adaptedTime);
+                if (!!d && date === 0) {
+                    Log.warn(`Les dates du filtre des trains doivent être absolues et non nulles.`
+                        + ` La date ${d} ne sera donc pas prise en compte`);
+                }
+                return date;
+            })
+            .filter(d => d!== 0);
+        const dateFromValue = dateFrom?.getDate(adaptedTime);
+        if (!!dateFrom && dateFromValue === 0) {
+            Log.warn(`Les dates du filtre des trains doivent être absolues et non nulles.`
+                + ` La date ${dateFrom} ne sera donc pas prise en compte`);
+        }
+        const dateToValue = dateTo?.getDate(adaptedTime);
+        if (!!dateFrom && dateFromValue === 0) {
+            Log.warn(`Les dates du filtre des trains doivent être absolues et non nulles.`
+                + ` La date ${dateTo} ne sera donc pas prise en compte`);
+        }
+    
+        // Vérifie les conditions ci-dessous pour chaque train
+        for (const train of this.values()) {
+    
+            // Numéros de train
+            if (numbers.length > 0) {
+                if (!numbers.some(n => train.number.includes(n))) continue;
+            }
+    
+            // Dates exactes
+            if (datesValues.length > 0) {
+                if (!datesValues.includes(train.date.getDate(adaptedTime))) continue;
+            }
+
+            // Arrêt de départ et/ou d'arrivée
+            const fromStop = from ? train.path.getStop(from) : undefined;
+            if (from && fromStop !== train.path.origin) continue;
+            const toStop = to ? train.path.getStop(to) : undefined;
+            if (to && toStop !== train.path.destination) continue;
+
+            // Arrêts du train (départ, arrivée, gares intermédiaires)
+            //  avec passage dans l'intervalle de dates
+            // via.forEach(s => {
+            //     const stop = train.path.getStop(s);
+            //     if (!stop) continue;
+            //     const arrivalTime = stop!.getTime(false, train.date);
+            //     if (arrivalTime && dateToValue && arrivalTime.compareTo(dateTo!) < 0) continue;
+            //     const departureTime = stop!.getTime(true, train.date);
+            //     if (departureTime && dateFromValue && departureTime.compareTo(dateFrom!) < 0) continue;
+            // })
+    
+            result.push(train);
+        }
+    
+        return result;
     }
 
     /**
@@ -7238,7 +8288,9 @@ class Trains {
      * @param {Train} train - Train à ajouter.
      * @throws {Error} - Si le train est déjà présent dans la base de données.
      */
-    private static set(train: Train): void {
+    private static set(
+        train: Train
+    ): void {
         if (this.has(train.key)) {
             throw new Error(`Le train ${train} est déjà présent`
                 + ` dans la base de données.`);
@@ -7312,7 +8364,9 @@ class Trains {
      * @param {Train} train - Train à ajouter.
      * @returns {Train} - Train ajouté avec sa clé mise à jour si nécessaire.
      */
-    private static insert(train: Train): Train {
+    private static insert(
+        train: Train
+    ): Train {
 
         // Clé existante : ajoute le train à la base de données.
         // Si un train avec la même clé est déjà présent dans la base de données, une erreur est levée.
@@ -7360,7 +8414,9 @@ class Trains {
      * S'il n'existe plus qu'un train avec suffixe, le suffixe est supprimé.
      * @param {string} key - Clé du train à supprimer.
      */
-    public static delete(key: string): void {
+    public static delete(
+        key: string
+    ): void {
 
         // Supprime le train de la map.
         this.map.delete(key);
@@ -7395,7 +8451,9 @@ class Trains {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase: boolean = false): void {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.size > 0) {
@@ -7407,7 +8465,10 @@ class Trains {
         Paths.load(); 
 
         // Charge la base de données.
-        const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
+        const data = WorkbookService.getDataFromTable({
+            sheetName: this.SHEET,
+            tableName: this.TABLE
+        });
         if (!data || data.length <= 1) {
             Log.warn(`Trains.load : aucune donnée trouvée dans la table.`);
             return;
@@ -7500,13 +8561,13 @@ class Trains {
             ]);
 
         // Imprime le tableau.
-        const table = WorkbookService.printTable(
-            this.HEADERS,
-             data,
-             sheetName,
-             tableName,
-             startCell
-        );
+        const table = WorkbookService.printTable({
+            headers: this.HEADERS, 
+            data,
+            sheetName, 
+            tableName, 
+            startCell
+        });
 
         // Met les dates au format "hh:mm:ss".
         const timeColumns = [
@@ -7523,7 +8584,9 @@ class Trains {
     public static import(): void {
 
         // Charge la base de données.
-        const data = WorkbookService.getDataFromSheet(this.IMPORT_SHEET);
+        const data = WorkbookService.getDataFromSheet({
+            sheetName: this.IMPORT_SHEET
+        });
         if (!data || data.length <= 1) {
             Log.warn(`Trains.load : aucune donnée trouvée dans la table.`);
             return;
@@ -7703,6 +8766,15 @@ class TrainPath {
         return TrainPaths.get(value!);
     }
 
+    // public static fromTrain(
+    //     train: Train | undefined
+    // ): TrainPath | undefined {
+    //     if (train == null) return undefined;
+
+    //     if (value instanceof TrainPath) return value;
+    //     return TrainPaths.get(value!);
+    // }
+
     /**
      * Construit la clé du sillon qui est composée du premier service rattaché
      *  suivi du numéro de sillon et du groupe de jours de circulation.
@@ -7759,7 +8831,9 @@ class TrainPaths {
      * @param {string} key - Clé du sillon.
      * @returns {boolean} - Vrai si le sillon gare est présent, faux sinon.
      */
-    public static has(key: string): boolean {
+    public static has(
+        key: string
+    ): boolean {
         return this.map.has(key);
     }
 
@@ -7768,9 +8842,27 @@ class TrainPaths {
      * @param {string} key - Clé du sillon.
      * @returns {TrainPath | undefined} - TrainPath correspondant, ou undefined si non trouvé.
      */
-    public static get(key: string): TrainPath | undefined {
+    public static get(
+        key: string
+    ): TrainPath | undefined {
         return this.map.get(key);
     }
+
+    // public static getFrom(
+    //     numbers: TrainNumber[],
+    //     days: Days,
+    //     services: string[],
+    //     from: StationWithParity | Station | string,
+    //     to: StationWithParity | Station | string,
+    //     via: (StationWithParity | Station | string)[]
+    // ): TrainPath | undefined {
+    //     this.values.forEach(trainPath => {
+    //         if (numbers.length > 0) {
+    //             if 
+    //         }
+    //     })
+    //     return this.map.get(key);
+    // }
 
     /**
      * Ajoute un sillon dans la base de données, référencé par sa clé.
@@ -7778,7 +8870,9 @@ class TrainPaths {
      * @param {TrainPath} trainPath - TrainPath à ajouter.
      * @throws {Error} - Si le sillon est déjà présent dans la base de données.
      */
-    private static set(trainPath: TrainPath): void {
+    private static set(
+        trainPath: TrainPath
+    ): void {
         if (this.has(trainPath.key)) {
             throw new Error(`Le sillon ${trainPath} est déjà présent`
                 + ` dans la base de données.`);
@@ -7851,7 +8945,9 @@ class TrainPaths {
      * @param {TrainPath} trainPath - TrainPath à ajouter.
      * @returns {TrainPath} - TrainPath ajouté.
      */
-    private static insert(trainPath: TrainPath): TrainPath {
+    private static insert(
+        trainPath: TrainPath
+    ): TrainPath {
 
         // Ajoute l'objet Path dans la base de données, indexé par sa clé.
         // Si un sillon avec la même clé est déjà présent dans la base de données, une erreur est levée.
@@ -7864,7 +8960,9 @@ class TrainPaths {
      * Supprime le sillon de la base de données dont la clé est donnée en paramètre.
      * @param {string} key - Clé du sillon à supprimer.
      */
-    public static delete(key: string): void {
+    public static delete(
+        key: string
+    ): void {
 
         // Supprime le sillon de la map.
         this.map.delete(key);
@@ -7875,7 +8973,9 @@ class TrainPaths {
      * @param {boolean} [erase=false] - Si vrai, force le rechargement de la base de données.
      *  Si faux (par défaut), ne recharge pas si déjà chargé.
      */
-    public static load(erase: boolean = false): void {
+    public static load(
+        erase: boolean = false
+    ): void {
 
         // Vérifie si la table à charger existe déjà.
         if (this.size > 0) {
@@ -7887,7 +8987,10 @@ class TrainPaths {
         Paths.load(); 
 
         // Charge la base de données.
-        const data = WorkbookService.getDataFromTable(this.SHEET, this.TABLE);
+        const data = WorkbookService.getDataFromTable({
+            sheetName: this.SHEET,
+            tableName: this.TABLE
+        });
         if (!data || data.length <= 1) {
             Log.warn(`TrainPaths.load : aucune donnée trouvée dans la table.`);
             return;
@@ -7980,318 +9083,511 @@ class TrainPaths {
             ]);
 
         // Imprime le tableau.
-        const table = WorkbookService.printTable(
-            this.HEADERS,
-             data,
-             sheetName,
-             tableName,
-             startCell
-        );
+        const table = WorkbookService.printTable({
+            headers: this.HEADERS, 
+            data,
+            sheetName, 
+            tableName, 
+            startCell
+        });
     }
 }
 
-function testWorkbookService(options: Partial<AssertDDOptions> = {}) {
+function testWorkbookService(
+    options: Partial<AssertDDOptions> = {}
+) {
+    
     const assert = new AssertDD(options);
+
     const testSheetName = "testWorkbookService";
     const testTableName = "testTable";
 
-    // 1️⃣ Création feuille
-    let sheet = WorkbookService.getSheet(testSheetName, { createIfMissing: true });
-    assert.check("Création feuille", sheet.getName(), testSheetName);
+    /* ==========================================================
+       1. FEUILLES
+       ========================================================== */
+    
+    // La fonction getSheet ne peut pas être incorporée dans assert.check
+    //  car elle nécessite un lancement en fonction async.
+    const sheetName = WorkbookService.getSheet({ 
+        sheetName: testSheetName,
+        createIfMissing: true
+    }).getName();;
+    const sheetName2 = WorkbookService.getSheet({
+        sheetName: testSheetName
+    }).getName();
 
-    // 2️⃣ Récup feuille existante
-    const sheet2 = WorkbookService.getSheet(testSheetName);
-    assert.check("Récup feuille", sheet2.getName(), testSheetName);
+    const getSheetTests = [
+        { label: "Création feuille", actual: sheetName },
+        { label: "Récupération feuille", actual: sheetName2 }
+    ];
 
-    // 3️⃣ checkCellName OK
-    assert.check("Cellule valide", WorkbookService.checkCellName("A1"), "A1");
+    assert.check(getSheetTests, {
+        category: "WorkbookService",
+        expected: testSheetName
+    });
 
-    // 4️⃣ checkCellName KO
-    assert.check("Cellule invalide", WorkbookService.checkCellName("123", false), "");
+    /* ==========================================================
+       2. VALIDATION CELLULES
+       ========================================================== */
 
-    // 5️⃣ Création tableau
+    const cellTests = [
+        { input: "A1",  failOnError: true,  expected: "A1" },
+        { input: "123", failOnError: false, expected: "" }
+    ];
+
+    assert.check(cellTests, {
+        category: "WorkbookService",
+        label: t => `checkCellName("${t.input}")`,
+        actual: (t: typeof cellTests[number]) =>
+            WorkbookService.checkCellName(
+                t.input,
+                t.failOnError
+            )
+    });
+
+    /* ==========================================================
+       3. TABLEAU EXCEL
+       ========================================================== */
+
     const headers = [["ColStr", "ColNum", "ColBool"]];
-    const data = [
+    const data: CellValue[][] = [
         ["Paris", 42, true],
         ["", "12", "FALSE"],
         [undefined, "abc", undefined]
     ];
 
-    const table = WorkbookService.printTable(headers, data, testSheetName, testTableName);
-    assert.check("Création tableau", table?.getName(), testTableName);
+    const table = WorkbookService.printTable({
+            headers, 
+            data,
+            sheetName: testSheetName, 
+            tableName: testTableName
+    });
+    const tableName = table.getName();
 
-    // 6️⃣ Lecture brute
-    const tableData = WorkbookService.getDataFromTable(testSheetName, testTableName);
-    assert.check("Lecture brute", tableData[1][0], "Paris");
+    assert.check([
+        {
+            label: "Création tableau",
+            actual: tableName,
+            expected: testTableName
+        }
+    ], {
+        category: "WorkbookService"
+    });
+
+    /* ==========================================================
+       4. LECTURE BRUTE
+       ========================================================== */
+
+    // La fonction getDataFromTable ne peut pas être incorporée dans assert.check
+    //  car elle nécessite un lancement en fonction async.
+    const tableData = WorkbookService.getDataFromTable({
+        sheetName: testSheetName,
+        tableName: testTableName
+    });
+
+    assert.check([
+        {
+            label: "Lecture brute ligne 1 colonne 1",
+            actual: () => tableData[1][0],
+            expected: "Paris"
+        }
+    ], {
+        category: "WorkbookService"
+    });
+
+    /* ==========================================================
+       5. getString
+       ========================================================== */
 
     const row1 = tableData[1];
     const row2 = tableData[2];
     const row3 = tableData[3];
 
-    // --- getString (avec défaut "")
-    assert.check("getString normal", WorkbookService.getString(row1, 0), "Paris");
-    assert.check("getString vide => ''", WorkbookService.getString(row2, 0), "");
-    assert.check("getString undefined => ''", WorkbookService.getString(row3, 0), "");
+    const getStringTests = [
+        { desc: "normal", row: row1, col: 0, expected: "Paris" },
+        { desc: "vide", row: row2, col: 0, expected: "" },
+        { desc: "undefined", row: row3, col: 0, expected: "" }
+    ];
 
-    // --- getNumber (défaut 0)
-    assert.check("getNumber number", WorkbookService.getNumber(row1, 1), 42);
-    assert.check("getNumber string", WorkbookService.getNumber(row2, 1), 12);
-    assert.check("getNumber invalide => 0", WorkbookService.getNumber(row3, 1), 0);
+    assert.check(getStringTests, {
+        category: "WorkbookService",
+        label: t =>  `getString ${t.desc})`,
+        actual: (t: typeof getStringTests[number]) => 
+            WorkbookService.getString(t.row, t.col)
+    });
 
-    // --- getBoolean (défaut false)
-    assert.check("getBoolean true", WorkbookService.getBoolean(row1, 2), true);
-    assert.check("getBoolean 'FALSE'", WorkbookService.getBoolean(row2, 2), false);
-    assert.check("getBoolean undefined => false", WorkbookService.getBoolean(row3, 2), false);
+    /* ==========================================================
+       6. getNumber
+       ========================================================== */
 
-    // --- getRequired (OK)
-    assert.check("getRequiredString OK", WorkbookService.getRequiredString(row1, 0), "Paris");
-    assert.check("getRequiredNumber OK", WorkbookService.getRequiredNumber(row1, 1), 42);
-    assert.check("getRequiredBoolean OK", WorkbookService.getRequiredBoolean(row1, 2), true);
+    const getNumberTests = [
+        { desc: "number", row: row1, col: 1, expected: 42 },
+        { desc: "string", row: row2, col: 1, expected: 12 },
+        { desc: "invalide => 0", row: row3, col: 1, expected: 0 }
+    ];
 
-    // --- getRequired (KO)
-    let errorCount = 0;
+    assert.check(getNumberTests, {
+        category: "WorkbookService",
+        label: t =>  `getNumber ${t.desc})`,
+        actual: (t: typeof getNumberTests[number]) => 
+            WorkbookService.getNumber(t.row, t.col)
+    });
 
-    try { WorkbookService.getRequiredString(row2, 0); } catch { errorCount++; }
-    try { WorkbookService.getRequiredNumber(row3, 1); } catch { errorCount++; }
-    try { WorkbookService.getRequiredBoolean(row3, 2); } catch { errorCount++; }
+    /* ==========================================================
+       7. getBoolean
+       ========================================================== */
+    
+       const getBooleanTests = [
+        { desc: "true", row: row1, col: 2, expected: true },
+        { desc: "'FALSE'", row: row2, col: 2, expected: false },
+        { desc: "undefined => false", row: row3, col: 2, expected: false }
+    ];
 
-    assert.check("getRequired KO déclenche erreur", errorCount, 3);
+    assert.check(getBooleanTests, {
+        category: "WorkbookService",
+        label: t =>  `getBoolean ${t.desc})`,
+        actual: (t: typeof getBooleanTests[number]) => 
+            WorkbookService.getBoolean(t.row, t.col)
+    });
 
-    // 7️⃣ Suppression feuille
-    WorkbookService.getSheet(testSheetName)?.delete();
-    assert.check(
-        "Suppression feuille",
-        WorkbookService.getSheet(testSheetName, { failOnError: false }),
-        null
-    );
+    /* ==========================================================
+       8. getRequiredString
+       ========================================================== */
 
-    // 8️⃣ Résumé
-    assert.printSummary("Tests WorkbookService");
+    const getRequiredStringTests = [
+        { desc: "OK", row: row1, col: 0, expected: "Paris" },
+        { desc: "=> erreur", row: row2, col: 0, expected: AssertDD.THROWS }
+    ];
+
+    assert.check(getRequiredStringTests, {
+        category: "WorkbookService",
+        label: t =>  `getRequiredString ${t.desc})`,
+        actual: (t: typeof getRequiredStringTests[number]) => 
+            WorkbookService.getRequiredString(t.row, t.col)
+    });
+
+    /* ==========================================================
+       9. getRequiredNumber
+       ========================================================== */
+
+    const getRequiredNumberTests = [
+        { desc: "OK", row: row1, col: 1, expected: 42 },
+        { desc: "=> erreur", row: row3, col: 1, expected: AssertDD.THROWS }
+    ];
+
+    assert.check(getRequiredNumberTests, {
+        category: "WorkbookService",
+        label: t =>  `getRequiredNumber ${t.desc})`,
+        actual: (t: typeof getRequiredNumberTests[number]) => 
+            WorkbookService.getRequiredNumber(t.row, t.col)
+    });
+
+    /* ==========================================================
+       10. getRequiredBoolean
+       ========================================================== */
+
+    const getRequiredBooleanTests = [
+        { desc: "OK", row: row1, col: 2, expected: true },
+        { desc: "=> erreur", row: row3, col: 2, expected: AssertDD.THROWS }
+    ];
+
+    assert.check(getRequiredBooleanTests, {
+        category: "WorkbookService",
+        label: t =>  `getRequiredBoolean ${t.desc})`,
+        actual: (t: typeof getRequiredBooleanTests[number]) => 
+            WorkbookService.getRequiredBoolean(t.row, t.col)
+    });
+
+    /* ==========================================================
+       11. SUPPRESSION FEUILLE
+       ========================================================== */
+
+    // La fonction getSheet ne peut pas être incorporée dans assert.check
+    //  car elle nécessite un lancement en fonction async.
+    WorkbookService.getSheet({
+        sheetName: testSheetName
+    })?.delete();
+    const deletedSheet = WorkbookService.getSheet({
+        sheetName: testSheetName,
+        failOnError: false
+    });
+       
+    assert.check([
+        {
+            label: "Suppression feuille",
+            actual: deletedSheet,
+            expected: null
+        }
+    ], {
+        category: "WorkbookService"
+    });
+
+    /* ==========================================================
+       SYNTHÈSE
+       ========================================================== */
+
+    assert.printSummary("testWorkbookService");
 }
 
-function testDateTime(options: Partial<AssertDDOptions> = {}) { 
+function testDateTime(
+    options: Partial<AssertDDOptions> = {}
+) {
 
     const assert = new AssertDD(options);
+
     DateTime.load();
 
-    const round = (v: number) => Math.round(v * 1e10) / 1e10;
+    // Arrondi pour comparer deux dates sans prendre en compte des différences inférieures à la seconde
+    const round = (v: number) => 
+        Math.round(v * 1e10) / 1e10;
 
     /* ==========================================================
-    1. CONSTRUCTION & ROLLOVER
-    ========================================================== */
+       1. CONSTRUCTION & ROLLOVER
+       ========================================================== */
 
     const constructorTests = [
-        {
-            desc: 'Heure après rollover (04:00)',
-            value: 4 / 24,
-            isRelative: false,
-            expected: 4 / 24
-        },
-        {
-            desc: 'Heure avant rollover (01:00 → 25:00)',
-            value: 1 / 24,
-            isRelative: false,
-            expected: 1 / 24 + 1
-        },
-        {
-            desc: 'Minuit (00:00 → 24:00)',
-            value: 0,
-            isRelative: false,
-            expected: 1
-        },
-        {
-            desc: 'Durée relative (01:00)',
-            value: 1 / 24,
-            isRelative: true,
-            expected: 1 / 24
-        },
+        { value: 4/24, isRelative: false, expectedValue: 4/24,     desc: "04:00" },
+        { value: 1/24, isRelative: false, expectedValue: 1/24 + 1, desc: "01:00 → 25:00" },
+        { value: 0,    isRelative: false, expectedValue: 1,        desc: "00:00 → 24:00" },
+        { value: 1/24, isRelative: true,  expectedValue: 1/24,     desc: "Durée relative" }
     ];
 
-    constructorTests.forEach(t => {
-        const dt = DateTime.from(t.value, t.isRelative);
-        assert.check(
-            `from(${t.value}, ${t.isRelative}) → excelValue (${t.desc})`,
-            round(dt?.excelValue ?? 0),
-            round(t.expected)
-        );
+    assert.check(constructorTests, {
+        category: "DateTime",
+        label: t => `from(${t.value}, ${t.isRelative}) (${t.desc})`,
+        actual: (t: typeof constructorTests[number]) =>
+            round(DateTime.from(t.value, t.isRelative)!.excelValue),
+        expected: (t: typeof constructorTests[number]) =>
+            typeof t.expectedValue === "number"
+               ? round(t.expectedValue)
+               : t.expectedValue
     });
 
     /* ==========================================================
-    2. GETTERS HEURE
-    ========================================================== */
+       2. GETTERS HEURE
+       ========================================================== */
 
-    const time = DateTime.from(4.5 / 24)!; // 04:30
+    const time1 = DateTime.from(4.5 / 24)!;
 
-    assert.check('getHours()', time.getHours(), 4);
-    assert.check('getMinutes()', time.getMinutes(), 30);
-    assert.check('getSeconds()', time.getSeconds(), 0);
+    const gettersTests = [
+        { label: "getHours()", actual: () => time1.getHours(), expected: 4 },
+        { label: "getMinutes()", actual: () => time1.getMinutes(), expected: 30 },
+        { label: "getSeconds()", actual: () => time1.getSeconds(), expected: 0 }
+    ];
+
+    assert.check(gettersTests, {
+        category: "DateTime"
+    });
 
     /* ==========================================================
-    3. GETTERS DATE & ADAPTATION
-    ========================================================== */
+       3. GETTERS DATE & ADAPTATION
+       ========================================================== */
 
-    // 22/06/2025 01:00 → adapté = 21/06/2025
     const dtAdapt = DateTime.from(45830 + 1/24)!;
 
-    assert.check('getDay(adapted)', dtAdapt.getDay(true), 21);
-    assert.check('getDay(real)', dtAdapt.getDay(false), 22);
+    const getDayTests = [
+        { adapted: true, expected: 21 },
+        { adapted: false, expected: 22 },
+    ];
+    const getDayOfWeekTests = [
+        { adapted: true, expected: Day.SATURDAY.toString() },
+        { adapted: false, expected: Day.SUNDAY.toString() },
+    ]
 
-    assert.check(
-        'getDayOfWeek(adapted)',
-        dtAdapt.getDayOfWeek(true)?.toString(),
-        Day.SATURDAY.toString()
-    );
+    assert.check(getDayTests, {
+        category: "DateTime",
+        label: t => `getDay(${t.adapted ? "adapted" : "real"})`,
+        actual: (t: typeof getDayTests[number]) => dtAdapt.getDay(t.adapted)
+    });
 
-    assert.check(
-        'getDayOfWeek(real)',
-        dtAdapt.getDayOfWeek(false)?.toString(),
-        Day.SUNDAY.toString()
-    );
-
+    assert.check(getDayOfWeekTests, {
+        label: t => `getDayOfWeek(${t.adapted ? "adapted" : "real"})`,
+        actual: (t: typeof getDayOfWeekTests[number]) => dtAdapt.getDayOfWeek(t.adapted)?.toString()
+    });
+    
     /* ==========================================================
-    4. getTime() adapté / non adapté
-    ========================================================== */
+       4. getTime() adapté / non adapté
+       =========================================================== */
 
-    const t = DateTime.from(1/24)!; // 01:00
+    const time2 = DateTime.from(1/24)!;
 
-    assert.check(
-        'getTime(adapted) → 25:00',
-        round(t.getTime(true)),
-        round(1/24 + 1)
-    );
-
-    assert.check(
-        'getTime(real) → 01:00',
-        round(t.getTime(false)),
-        round(1/24)
-    );
-
-    /* ==========================================================
-    5. format() heure
-    ========================================================== */
-
-    const formatTimeTests = [
-        { value: 4.5/24, fmt: DateTime.TIME_FORMAT_WITH_SECONDS, exp: '04:30:00' },
-        { value: 4.5/24, fmt: DateTime.TIME_FORMAT_WITHOUT_SECONDS, exp: '04:30' },
-        { value: -4.5/24, fmt: DateTime.TIME_FORMAT_WITHOUT_SECONDS, exp: '-04:30' },
+    const getTimeTests = [
+        { adapted: true, expected: round(1 + 1/24) },
+        { adapted: false, expected: round(1/24) },
     ];
 
-    formatTimeTests.forEach(t => {
-        const dt = DateTime.from(t.value, true)!;
-        assert.check(
-            `format("${t.fmt}")`,
-            dt.format(t.fmt),
-            t.exp
-        );
+    assert.check(getTimeTests, {
+        category: "DateTime",
+        label: t => `getTime(${t.adapted ? "adapted" : "real"})`,
+        actual: (t: typeof getTimeTests[number]) =>
+            round(time2.getTime(t.adapted))
     });
 
     /* ==========================================================
-    6. format() date
-    ========================================================== */
+       5. format() heure
+       ========================================================== */
 
-    const dt = DateTime.from(45830.75)!; // 22/06/2025
+    const formatTimeTests = [
+        { value: 4.5/24, fmt: DateTime.TIME_FORMAT_WITH_SECONDS, expected: "04:30:00" },
+        { value: 4.5/24, fmt: DateTime.TIME_FORMAT_WITHOUT_SECONDS, expected: "04:30" },
+        { value: -4.5/24, fmt: DateTime.TIME_FORMAT_WITHOUT_SECONDS, expected: "-04:30" },
+    ];
 
-    assert.check(
-        'format DATE_WITH_YEAR',
-        dt.format(DateTime.DATE_FORMAT_WITH_YEAR),
-        '22/06/2025'
-    );
-
-    assert.check(
-        'format DATE_WITHOUT_YEAR',
-        dt.format(DateTime.DATE_FORMAT_WITHOUT_YEAR),
-        '22/06'
-    );
-
-    assert.check(
-        'format DATE_WITH_DAY',
-        dt.format('dddd dd/mm/yyyy'),
-        'Dimanche 22/06/2025'
-    );
-
-    assert.check(
-        'format DATE_ID',
-        dt.format(DateTime.DATE_FORMAT_FOR_ID),
-        '250622'
-    );
+    assert.check(formatTimeTests, {
+        category: "DateTime",
+        label: t => `format("${t.fmt}")`,
+        actual: (t: typeof formatTimeTests[number]) =>
+            DateTime.from(t.value, true)!.format(t.fmt)
+    });
 
     /* ==========================================================
-    7. JOURS FÉRIÉS (Lundi de Pâques 2026)
-    ========================================================== */
+       6. format() date
+       ========================================================== */
+
+    const dt = DateTime.from(45830.75)!;
+
+    const formatDateTests = [
+        { fmt: DateTime.DATE_FORMAT_WITH_YEAR, expected: "22/06/2025" },
+        { fmt: DateTime.DATE_FORMAT_WITHOUT_YEAR, expected: "22/06" },
+        { fmt: "dddd dd/mm/yyyy", expected: "Dimanche 22/06/2025" },
+        { fmt: DateTime.DATE_FORMAT_FOR_ID, expected: "250622" },
+    ];
+
+    assert.check(formatDateTests, {
+        category: "DateTime",
+        label: t => `format("${t.fmt}")`,
+        actual: (t: typeof formatDateTests[number]) =>
+            dt.format(t.fmt)
+    });
+
+    /* ==========================================================
+       7. JOURS FÉRIÉS
+       ========================================================== */
 
     // 06/04/2026 = Lundi de Pâques
     const easterMonday2026 = DateTime.from("06/04/2026 6:00")!;
 
-    // Vérifie la détection du jour férié
-    assert.check(
-        'isHoliday (Lundi de Pâques 2026)',
-        easterMonday2026.isHoliday(),
-        true
-    );
+    const holidayTests = [
+        {
+            label: 'isHoliday (Lundi de Pâques 2026)',
+            actual: () => easterMonday2026.isHoliday(),
+            expected: true
+        },
+        {
+            withHolidays: true,
+            expected: Day.HOLIDAY.toString()
+        },
+        {
+            withHolidays: false,
+            expected: Day.MONDAY.toString()
+        }
+    ];
 
-    // Vérifie que getDayOfWeek AVEC férié → HOLIDAY
-    assert.check(
-        'getDayOfWeek(withHolidays=true) → HOLIDAY',
-        easterMonday2026.getDayOfWeek(true, true)?.toString(),
-        Day.HOLIDAY.toString()
-    );
+    assert.check(holidayTests, {
+        category: "DateTime",
+        label: t => `getDayOfWeek(withHolidays=${t.withHolidays})`,
+        actual: (t: typeof holidayTests[number]) => {
+            return easterMonday2026.getDayOfWeek(true, t.withHolidays)?.toString();
+        }
+    });
 
-    // Vérifie que SANS férié → vrai jour (lundi)
-    assert.check(
-        'getDayOfWeek(withHolidays=false) → Lundi',
-        easterMonday2026.getDayOfWeek(true, false)?.toString(),
-        Day.MONDAY.toString()
-    );
+    const holidayFormatTests = [
+        { withHolidays: true, expected: "Férié 06/04/2026" },
+        { withHolidays: false, expected: "Lundi 06/04/2026" }
+    ];
 
-    // Vérifie format avec férié
-    assert.check(
-        'format dddd avec férié',
-        easterMonday2026.format('dddd dd/mm/yyyy', true, true),
-        'Férié 06/04/2026'
-    );
-
-    // Vérifie format sans férié
-    assert.check(
-        'format dddd sans férié',
-        easterMonday2026.format('dddd dd/mm/yyyy', true, false),
-        'Lundi 06/04/2026'
-    );
+    assert.check(holidayFormatTests, {
+        category: "DateTime",
+        label: t => `format(withHolidays=${t.withHolidays})`,
+        actual: (t: typeof holidayFormatTests[number]) =>
+            easterMonday2026.format(
+                "dddd dd/mm/yyyy",
+                true,
+                t.withHolidays
+            )
+    });
 
     /* ==========================================================
-    8. resolveAgainst / relativeTo / equalsTo / compare
-    ========================================================== */
+       8. resolveAgainst()
+       ========================================================== */
 
     const ref = DateTime.from(45830 + 10/24)!;
     const rel = DateTime.from(3/24, true)!;
     const abs = DateTime.from(45830 + 10/24)!;
+    const abs2 = DateTime.from(45830 + 13/24)!;
 
-    assert.check(
-        'resolveAgainst',
-        round(rel.resolveAgainst(ref).excelValue),
-        round(45830 + 13/24)
-    );
+    const resolveAgainstTests = [
+        { a: rel, b: ref, expected: round(45830 + 13/24) },
+        { a: abs, b: ref, expected: round(abs.excelValue) },
+    ];
 
-    assert.check(
-        'relativeTo',
-        abs.relativeTo(ref).excelValue,
-        0
-    );
-
-    assert.check(
-        'equalsTo',
-        abs.equalsTo(DateTime.from(45830 + 10/24)),
-        true
-    );
-
-    assert.check(
-        'compareTo',
-        abs.compareTo(DateTime.from(45830 + 10/24)!),
-        0
-    );
+    assert.check(resolveAgainstTests, {
+        category: "DateTime",
+        label: t => `resolveAgainst(${t.a}, ${t.b})`,
+        actual: (t: typeof resolveAgainstTests[number]) =>
+            round(t.a.resolveAgainst(t.b).excelValue)
+    });
 
     /* ==========================================================
-    9. equalsOrUndefined()
-    ========================================================== */
+       9. relativeTo()
+       ========================================================== */
+    
+    const relativeToTests = [
+        { a: rel, b: ref, expected: AssertDD.THROWS },
+        { a: abs2, b: ref, expected: round(3/24) },
+    ];
+
+    assert.check(relativeToTests, {
+        category: "DateTime",
+        label: t => `relativeTo(${t.a}, ${t.b})`,
+        actual: (t: typeof relativeToTests[number]) =>
+            round(t.a.relativeTo(t.b).excelValue)
+    });
+
+    /* ==========================================================
+       10. equalsTo()
+       ========================================================== */
+
+       const equalsToTests = [
+           { a: rel, b: ref, expected: false },
+           { a: abs, b: ref, expected: true },
+       ];
+
+       assert.check(equalsToTests, {
+           category: "DateTime",
+           label: t => `equalsTo(${t.a}, ${t.b})`,
+           actual: (t: typeof equalsToTests[number]) =>
+               t.a.equalsTo(t.b)
+       });
+
+    /* ==========================================================
+       11. compareTo()
+       ========================================================== */
+
+    const compareToTests = [
+        { a: 45830 + 10/24, b: 45830 + 10/24, expected: 0 },
+        { a: 45830 + 10/24, b: 45830 + 1/24,  expected: 1 },
+        { a: 45830 + 10/24, b: 45831,         expected: -1 },
+        { a: 45830 + 10/24, b: 10/24,         expected: 0 },
+        { a: 45830,         b: 10/24,         expected: 1 },
+        { a: 1/24,          b: 10/24,         expected: -1, isRelative: true },
+    ];
+
+    const getSign = (v: number) =>
+        v > 0 ? 1 : v < 0 ? -1 : 0;
+
+    assert.check(compareToTests, {
+        category: "DateTime",
+        label: t => `compareTo(${t.a}, ${t.b})`,
+        actual: (t: typeof compareToTests[number]) =>
+            getSign(DateTime.from(t.a, "isRelative" in t)!
+                    .compareTo(DateTime.from(t.b, "isRelative" in t)!)
+            )
+    });
+
+    /* ==========================================================
+       12. equalsOrUndefined()
+       ========================================================== */
 
     const dt1 = DateTime.from(45830 + 10/24)!;
     const dt2 = DateTime.from(45830)!;
@@ -8303,127 +9599,120 @@ function testDateTime(options: Partial<AssertDDOptions> = {}) {
         { a: dt1, b: dt2, expected: false },
     ];
 
-    equalsOrUndefinedTests.forEach((t, index) => {
-        assert.check(
-            `equalsOrUndefined test #${index + 1}`,
-            DateTime.equalsOrUndefined(t.a, t.b),
-            t.expected
-        );
+    assert.check(equalsOrUndefinedTests, {
+        category: "DateTime",
+        label: t => `equalsOrUndefined(${t.a ? "dt" : "undefined"}, ${t.b ? "dt" : "undefined"})`,
+        actual: (t: typeof equalsOrUndefinedTests[number]) =>
+            DateTime.equalsOrUndefined(t.a, t.b)
     });
 
     /* ==========================================================
-    10. add / subtract relatifs
-    ========================================================== */
+       13. add() / subtract()
+       ========================================================== */
 
     const A = DateTime.from(2/24, true)!;
     const B = DateTime.from(3/24, true)!;
 
-    assert.check('add', round(A.add(B).excelValue), round(5/24));
-    assert.check('subtract', round(A.subtract(B).excelValue), round(-1/24));
+    const operationTests = [
+        {
+            label: "add()",
+            actual: () => round(A.add(B).excelValue),
+            expected: round(5/24)
+        },
+        {
+            label: "subtract()",
+            actual: () => round(A.subtract(B).excelValue),
+            expected: round(-1/24)
+        }
+    ];
+
+    assert.check(operationTests, {
+        category: "DateTime"
+    });
 
     /* ==========================================================
-    11. PARSE STRING (from + parseDateAndTime)
-    ========================================================== */
+       14. PARSE STRING
+       ========================================================== */
 
     const parseTests = [
 
-        // --- Nombres simples ---
+        // Nombres simples
         { input: "1.5", expected: 1.5 },
         { input: "1,5", expected: 1.5 },
         { input: "-1.5", expected: undefined }, // absolu interdit
 
-        // --- Heures seules ---
-        { input: "04:30", expected: 4.5 / 24 },
-        { input: "04h30", expected: 4.5 / 24 },
-        { input: "04h30min01s", expected: (4.5 + 1/3600) / 24 },
-        { input: "01:00", expected: 1/24 + 1 }, // rollover
+        // Heures seules
+        { input: "04:30", expectedValue: 4.5 / 24 },
+        { input: "04h30", expectedValue: 4.5 / 24 },
+        { input: "04h30min01s", expectedValue: (4.5 + 1/3600) / 24 },
+        { input: "01:00", expectedValue: 1/24 + 1 }, // rollover
 
-        // --- Heure négative ---
-        { input: "-02:00", expected: -2/24, relative: true },
+        // Heure négative
+        { input: "-02:00", expectedValue: -2/24, relative: true },
 
-        // --- Date seule ---
+        // Date seule
         { input: "22/06/2025", expected: 45830 },
         { input: "22-06-2025", expected: 45830 },
         { input: "2025/06/22", expected: 45830 },
 
-        // --- Date + heure ---
-        { input: "22/06/2025 04:30", expected: 45830 + 4.5/24 },
-        { input: "22-06-2025 04:30", expected: 45830 + 4.5/24 },
+        // Date + heure
+        { input: "22/06/2025 04:30", expectedValue: 45830 + 4.5/24 },
+        { input: "22-06-2025 04:30", expectedValue: 45830 + 4.5/24 },
 
-        // --- Ordre inversé ---
-        { input: "04:30 22/06/2025", expected: 45830 + 4.5/24 },
+        // Ordre inversé
+        { input: "04:30 22/06/2025", expectedValue: 45830 + 4.5/24 },
 
-        // --- Heure négative avec date (doit être ignoré) ---
-        { input: "22/06/2025 -02:00", expected: 45830 + 2/24 },
-        { input: "22-06-2025 -02:00", expected: 45830 + 2/24 },
+        // Heure négative avec date (doit être ignoré)
+        { input: "22/06/2025 -02:00", expectedValue: 45830 + 2/24 },
+        { input: "22-06-2025 -02:00", expectedValue: 45830 + 2/24 },
 
-        // --- Double négatif (invalide) ---
-        { input: "- - 02:00", expected: 1 + 2/24 },
+        // Double négatif (invalide)
+        { input: "- - 02:00", expectedValue: 1 + 2/24 },
 
-        // --- Format partiel ---
-        { input: "22/06 04:00", check: (v: number) => round(v % 1) === round(4/24) },
+        // Format partiel
+        { input: "22/06 04:00", timeOnly: true, expectedValue: 4/24 },
+            // expected: () => round(4/24)
 
-        // --- Chaîne invalide ---
+        // Chaîne invalide
         { input: "abc", expected: undefined },
         { input: "22/99/2025", expected: undefined },
         { input: "25:61", expected: undefined },
 
     ];
 
-    parseTests.forEach((t, i) => {
-        const dt = DateTime.from(t.input as string, t.relative);
+    assert.check(parseTests, {
+        category: "DateTime",
+        label: t =>`parse("${t.input}")`,
+        actual: (t: typeof parseTests[number]) => {
 
-        if ("check" in t) {
-            assert.check(
-                `parse test #${i + 1} (${t.input}) custom`,
-                t.check!(dt?.excelValue ?? NaN),
-                true
-            );
-        } else if (t.expected === undefined) {
-            assert.check(
-                `parse test #${i + 1} (${t.input})`,
-                dt,
-                undefined
-            );
-        } else {
-            assert.check(
-                `parse test #${i + 1} (${t.input})`,
-                round(dt?.excelValue ?? NaN),
-                round(t.expected as number)
-            );
-        }
+            const dt = DateTime.from(t.input, t.relative);
+            if (dt === undefined) return undefined;
+            
+            const value = ("timeOnly" in t)
+                ? dt?.excelValue % 1
+                : dt?.excelValue;
+
+            return round(value);
+        },
+        expected: (t: typeof parseTests[number]) =>
+             typeof t.expectedValue === "number"
+                ? round(t.expectedValue)
+                : t.expectedValue
     });
 
     /* ==========================================================
-    12. parseDate formats
-    ========================================================== */
+       SYNTHÈSE
+       ========================================================== */
 
-    const dateTests = [
-        { input: "22/06/2025", expected: 45830 },
-        { input: "2025/06/22", expected: 45830 },
-        { input: "22/06", check: (v: number) => v > 45000 },
-    ];
-
-    dateTests.forEach((t, i) => {
-        const v = ExcelDate.parseDate(t.input);
-
-        if ("check" in t) {
-            assert.check(`parseDate #${i + 1}`, t.check!(v!), true);
-        } else {
-            assert.check(`parseDate #${i + 1}`, v, t.expected);
-        }
-    });
-
-    /* ==========================================================
-    SYNTHÈSE
-    ========================================================== */
-
-    assert.printSummary('testDateTime');
+    assert.printSummary("testDateTime");
 }
 
-function testDays(options: Partial<AssertDDOptions> = {}) {
+function testDays(
+    options: Partial<AssertDDOptions> = {}
+) {
 
     const assert = new AssertDD(options);
+
     Days.load();
     Day.load();
 
@@ -8432,229 +9721,198 @@ function testDays(options: Partial<AssertDDOptions> = {}) {
        ========================================================== */
 
     const fromTests = [
-        {
-            desc: "Jour simple lundi",
-            input: 1,
-            expected: "1"
-        },
-        {
-            desc: "Groupe semaine 12345",
-            input: "5-4-3-2-1",
-            expected: "12345"
-        },
-        {
-            desc: "Valeurs invalides ignorées",
-            input: "a9b1c7",
-            expected: "17"
-        }
+        { input: 1,           expected: "1",     desc: "Jour simple" },
+        { input: "5-4-3-2-1", expected: "12345", desc: "Tri automatique" },
+        { input: "a9b1c7",    expected: "17",    desc: "Valeurs invalides ignorées" }
     ];
 
-    fromTests.forEach(t => {
-        const d = Days.from(t.input)!;
-
-        assert.check(
-            `Days.from("${t.input}") → numbersString (${t.desc})`,
-            d.numbersString,
-            t.expected
-        );
+    assert.check(fromTests, {
+        category: "Days",
+        label: t => `Days.from("${t.input}") (${t.desc})`,
+        actual: (t: typeof fromTests[number]) => Days.from(t.input)!.numbersString
     });
 
     /* ==========================================================
-       2. extractFromString
+       2. extractFromString()
        ========================================================== */
 
     const extractTests = [
-        { desc: "Nom complet", input: "lundi", expected: [1] },
-        { desc: "Abréviation", input: "ma", expected: [2] },
-        { desc: "Numéros mélangés", input: "7;1;3", expected: [1, 3, 7] },
-        { desc: "Texte mixte", input: "lumeven", expected: [1, 3, 5] }
+        { input: "lundi",   expectedValue: [1] },
+        { input: "ma",      expectedValue: [2] },
+        { input: "7;1;3",   expectedValue: [1, 3, 7] },
+        { input: "lumeven", expectedValue: [1, 3, 5] }
     ];
 
-    extractTests.forEach(t => {
-        const result = Days.extractFromString(t.input);
-        assert.check(
-            `extractFromString("${t.input}") (${t.desc})`,
-            JSON.stringify(result),
-            JSON.stringify(t.expected)
-        );
+    assert.check(extractTests, {
+        category: "Days",
+        label: t => `extractFromString("${t.input}")`,
+        actual: (t: typeof extractTests[number]) =>
+            JSON.stringify(Days.extractFromString(t.input)),
+        expected: (t: typeof extractTests[number]) =>
+            JSON.stringify(t.expectedValue)
     });
 
     /* ==========================================================
-       3. union / intersection
+       3. union() / intersection()
        ========================================================== */
 
     const d1 = Days.from("1-3-5")!;
     const d2 = Days.from("3-4")!;
 
-    const inter = Days.intersection(d1, d2);
-    const union = Days.union(d1, d2);
+    const intersectionUnionTests = [
+        {
+            label: "intersection 135 ∩ 34",
+            actual: () => Days.intersection(d1, d2)?.numbersString,
+            expected: "3"
+        },
+        {
+            label: "union 135 ∪ 34",
+            actual: () => Days.union(d1, d2)?.numbersString,
+            expected: "1345"
+        }
+    ];
 
-    assert.check("Intersection 135 ∩ 34", inter?.numbersString, "3");
-    assert.check("Union 135 ∪ 34", union?.numbersString, "1345");
+    assert.check(intersectionUnionTests, {
+        category: "Days"
+    });
 
     /* ==========================================================
-       4. contains / intersects
+       4. contains()
        ========================================================== */
 
     const d = Days.from("1-3-5")!;
 
-    assert.check("contains(3)", d.contains(3), true);
-    assert.check("contains(2)", d.contains(2), false);
-    assert.check("intersects true", d.intersects(Days.from(3)!), true);
-    assert.check("intersects false", d.intersects(Days.from(2)!), false);
+    const containsTests = [
+        { day: 3, expected: true },
+        { day: 2, expected: false }
+    ];
+
+    assert.check(containsTests, {
+        category: "Days",
+        label: t => `contains(${t.day})`,
+        actual: (t: typeof containsTests[number]) =>
+            d.contains(t.day)
+    });
 
     /* ==========================================================
-       5. Constantes Days
+       5. intersects()
+       ========================================================== */
+
+    const intersectsTests = [
+        { day: 3, expected: true },
+        { day: 2, expected: false }
+    ];
+
+    assert.check(intersectsTests, {
+        category: "Days",
+        label: t => `intersects(${t.day})`,
+        actual: (t: typeof intersectsTests[number]) =>
+            d.intersects(Days.from(t.day)!)
+    });
+
+    /* ==========================================================
+       6. Days.difference() / count() / numbersString()
+       ========================================================== */
+       const dA = Days.from("1-3-5")!;
+       const dB = Days.from("3")!;
+       
+       assert.check([
+           {
+               label: "difference 135 - 3",
+               actual: () => Days.difference(dA, dB)?.numbersString,
+               expected: "15"
+           },
+           {
+               label: "count 135",
+               actual: () => dA.count,
+               expected: 3
+           },
+           {
+               label: "numbersString 135",
+               actual: () => dA.numbersString,
+               expected: "135"
+           }
+       ], {
+           category: "Days"
+       });
+
+    /* ==========================================================
+       7. ACCESSEURS STATIQUES Day
        ========================================================== */
 
     const constantsTests = [
-        { const: Days.MONDAY,    num: 1, name: "Lundi" },
-        { const: Days.TUESDAY,   num: 2, name: "Mardi" },
-        { const: Days.WEDNESDAY, num: 3, name: "Mercredi" },
-        { const: Days.THURSDAY,  num: 4, name: "Jeudi" },
-        { const: Days.FRIDAY,    num: 5, name: "Vendredi" },
-        { const: Days.SATURDAY,  num: 6, name: "Samedi" },
-        { const: Days.SUNDAY,    num: 7, name: "Dimanche" },
-        { const: Days.HOLIDAY,   num: 8, name: "Férié" },
+        { days: Days.MONDAY,    day: Days.MONDAY,       num: 1, name: "Lundi" },
+        { days: Days.TUESDAY,   day: Days.TUESDAY,      num: 2, name: "Mardi" },
+        { days: Days.WEDNESDAY, day: Days.WEDNESDAY,    num: 3, name: "Mercredi" },
+        { days: Days.THURSDAY,  day: Days.THURSDAY,     num: 4, name: "Jeudi" },
+        { days: Days.FRIDAY,    day: Days.FRIDAY,       num: 5, name: "Vendredi" },
+        { days: Days.SATURDAY,  day: Days.SATURDAY,     num: 6, name: "Samedi" },
+        { days: Days.SUNDAY,    day: Days.SUNDAY,       num: 7, name: "Dimanche" },
+        { days: Days.HOLIDAY,   day: Days.HOLIDAY,      num: 8, name: "Férié" }
     ];
 
-    constantsTests.forEach(t => {
+    assert.check(constantsTests, {
+        category: "Days",
+        label: t => `Constante ${t.name}`,
+        actual: (t: typeof constantsTests[number]) => 
+            [
+                t.days.contains(t.num),
+                t.days.fullName,
+                Days.from(t.num) === t.days
+            ].join("|"),
 
-        assert.check(
-            `Days constant contains (${t.name})`,
-            t.const.contains(t.num),
-            true
-        );
-
-        assert.check(
-            `Days constant fullName (${t.name})`,
-            t.const.fullName,
-            t.name
-        );
-
-        assert.check(
-            `Days constant identity (${t.name})`,
-            Days.from(t.num) === t.const,
-            true
-        );
+        expected: (t: typeof constantsTests[number]) =>
+            [true, t.name, true].join("|")
     });
 
     /* ==========================================================
-       6. Day.from / cohérence avec Days
+       8. Day.from()
        ========================================================== */
 
-    constantsTests.forEach(t => {
-
-        const day = Day.from(t.num)!;
-
-        assert.check(
-            `Day.from(${t.num}) fullName`,
-            day.fullName,
-            t.name
-        );
-
-        assert.check(
-            `Day.from(${t.num}) mask`,
-            day.mask,
-            t.const.mask
-        );
-
-        assert.check(
-            `Day.from(${t.num}) index`,
-            day.index,
-            t.num - 1
-        );
-
-        assert.check(
-            `Day.from(${t.num}) identity`,
-            Day.from(day) === day,
-            true
-        );
+    assert.check(constantsTests, {
+        category: "Day",
+        label: t => `Day.from(${t.num})`,
+        actual: (t: typeof constantsTests[number]) => {
+            const day = Day.from(t.num)!;
+            return [
+                day,
+                day.fullName,
+                day.mask,
+                day.mask,
+                day.index,
+                Day.from(day) === day
+            ].join("|");
+        },
+        expected: (t: typeof constantsTests[number]) =>
+            [
+                t.day,
+                t.name,
+                t.day.mask,
+                t.days.mask,
+                t.num - 1,
+                true
+            ].join("|")
     });
 
     /* ==========================================================
-       7. Cohérence mask → index (log2)
-       ========================================================== */
-
-    for (let i = 0; i < 8; i++) {
-
-        const day = Day.from(i + 1)!;
-
-        assert.check(
-            `maskToIndex ${1 << i}`,
-            day.index,
-            i
-        );
-    }
-
-    /* ==========================================================
-       8. Accesseurs statiques Day
-       ========================================================== */
-
-    const dayConstants = [
-        { getter: () => Day.MONDAY,    index: 0 },
-        { getter: () => Day.TUESDAY,   index: 1 },
-        { getter: () => Day.WEDNESDAY, index: 2 },
-        { getter: () => Day.THURSDAY,  index: 3 },
-        { getter: () => Day.FRIDAY,    index: 4 },
-        { getter: () => Day.SATURDAY,  index: 5 },
-        { getter: () => Day.SUNDAY,    index: 6 },
-        { getter: () => Day.HOLIDAY,   index: 7 },
-    ];
-
-    dayConstants.forEach(t => {
-        const d = t.getter();
-
-        assert.check(
-            `Day getter index ${t.index}`,
-            d.index,
-            t.index
-        );
-
-        assert.check(
-            `Day getter identity ${t.index}`,
-            Day.from(d.code) === d,
-            true
-        );
-    });
-
-    /* ==========================================================
-       9. Iteration Day.values()
+       9. Day.values()
        ========================================================== */
 
     const values = Array.from(Day.values());
 
-    assert.check(
-        "Day.values length",
-        values.length,
-        8
-    );
-
-    values.forEach((d, i) => {
-        assert.check(
-            `Day.values index ${i}`,
-            d.index,
-            i
-        );
+    assert.check([
+        {
+            label: "Day.values length",
+            actual: () => values.length,
+            expected: 8
+        }
+    ], {
+        category: "Day"
     });
 
     /* ==========================================================
-    10. Days.difference / count / numbersString
-    ========================================================== */
-
-    const dA = Days.from("1-3-5")!;
-    const dB = Days.from("3")!;
-
-    const diff = Days.difference(dA, dB);
-
-    assert.check("difference 135 - 3", diff?.numbersString, "15");
-
-    assert.check("count 135", dA.count, 3);
-    assert.check("numbersString 135", dA.numbersString, "135");
-
-    /* ==========================================================
-    11. DaysValues
-    ========================================================== */
+       10. DaysValues
+       ========================================================== */
 
     const base = Days.from("1-2-3-4-5-6-7")!;
     const dv = new DaysValues(base);
@@ -8662,66 +9920,68 @@ function testDays(options: Partial<AssertDDOptions> = {}) {
     dv.set(Days.from("1-2-3-4-5")!, "A");
     dv.set(Days.from("6-7")!, "B");
 
-    assert.check(
-        "DaysValues toString split",
-        dv.toString(),
-        "12345: A, 67: B"
-    );
-    assert.check(
-        "DaysValues get Monday",
-        dv.get(Day.MONDAY),
-        "A"
-    );
-    assert.check(
-        "DaysValues get Sunday",
-        dv.get(Day.SUNDAY),
-        "B"
-    );
+    assert.check([
+        {
+            label: "DaysValues split",
+            actual: () => dv.toString(),
+            expected: "12345: A, 67: B"
+        },
 
-    // merge automatique + valeur unique pour tous les jours de la semaine
+        {
+            label: "DaysValues Monday",
+            actual: () => dv.get(Day.MONDAY),
+            expected: "A"
+        },
+
+        {
+            label: "DaysValues Sunday",
+            actual: () => dv.get(Day.SUNDAY),
+            expected: "B"
+        }
+    ], {
+        category: "Days"
+    });
+
     dv.set(Days.from("6-7")!, "A");
-
-    assert.check(
-        "DaysValues merge",
-        dv.toString(),
-        "A"
-    );
-
-    // fill gaps
     const dv2 = new DaysValues(base);
     dv2.set(Days.from("1-2")!, "X");
     dv2.fillGaps("Y");
-
-    assert.check(
-        "DaysValues fillGaps",
-        dv2.isComplete(),
-        true
-    );
-
-    // parsing
     const parsed = DaysValues.from(base, "12345: A, 67: B");
 
-    assert.check(
-        "DaysValues from string",
-        parsed.toString(),
-        "12345: A, 67: B"
-    );
+    assert.check([
+        {
+            label: "DaysValues merge",
+            actual: () => dv.toString(),
+            expected: "A"
+        },        
+        {
+            label: "DaysValues fillGaps",
+            actual: () => dv2.isComplete(),
+            expected: true
+        },
+        {
+            label: "DaysValues.from()",
+            actual: () => parsed.toString(),
+            expected: "12345: A, 67: B"
+        }
+    ], {
+        category: "Days"
+    });
 
     /* ==========================================================
        SYNTHÈSE
        ========================================================== */
 
-    assert.printSummary('testDays');
+    assert.printSummary("testDays");
 }
 
-function testParity(options: Partial<AssertDDOptions> = {}) {
+function testParity(
+    options: Partial<AssertDDOptions> = {}
+) {
 
-    Parity.load();
     const assert = new AssertDD(options);
 
-    /* ==========================================================
-       TESTS DATA-DRIVEN - CLASSE Parity
-       ========================================================== */
+    Parity.load();
 
     /* ==========================================================
        1. CONSTRUCTEUR & normalizeParityValue()
@@ -8730,93 +9990,94 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
     const constructorTests = [
         { desc: 'Lettre impair "I"', value: "I", doubleParityAllowed: false, expected: Parity.ODD },
         { desc: 'Lettre pair "P"', value: "P", doubleParityAllowed: false, expected: Parity.EVEN },
-        { desc: 'Chiffre impair 1', value: 1, doubleParityAllowed: false, expected: Parity.ODD },
-        { desc: 'Chiffre pair 2', value: 2, doubleParityAllowed: false, expected: Parity.EVEN },
-        { desc: 'Numéro de train impair', value: "12345", doubleParityAllowed: false, expected: Parity.ODD },
-        { desc: 'Numéro de train pair', value: "12346", doubleParityAllowed: false, expected: Parity.EVEN },
-        { desc: 'Valeur vide', value: "", doubleParityAllowed: false, expected: Parity.UNDEFINED },
+        { desc: "Chiffre impair 1", value: 1, doubleParityAllowed: false, expected: Parity.ODD },
+        { desc: "Chiffre pair 2", value: 2, doubleParityAllowed: false, expected: Parity.EVEN },
+        { desc: "Numéro de train impair", value: "12345", doubleParityAllowed: false, expected: Parity.ODD },
+        { desc: "Numéro de train pair", value: "12346", doubleParityAllowed: false, expected: Parity.EVEN },
+        { desc: "Valeur vide", value: "", doubleParityAllowed: false, expected: Parity.UNDEFINED },
         { desc: 'Zéro "0"', value: "0", doubleParityAllowed: false, expected: Parity.UNDEFINED },
-        { desc: 'Double IP interdite', value: "IP", doubleParityAllowed: false, expected: Parity.UNDEFINED },
-        { desc: 'Double IP autorisée', value: "IP", doubleParityAllowed: true, expected: Parity.DOUBLE },
+        { desc: "Double IP interdite", value: "IP", doubleParityAllowed: false, expected: Parity.UNDEFINED },
+        { desc: "Double IP autorisée", value: "IP", doubleParityAllowed: true, expected: Parity.DOUBLE },
         { desc: 'Double implicite "1/2"', value: "1/2", doubleParityAllowed: true, expected: Parity.DOUBLE }
     ];
 
-    constructorTests.forEach(t => {
-        const p = Parity.from(t.value, t.doubleParityAllowed);
-        assert.check(
-            `Parity.from(${JSON.stringify(t.value)}, ${t.doubleParityAllowed}) – ${t.desc}`,
-            p.value,
-            t.expected
-        );
+    assert.check(constructorTests, {
+        category: "Parity",
+        label: t => `Parity.from(${JSON.stringify(t.value)}, ${t.doubleParityAllowed}) (${t.desc})`,
+        actual: (t: typeof constructorTests[number]) =>
+            Parity.from(t.value, t.doubleParityAllowed).value
     });
 
     /* ==========================================================
        2. null / undefined
        ========================================================== */
 
-       const nullTests = [
+    const nullTests = [
         { value: null },
         { value: undefined }
     ];
 
-    nullTests.forEach(t => {
-        const p = Parity.from(t.value);
-        assert.check(
-            `Parity.from(${t.value}) → undefined`,
-            p.value,
-            Parity.UNDEFINED
-        );
+    assert.check(nullTests, {
+        category: "Parity",
+        label: t => `Parity.from(${t.value})`,
+        actual: (t: typeof nullTests[number]) =>
+            Parity.from(t.value).value,
+        expected: () => Parity.UNDEFINED
     });
 
     /* ==========================================================
        3. Pool
        ========================================================== */
 
-    assert.check(
-        "Pool: même instance pour même valeur",
-        Parity.from("I") === Parity.from(1),
-        true
-    );
-
-    assert.check(
-        "Pool: instances différentes si doubleParityAllowed diffère",
-        Parity.from("I", false) !== Parity.from("I", true),
-        true
-    );
+    assert.check([
+        {
+            label: "Pool même instance",
+            actual: () => Parity.from("I") === Parity.from(1),
+            expected: true
+        },
+        {
+            label: "Pool différent selon doubleParityAllowed",
+            actual: () => Parity.from("I", false) !== Parity.from("I", true),
+            expected: true
+        }
+    ], {
+        category: "Parity"
+    });
 
     /* ==========================================================
-       4. is() / isDefined()
+       4. is()
        ========================================================== */
-
 
     const isTests = [
         { value: "I", parity: Parity.ODD, expected: true },
         { value: "I", parity: Parity.EVEN, expected: false }
     ];
 
-    isTests.forEach(t => {
-        assert.check(
-            `is ${t.value} === ${t.parity}`,
-            Parity.from(t.value).is(t.parity),
-            t.expected
-        );
+    assert.check(isTests, {
+        category: "Parity",
+        label: t => `is ${t.value} === ${t.parity}`,
+        actual: (t: typeof isTests[number]) =>
+            Parity.from(t.value).is(t.parity)
     });
+
+    /* ==========================================================
+       5. isDefined()
+       ========================================================== */
 
     const isDefinedTests = [
         { parity: Parity.UNDEFINED, expected: false },
         { parity: Parity.EVEN, expected: true }
     ];
 
-    isDefinedTests.forEach(t => {
-        assert.check(
-            `isDefined ${t.parity}`,
-            Parity.from(t.parity).isDefined(),
-            t.expected
-        );
+    assert.check(isDefinedTests, {
+        category: "Parity",
+        label: t => `isDefined ${t.parity}`,
+        actual: (t: typeof isDefinedTests[number]) =>
+            Parity.from(t.parity).isDefined()
     });
 
     /* ==========================================================
-       5. isOpposedTo()
+       6. isOpposedTo()
        ========================================================== */
 
     const isOpposedTests = [
@@ -8827,113 +10088,116 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
         { a: undefined, b: undefined, expected: false }
     ];
 
-    isOpposedTests.forEach(t => {
-        const a = t.a !== undefined ? Parity.from(t.a) : undefined;
-        const b = t.b !== undefined ? Parity.from(t.b) : undefined;
-        assert.check(
-            `isOpposedTo ${t.a} / ${t.b}`,
-            a?.isOpposedTo(b) ?? false,
-            t.expected
-        );
+    assert.check(isOpposedTests, {
+        category: "Parity",
+        label: t => `isOpposedTo ${t.a} / ${t.b}`,
+        actual: (t: typeof isOpposedTests[number]) => {
+
+            const a = t.a !== undefined ? Parity.from(t.a) : undefined;
+            const b = t.b !== undefined ? Parity.from(t.b) : undefined;
+
+            return a?.isOpposedTo(b) ?? false;
+        }
     });
 
-    assert.check(
-        "DOUBLE n'est opposé à rien",
-        Parity.double().isOpposedTo(Parity.odd()),
-        false
-    );
-
-    assert.check(
-        "UNDEFINED n'est opposé à rien",
-        Parity.undefined().isOpposedTo(Parity.even()),
-        false
-    );
-
+    assert.check([
+        {
+            label: "DOUBLE n'est opposé à rien",
+            actual: () => Parity.double().isOpposedTo(Parity.odd()),
+            expected: false
+        },
+        {
+            label: "UNDEFINED n'est opposé à rien",
+            actual: () => Parity.undefined().isOpposedTo(Parity.even()),
+            expected: false
+        }
+    ], {
+        category: "Parity"
+    });
 
     /* ==========================================================
-       6. equalsTo() / 
+       7. equalsTo()
        ========================================================== */
-
-    assert.check(
-        "equalsTo basé sur identité",
-        Parity.from("I").equalsTo(Parity.from("I")),
-        true
-    );
 
     const equalsTests = [
         { a: "I", b: 1, expected: true },
         { a: "I", b: "P", expected: false }
     ];
 
-    equalsTests.forEach(t => {
-        assert.check(
-            `equalsTo ${t.a} / ${t.b}`,
-            Parity.from(t.a).equalsTo(Parity.from(t.b)),
-            t.expected
-        );
+    assert.check(equalsTests, {
+        category: "Parity",
+        label: t => `equalsTo ${t.a} / ${t.b}`,
+        actual: (t: typeof equalsTests[number]) =>
+            Parity.from(t.a).equalsTo(Parity.from(t.b))
     });
 
     const oddSimple = Parity.odd(false);
     const oddDoubleAllowed = Parity.odd(true);
 
-    assert.check(
-        "equalsTo faux si doubleParityAllowed différent",
-        oddSimple.equalsTo(oddDoubleAllowed),
-        false
-    );
+    assert.check([
+        {
+            label: "equalsTo basé sur identité",
+            actual: () => Parity.from("I").equalsTo(Parity.from("I")),
+            expected: true
+        },
+        {
+            label: "equalsTo faux si doubleParityAllowed différent",
+            actual: () => oddSimple.equalsTo(oddDoubleAllowed),
+            expected: false
+        }
+    ], {
+        category: "Parity"
+    });
 
     /* ==========================================================
-        7. Parity.includes()
-        ----------------------------------------------------------
-        Vérifie :
-        - parité simple vs simple
-        - parité double
-        - undefined
-        - valeurs non valides
-        ========================================================== */
+       8. includes()
+       ========================================================== */
 
     const includesTests = [
-        // --- parité simple ---
+
+        // Parités simples
         { a: "I", b: "I", expected: true },
-        { a: "I", b: 1,   expected: true },   // odd / odd
+        { a: "I", b: 1, expected: true },
         { a: "I", b: "P", expected: false },
         { a: "P", b: "I", expected: false },
 
-        // --- parité double ---
+        // Parités doubles
         { a: "IP", b: "I", expected: true },
         { a: "IP", b: "P", expected: true },
-        { a: "IP", b: 1,   expected: true },
-        { a: "IP", b: 2,   expected: true },
+        { a: "IP", b: 1, expected: true },
+        { a: "IP", b: 2, expected: true },
 
-        // --- simple n'inclut pas double ---
-        { a: "I",  b: "IP", expected: false },
-        { a: "P",  b: "IP", expected: false },
+        // Parités doubles non autorisées
+        { a: "I", b: "IP", expected: false },
+        { a: "P", b: "IP", expected: false },
 
-        // --- undefined ---
+        // Parités indéfinies
         { a: null, b: "I", expected: false },
-        { a: "I",  b: null, expected: false },
-        { a: null, b: null, expected: false },
+        { a: "I", b: null, expected: false },
+        { a: null, b: null, expected: false }
     ];
 
-    includesTests.forEach(t => {
-        assert.check(
-            `includes ${t.a} ⊇ ${t.b}`,
-            Parity.from(t.a, true).includes(t.b),
-            t.expected
-        );
+    assert.check(includesTests, {
+        category: "Parity",
+        label: t => `includes ${t.a} ⊇ ${t.b}`,
+        actual: (t: typeof includesTests[number]) =>
+            Parity.from(t.a, true).includes(t.b)
     });
 
     const simpleParity = Parity.odd(false);
 
-    assert.check(
-        "includes refuse double si non autorisée",
-        simpleParity.includes("IP"),
-        false
-    );
- 
+    assert.check([
+        {
+            label: "includes refuse double si non autorisée",
+            actual: () => simpleParity.includes("IP"),
+            expected: false
+        }
+    ], {
+        category: "Parity"
+    });
 
     /* ==========================================================
-       8. invert()
+       9. invert()
        ========================================================== */
 
     const invertTests = [
@@ -8943,104 +10207,74 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
         { value: "", doubleParityAllowed: false, expected: Parity.UNDEFINED }
     ];
 
-    invertTests.forEach(t => {
-        const p = Parity.from(t.value, t.doubleParityAllowed).invert();
-        assert.check(
-            `invert ${t.value}`,
-            p.value,
-            t.expected
-        );
+    assert.check(invertTests, {
+        category: "Parity",
+        label: t => `invert ${t.value}`,
+        actual: (t: typeof invertTests[number]) =>
+            Parity.from(t.value, t.doubleParityAllowed)
+                .invert()
+                .value
     });
 
     const pDouble = Parity.double();
     const pUndefined = Parity.undefined();
 
-    assert.check(
-        "invert DOUBLE retourne la même instance",
-        pDouble.invert() === pDouble,
-        true
-    );
-
-    assert.check(
-        "invert UNDEFINED retourne la même instance",
-        pUndefined.invert() === pUndefined,
-        true
-    );
-
-    /* ==========================================================
-       9. combineWith()
-       ========================================================== */
-
-       const combineTests = [
-        // undefined + odd → odd
+    assert.check([
         {
-            a: Parity.undefined(true),
-            b: Parity.odd(),
-            expected: Parity.ODD
+            label: "invert DOUBLE retourne même instance",
+            actual: () => pDouble.invert() === pDouble,
+            expected: true
         },
-
-        // odd + undefined → odd
         {
-            a: Parity.odd(true),
-            b: Parity.undefined(),
-            expected: Parity.ODD
-        },
-
-        // odd + odd → odd
-        {
-            a: Parity.odd(true),
-            b: Parity.odd(),
-            expected: Parity.ODD
-        },
-
-        // even + even → even
-        {
-            a: Parity.even(true),
-            b: Parity.even(),
-            expected: Parity.EVEN
-        },
-
-        // odd + even → double
-        {
-            a: Parity.odd(true),
-            b: Parity.even(),
-            expected: Parity.DOUBLE
+            label: "invert UNDEFINED retourne même instance",
+            actual: () => pUndefined.invert() === pUndefined,
+            expected: true
         }
-    ];
-
-    combineTests.forEach(t => {
-        const result = t.a.combineWith(t.b);
-        assert.check(
-            `combineWith ${t.a.value} + ${t.b.value}`,
-            result.value,
-            t.expected
-        );
+    ], {
+        category: "Parity"
     });
 
-    // Test erreur si double non autorisé
-    assert.throws(
-        "combineWith interdit si doubleParityAllowed = false",
-        () => Parity.odd(false).combineWith(Parity.even())
-    );
+    /* ==========================================================
+       10. combineWith()
+       ========================================================== */
 
-    // Test immutabilité
+    const combineTests = [
+        { a: Parity.undefined(true), b: Parity.odd(), expected: Parity.ODD },
+        { a: Parity.odd(true), b: Parity.undefined(), expected: Parity.ODD },
+        { a: Parity.odd(true), b: Parity.odd(), expected: Parity.ODD },
+        { a: Parity.even(true), b: Parity.even(), expected: Parity.EVEN },
+        { a: Parity.odd(true), b: Parity.even(), expected: Parity.DOUBLE },
+        { a: Parity.even(false), b: Parity.odd(), expected: AssertDD.THROWS },
+    ];
+
+    assert.check(combineTests, {
+        category: "Parity",
+        label: t => `combineWith ${t.a.value} + ${t.b.value}`
+            + `${t.expected === AssertDD.THROWS ? " interdit si doubleParityAllowed = false" : ""}`,
+        actual: (t: typeof combineTests[number]) =>
+            t.a.combineWith(t.b).value
+    });
+
     const original = Parity.odd(true);
     const combined = original.combineWith(Parity.even());
 
-    assert.check(
-        "combineWith ne modifie pas l'instance d'origine",
-        original.value,
-        Parity.ODD
-    );
-
-    assert.check(
-        "combineWith retourne une nouvelle instance si changement",
-        combined !== original,
-        true
-    );
+    assert.check([
+        {
+            label: "combineWith ne modifie pas l'origine",
+            actual: () => original.value,
+            expected: Parity.ODD
+        },
+        {
+            label: "combineWith retourne nouvelle instance",
+            actual: () => combined !== original,
+            expected: true
+        }
+    ], {
+        category: "Parity"
+    });
 
     /* ==========================================================
-       10. printDigit() / printLetter()
+       11. printDigit() / printLetter()
        ========================================================== */
 
     const printTests = [
@@ -9055,48 +10289,56 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
         { value: "", digit: "", letter: "" }
     ];
 
-    printTests.forEach(t => {
-        const p = Parity.from(t.value, t.doubleParityAllowed);
-        assert.check(`printDigit ${t.value}`, p.printDigit(), t.digit);
-        assert.check(`printLetter ${t.value}`, p.printLetter(), t.letter);
+    assert.check(printTests, {
+        category: "Parity",
+        label: t => `print ${t.value}`,
+        actual: (t: typeof printTests[number]) => {
+            const p = Parity.from(t.value, t.doubleParityAllowed);
+            return [
+                p.printDigit(),
+                p.printLetter()
+            ].join("|");
+        },
+        expected: (t: typeof printTests[number]) =>
+            [t.digit, t.letter].join("|")
     });
 
     /* ==========================================================
-       11. static factories
+       12. static factories
        ========================================================== */
 
-    assert.check(
-        "Parity.odd() crée une parité impaire",
-        Parity.odd().value,
-        Parity.ODD
-    );
-
-    assert.check(
-        "Parity.even() crée une parité paire",
-        Parity.even().value,
-        Parity.EVEN
-    );
-
-    assert.check(
-        "Parity.double() crée une parité double",
-        Parity.double().value,
-        Parity.DOUBLE
-    );
-
-    assert.check(
-        "Parity.undefined() crée une parité undefined",
-        Parity.undefined().value,
-        Parity.UNDEFINED
-    );
-
-    assert.check(
-        "Parity.double() autorise toujours doubleParityAllowed",
-        Parity.double().combineWith(Parity.odd()).value,
-        Parity.DOUBLE
-    );
+    assert.check([
+        {
+            label: "Parity.odd()",
+            actual: () => Parity.odd().value,
+            expected: Parity.ODD
+        },
+        {
+            label: "Parity.even()",
+            actual: () => Parity.even().value,
+            expected: Parity.EVEN
+        },
+        {
+            label: "Parity.double()",
+            actual: () => Parity.double().value,
+            expected: Parity.DOUBLE
+        },
+        {
+            label: "Parity.undefined()",
+            actual: () => Parity.undefined().value,
+            expected: Parity.UNDEFINED
+        },
+        {
+            label: "Parity.double() autorise combineWith",
+            actual: () => Parity.double().combineWith(Parity.odd()).value,
+            expected: Parity.DOUBLE
+        }
+    ], {
+        category: "Parity"
+    });
 
     /* ==========================================================
-       12. static containsParityLetter()
+       13. static containsParityLetter()
        ========================================================== */
 
     const containsTests = [
@@ -9105,50 +10347,61 @@ function testParity(options: Partial<AssertDDOptions> = {}) {
         { text: "Train IP", parity: Parity.DOUBLE, expected: true }
     ];
 
-    containsTests.forEach(t => {
-        assert.check(
-            `containsParityLetter "${t.text}"`,
-            Parity.containsParityLetter(t.text, t.parity),
-            t.expected
-        );
+    assert.check(containsTests, {
+        category: "Parity",
+        label: t => `containsParityLetter "${t.text}"`,
+        actual: (t: typeof containsTests[number]) =>
+            Parity.containsParityLetter(t.text, t.parity)
     });
 
     /* ==========================================================
-       13. static letter() / digit()
+       14. static letter() / digit()
        ========================================================== */
 
     const staticTests = [
-        { method: 'letter', parity: Parity.ODD, type: 'string' },
-        { method: 'letter', parity: Parity.EVEN, type: 'string' },
-        { method: 'digit', parity: Parity.ODD, type: 'number' },
-        { method: 'digit', parity: Parity.EVEN, type: 'number' },
-        { method: 'digit', parity: 999, expected: 0 }
+        { method: "letter", parity: Parity.ODD, type: "string" },
+        { method: "letter", parity: Parity.EVEN, type: "string" },
+        { method: "digit", parity: Parity.ODD, type: "number" },
+        { method: "digit", parity: Parity.EVEN, type: "number" },
+        { method: "digit", parity: 999, expected: 0 }
     ];
 
-    staticTests.forEach(t => {
-        const result =
-            t.method === 'letter'
+    assert.check(staticTests, {
+        category: "Parity",
+        label: t =>
+            `${t.method}(${t.parity})`,
+        actual: (t: typeof staticTests[number]) => {
+            const result = t.method === "letter"
                 ? Parity.letter(t.parity)
                 : Parity.digit(t.parity);
-
-        if ('expected' in t) {
-            assert.check(`${t.method}(${t.parity})`, result, t.expected);
-        } else {
-            assert.check(`${t.method}(${t.parity}) type`, typeof result, t.type);
-        }
+            return "expected" in t
+                ? result
+                : typeof result;
+        },
+        expected: (t: typeof staticTests[number]) =>
+            "expected" in t
+                ? t.expected
+                : t.type
     });
 
+    /* ==========================================================
+       SYNTHÈSE
+       ========================================================== */
+       
     assert.printSummary("testParity");
 }
 
-function testTrainNumber(options: Partial<AssertDDOptions> = {}) {
+function testTrainNumber(
+    options: Partial<AssertDDOptions> = {}
+) {
 
     const assert = new AssertDD(options);
+
     TrainNumber.load(true);
 
-    // ------------------------------------------------------------
-    // Constructeur
-    // ------------------------------------------------------------
+    /* ==========================================================
+       1. CONSTRUCTEUR
+       ========================================================== */
 
     const constructorTests = [
         { desc: "Nombre simple", input: 146490, expected: "146490" },
@@ -9156,18 +10409,16 @@ function testTrainNumber(options: Partial<AssertDDOptions> = {}) {
         { desc: "Minuscules + parasites", input: "w-14a6490", expected: "W14A6490" }
     ];
 
-    constructorTests.forEach(t => {
-        const tn = TrainNumber.from(t.input);
-        assert.check(
-            `TrainNumber.from(${JSON.stringify(t.input)}) (${t.desc})`,
-            tn.value,
-            t.expected
-        );
+    assert.check(constructorTests, {
+        category: "TrainNumber",
+        label: t => `TrainNumber.from(${JSON.stringify(t.input)}) (${t.desc})`,
+        actual: (t: typeof constructorTests[number]) =>
+            TrainNumber.from(t.input).value
     });
 
-    // ------------------------------------------------------------
-    // includes()
-    // ------------------------------------------------------------
+    /* ==========================================================
+       2. includes()
+       ========================================================== */
 
     const tn = TrainNumber.from(146490);
 
@@ -9179,74 +10430,135 @@ function testTrainNumber(options: Partial<AssertDDOptions> = {}) {
         { value: "146492", expected: false }
     ];
 
-    includesTests.forEach(t => {
-        assert.check(
-            `includes(${t.value})`,
-            tn.includes(t.value),
-            t.expected
-        );
+    assert.check(includesTests, {
+        category: "TrainNumber",
+        label: t => `includes(${t.value})`,
+        actual: (t: typeof includesTests[number]) =>
+            tn.includes(t.value)
     });
 
-    // ------------------------------------------------------------
-    // isW()
-    // ------------------------------------------------------------
+    /* ==========================================================
+       3. isDoubleParity
+       ========================================================== */
 
-    const wTests = [
+    const doubleParityTests = [
+        { value: "146491", expected: false },
+        { value: "146490/1", expected: true }
+    ];
+
+    assert.check(doubleParityTests, {
+        category: "TrainNumber",
+        label: t => `isDoubleParity(${t.value})`,
+        actual: (t: typeof doubleParityTests[number]) =>
+            TrainNumber.from(t.value).isDoubleParity
+    });
+
+    /* ==========================================================
+       4. isCommercial
+       ========================================================== */
+
+    const isCommercialTests = [
+        { value: 147490, expected: true },
+        { value: 146490, expected: false },
+        { value: "E46490", expected: false }
+    ];
+
+    assert.check(isCommercialTests, {
+        category: "TrainNumber",
+        label: t => `isCommercial(${t.value})`,
+        actual: (t: typeof isCommercialTests[number]) =>
+            TrainNumber.from(t.value).isCommercial
+    });
+
+    /* ==========================================================
+       5. isW
+       ========================================================== */
+    
+    const isWTests = [
         { value: 146490, expected: true },
         { value: 569907, expected: true },
         { value: 147490, expected: false }
     ];
 
-    wTests.forEach(t => {
-        const tn = TrainNumber.from(t.value);
-        assert.check(`isW(${t.value})`, tn.isW(), t.expected);
+    assert.check(isWTests, {
+        category: "TrainNumber",
+        label: t => `isW(${t.value})`,
+        actual: (t: typeof isWTests[number]) =>
+            TrainNumber.from(t.value).isW
     });
 
-    // ------------------------------------------------------------
-    // isMouvement()
-    // ------------------------------------------------------------
+    /* ==========================================================
+       6. isMouvement
+       ========================================================== */
 
-    const mouvementTests = [
+    const isMouvementTests = [
         { value: "E46490", expected: true },
         { value: "146490", expected: false }
     ];
 
-    mouvementTests.forEach(t => {
-        const tn = TrainNumber.from(t.value);
-        assert.check(`isMouvement(${t.value})`, tn.isMouvement(), t.expected);
+    assert.check(isMouvementTests, {
+        category: "TrainNumber",
+        label: t => `isMouvement(${t.value})`,
+        actual: (t: typeof isMouvementTests[number]) =>
+            TrainNumber.from(t.value).isMouvement
     });
 
-    // ------------------------------------------------------------
-    // format()
-    // ------------------------------------------------------------
+    /* ==========================================================
+       7. zone
+       ========================================================== */
 
-    const formatTests = [
-        {
-            desc: "Abrégé",
-            value: 146490,
-            expected: "6490",
-            args: [true, false]
-        },
-        {
-            desc: "Double masquée",
-            value: 146490,
-            expected: "6490",
-            args: [true, true]
-        }
+    const zoneTests = [
+        { value: 147490, expected: 4 },
+        { value: 146490, expected: null }
     ];
 
-    formatTests.forEach(t => {
-        const tn = TrainNumber.from(t.value, false);
-        assert.check(
-            `format(${t.value}) (${t.desc})`,
-            tn.format(...t.args),
-            t.expected
-        );
+    assert.check(zoneTests, {
+        category: "TrainNumber",
+        label: t => `zone(${t.value})`,
+        actual: (t: typeof zoneTests[number]) =>
+            TrainNumber.from(t.value).zone
     });
 
-    // ------------------------------------------------------------
-    // adaptWithParity()
-    // ------------------------------------------------------------
+    /* ==========================================================
+       8. battery
+       ========================================================== */
+
+    const batteryTests = [
+        { value: 147490, expected: 90 },
+        { value: "147490/1", expected: 91 },
+        { value: 146490, expected: null }
+    ];
+
+    assert.check(batteryTests, {
+        category: "TrainNumber",
+        label: t => `battery(${t.value})`,
+        actual: (t: typeof batteryTests[number]) =>
+            TrainNumber.from(t.value).battery
+    });
+
+    /* ==========================================================
+       9. format()
+       ========================================================== */
+
+    const formatTests = [
+        { value: "146490/1", abbreviate: true,  withoutDoubleParity: false, expected: "6490/1" },
+        { value: "146490/1", abbreviate: false, withoutDoubleParity: false, expected: "146490/1" },
+        { value: "146490/1", abbreviate: true,  withoutDoubleParity: true, expected: "6490" },
+        { value: "146490/1", abbreviate: false, withoutDoubleParity: true, expected: "146490" }
+    ];
+
+    assert.check(formatTests, {
+        category: "TrainNumber",
+        label: t => `format(${t.value})`
+            + ` (${t.abbreviate ? "abrégé" : "non abrégé"})`
+            + ` (${t.withoutDoubleParity ? "sans double parité" : "avec double parité"})`,
+        actual: (t: typeof formatTests[number]) =>
+            TrainNumber.from(t.value, true).format(t.abbreviate, t.withoutDoubleParity)
+    });
+
+    /* ==========================================================
+       10. adaptWithParity()
+       ========================================================== */
 
     const parityTests = [
         { value: 146491, parity: Parity.EVEN, expected: "146490" },
@@ -9256,573 +10568,499 @@ function testTrainNumber(options: Partial<AssertDDOptions> = {}) {
         { value: 146490, parity: Parity.DOUBLE, abbreviate: true, expected: "6490/1" }
     ];
 
-    parityTests.forEach(t => {
-        const tn = TrainNumber.from(t.value);
-        assert.check(
-            `adaptWithParity(${t.value}, ${t.parity})`,
-            tn.adaptWithParity(t.parity, t.abbreviate),
-            t.expected
-        );
+    assert.check(parityTests, {
+        category: "TrainNumber",
+        label: t => `adaptWithParity(${t.value}, ${t.parity})`,
+        actual: (t: typeof parityTests[number]) =>
+            TrainNumber.from(t.value).adaptWithParity(t.parity, t.abbreviate)
     });
+
+    /* ==========================================================
+       11. toString()
+       ========================================================== */
+
+    const toStringTests = [
+        { value: 146490, expected: "146490" },
+        { value: 146491, expected: "146491" },
+        { value: 146490, doubleParity: true, expected: "146490/1" },
+        { value: 146491, doubleParity: true, expected: "146491/0" },
+    ];
+
+    assert.check(toStringTests, {
+        category: "TrainNumber",
+        label: t => `toString(${t.value})`,
+        actual: (t: typeof toStringTests[number]) =>
+            TrainNumber.from(t.value, t.doubleParity).toString()
+    });
+
+    /* ==========================================================
+       SYNTHÈSE
+       ========================================================== */
 
     assert.printSummary("testTrainNumber");
 }
 
-function testStation(options: Partial<AssertDDOptions> = {}) {
+function testStation(
+    options: Partial<AssertDDOptions> = {}
+) {
 
     const assert = new AssertDD(options);
+
     Stations.load(true);
 
     /* ==========================================================
-       TESTS DATA-DRIVEN - CLASSE Stations
-       ==========================================================
-       Objectifs :
-       - Valider le chargement des gares
-       - Vérifier la cohérence des rattachements
-       - Garantir l’accès via la Map statique
-       - Tester l’impression dans une feuille de test
+       1. load()
        ========================================================== */
-
-    /* ==========================================================
-       1. load() & état global
-       ----------------------------------------------------------
-       Vérifie :
-       - Chargement des gares
-       - Non-duplication sans erase
-       - Vidage et rechargement avec erase
-       ========================================================== */
-
-
-    assert.check(
-        "Stations.load(true) - au moins une gare chargée",
-        Stations.size > 0,
-        true
-    );
 
     const sizeAfterFirstLoad = Stations.size;
-
     Stations.load(false);
-
-    assert.check(
-        "Stations.load(false) - pas de rechargement supplémentaire",
-        Stations.size,
-        sizeAfterFirstLoad
-    );
-
+    const sizeAfterSecondLoad = Stations.size;
     Stations.load(true);
+    const sizeAfterReload = Stations.size;
 
-    assert.check(
-        "Stations.load(true) - rechargement après erase",
-        Stations.size,
-        sizeAfterFirstLoad
-    );
- 
+    const loadTests = [
+        {
+            label: "Stations.load(true) - au moins une gare chargée",
+            actual: Stations.size > 0,
+            expected: true
+        },
+        { 
+            label: "Stations.load(false) - pas de rechargement",
+            actual: sizeAfterSecondLoad,
+            expected: sizeAfterFirstLoad
+        },
+        { 
+            label: "Stations.load(true) - rechargement après erase",
+            actual: sizeAfterReload,
+            expected: sizeAfterFirstLoad 
+        }
+    ];
+
+    assert.check(loadTests, {
+        category: "Stations"
+    });
+
     /* ==========================================================
-       2. Accès getById() et get()
-       ----------------------------------------------------------
-       Vérifie :
-       - Accès par ID et clé
+       2. get() / getById()
        ========================================================== */
 
     const firstStation = Stations.values()[0] as Station;
 
-    assert.check(
-        "Stations contient au moins une Station",
-        firstStation instanceof Station,
-        true
-    );
+    const accessTests = [
+        { 
+            label: "Stations contient au moins une Station",
+            actual: firstStation instanceof Station,
+            expected: true 
+        },
+        {
+            label: `Stations.get("${firstStation.abbreviation}") retourne la même instance`,
+            actual: Stations.get(firstStation.abbreviation),
+            expected: firstStation
+        },
+        {
+            label: "Stations.getById(0) retourne une Station",
+            actual: Stations.getById(0) instanceof Station,
+            expected: true
+        }
+    ];
 
-    if (firstStation) {
-        assert.check(
-            `Stations.get("${firstStation.abbreviation}") retourne la même instance`,
-            Stations.get(firstStation.abbreviation),
-            firstStation
-        );
-    }
-
-    assert.check(
-        "Stations.getById(0) retourne une Station",
-        Stations.getById(0) instanceof Station,
-        true
-    );
+    assert.check(accessTests, {
+        category: "Stations"
+    });
 
     /* ==========================================================
-       3. Rattachements parent / enfants
-       ----------------------------------------------------------
-       Vérifie :
-       - Cohérence referenceStation → childStations
-       - Cohérence childStations → referenceStation
+       3. RATTACHEMENTS
        ========================================================== */
 
-    const attachmentTests: {
-        desc: string;
-        valid: boolean;
-    }[] = [];
+    const attachmentTests: AssertDDCheck[] = [];
 
     for (const station of Stations.values()) {
 
         if (station.referenceStation) {
             attachmentTests.push({
-                desc:
-                    `${station.abbreviation} référencée dans `
-                    + ` ${station.referenceStation.abbreviation}.childStations`,
-                valid: station.referenceStation.childStations.includes(station)
+                label: `${station.abbreviation} référencée dans ${station.referenceStation.abbreviation}.childStations`,
+                actual: station.referenceStation.childStations.includes(station),
+                expected: true
             });
         }
 
         for (const child of station.childStations) {
             attachmentTests.push({
-                desc:
-                    `${child.abbreviation}.referenceStation === `
-                    + station.abbreviation,
-                valid: child.referenceStation === station
+                label: `${child.abbreviation}.referenceStation === ${station.abbreviation}`,
+                actual: child.referenceStation === station,
+                expected: true
             });
         }
     }
 
-    attachmentTests.forEach(t => {
-        assert.check(
-            `Rattachement - ${t.desc}`,
-            t.valid,
-            true
-        );
+    assert.check(attachmentTests, {
+        category: "Stations"
     });
 
     /* ==========================================================
-       4. Données métier de base
-       ----------------------------------------------------------
-       Vérifie :
-       - Abréviation non vide
-       - Parité valide
+       4. DONNÉES MÉTIERS
        ========================================================== */
 
     const dataTests = Array.from(Stations.values()).map(station => ({
-        desc: `Station ${station.abbreviation} - abréviation non vide`,
-        value: station.abbreviation !== ""
+        label: `Station ${station.abbreviation} - abréviation non vide`,
+        actual: station.abbreviation !== "",
+        expected: true
     }));
 
-    dataTests.forEach(t => {
-        assert.check(t.desc, t.value, true);
+    assert.check(dataTests, {
+        category: "Stations"
     });
 
     /* ==========================================================
-       5. print() - feuille et tableau de test
-       ----------------------------------------------------------
-       Vérifie :
-       - Exécution sans erreur
-       - Création d’un tableau test indépendant
+       5. print()
        ========================================================== */
 
     let printSucceeded = true;
+    const sheetAndTableName = "testGares";
 
     try {
-        Stations.print(
-            "testGares",
-            "testGares",
-            "A1"
-        );
-    } catch (e) {
+        Stations.print(sheetAndTableName, sheetAndTableName, "A1");
+    } catch {
         printSucceeded = false;
     }
 
-    assert.check(
-        'Stations.print() - impression dans la feuille "testGares"',
-        printSucceeded,
-        true
-    );
+    assert.check([{
+        label: 'Stations.print() - impression dans "testGares"',
+        actual: printSucceeded,
+        expected: true
+    }], {
+        category: "Stations"
+    });
 
-    // Synthèse finale
+    WorkbookService.getSheet({
+        sheetName: sheetAndTableName
+    })?.delete();
+
+    /* ==========================================================
+       SYNTHÈSE
+       ========================================================== */
+
     assert.printSummary("testStation");
 }
 
-function testStationWithParity(options: Partial<AssertDDOptions> = {}) {
+function testStationWithParity(
+    options: Partial<AssertDDOptions> = {}
+) {
 
     const assert = new AssertDD(options);
 
     StationsWithParity.load(true);
 
     /* ==========================================================
-       1. Construction / hasDefinedParity()
+       1. CONSTRUCTION / hasDefinedParity()
        ========================================================== */
 
-    const sU = StationWithParity.from("JY");      // undefined
-    const sO = StationWithParity.from("JY_1");    // odd
-    const sE = StationWithParity.from("JY_2");    // even
-    const childSwpU = StationWithParity.from("JY-146_1"); // undefined
-    const childSwpO = StationWithParity.from("JY-146_2"); // odd
-    const childSwpE = StationWithParity.from("JY-146_3"); // even
+    const sU = StationWithParity.from("JY");
+    const sO = StationWithParity.from("JY_1");
+    const sE = StationWithParity.from("JY_2");
+    const childSwpU = StationWithParity.from("JY-146_1");
+    const childSwpO = StationWithParity.from("JY-146_2");
+    const childSwpE = StationWithParity.from("JY-146_3");
 
-    assert.check("Station sans parité", sU!.hasDefinedParity(), false);
-    assert.check("Station sans parité", sO!.hasDefinedParity(), true);
-    assert.check("Station parity odd", sO!.parity.is(Parity.ODD), true);
-    assert.check("Station parity even", sE!.parity.is(Parity.EVEN), true);
+    const constructorTests = [
+        { label: "Station sans parité", actual: sU!.hasDefinedParity(), expected: false },
+        { label: "Station avec parité", actual: sO!.hasDefinedParity(), expected: true },
+        { label: "Station parity odd", actual: sO!.parity.is(Parity.ODD), expected: true },
+        { label: "Station parity even", actual: sE!.parity.is(Parity.EVEN), expected: true }
+    ];
+
+    assert.check(constructorTests, {
+        category: "StationWithParity"
+    });
 
     /* ==========================================================
        2. from()
        ========================================================== */
 
-    assert.check("from(instance)", StationWithParity.from(sO) === sO, true);
-    assert.check("from(null)", StationWithParity.from(null) === undefined, true);
+    const fromTests = [
+        { label: "from(instance)", actual: StationWithParity.from(sO) === sO, expected: true },
+        { label: "from(null)", actual: StationWithParity.from(null) === undefined, expected: true }
+    ];
+
+    assert.check(fromTests, {
+        category: "StationWithParity"
+    })
 
     /* ==========================================================
        3. includes()
        ========================================================== */
 
-    assert.check(
-        "includes même station (undefined inclut odd)",
-        sU!.includes(sO),
-        true
-    );
+    const includesTests = [
+        { label: "includes undefined -> odd", actual: sU!.includes(sO), expected: true },
+        { label: "includes odd -> undefined", actual: sO!.includes(sU), expected: false },
+        { label: "includes même parité", actual: sO!.includes(sO), expected: true },
+        { label: "includes station fille sans parité", actual: sU!.includes(childSwpU), expected: true },
+        { label: "includes station fille avec parité", actual: sU!.includes(childSwpO), expected: true },
+        { label: "includes station fille opposée", actual: sO!.includes(childSwpE), expected: false }
+    ];
 
-    assert.check(
-        "includes même station (odd inclut undefined = faux)",
-        sO!.includes(sU),
-        false
-    );
-
-    assert.check(
-        "includes même station même parité",
-        sO!.includes(sO),
-        true
-    );
-
-    assert.check(
-        "includes station fille sans parité",
-        sU!.includes(childSwpU),
-        true
-    );
-
-    assert.check(
-        "includes station fille avec parité",
-        sU!.includes(childSwpO),
-        true
-    );
-
-    assert.check(
-        "includes station fille parité opposée",
-        sO!.includes(childSwpE),
-        false
-    );
+    assert.check(includesTests, {
+        category: "StationWithParity"
+    });
 
     /* ==========================================================
-       4. stationAfterTurnaround()
+       4. expandWithChildren()
+       ========================================================== */
+
+    const expandedU = sU!.expandWithChildren();
+    const expandedO = sO!.expandWithChildren();
+    const expandedAgain = sU!.expandWithChildren();
+    const ids = expandedU.map(s => s.id);
+
+    const expandTests = [
+        { label: "expand undefined contient odd", actual: expandedU.some(s => s.parity.is(Parity.ODD)), expected: true },
+        { label: "expand undefined contient even", actual: expandedU.some(s => s.parity.is(Parity.EVEN)), expected: true },
+        { label: "expand avec parité définie", actual: expandedO.some(s => s.parity.is(Parity.ODD)), expected: true },
+        { label: "expand sans doublons", actual: ids.length === new Set(ids).size, expected: true },
+        { label: "cache utilisé", actual: expandedU === expandedAgain, expected: true },
+        { label: "expand stable", actual: expandedU.length === expandedAgain.length, expected: true },
+        { label: "expand avec visited externe", actual: sU!.expandWithChildren(new Set<number>()).length > 0, expected: true },
+        { label: "key sans parité", actual: sU!.key, expected: "JY" },
+        { label: "key avec parité", actual: sO!.key, expected: "JY_1" }
+    ];
+
+    assert.check(expandTests, {
+        category: "StationWithParity"
+    });
+
+    /* ==========================================================
+       5. stationAfterTurnaround()
        ========================================================== */
 
     const turned = sO!.stationAfterTurnaround();
 
-    assert.check("turnaround existe ou non", true, true); // tolérant dataset
     if (turned) {
-        assert.check("turnaround station identique", turned.station === sO!.station, true);
-        assert.check("turnaround parité inversée", turned.parity.is(Parity.EVEN), true);
+
+        const turnaroundTests = [
+            { label: "turnaround station identique", actual: turned.station === sO!.station, expected: true },
+            { label: "turnaround parité inversée", actual: turned.parity.is(Parity.EVEN), expected: true }
+        ]
+        assert.check(turnaroundTests, {
+            category: "StationWithParity",
+        });
     }
 
     /* ==========================================================
-       5. expandWithChildren() - parité
-       ========================================================== */
-
-    const expandedU = sU!.expandWithChildren();
-
-    const hasOdd = expandedU.some(s => s.parity.is(Parity.ODD));
-    const hasEven = expandedU.some(s => s.parity.is(Parity.EVEN));
-
-    assert.check("expand undefined contient odd", hasOdd, true);
-    assert.check("expand undefined contient even", hasEven, true);
-
-    const expandedO = sO!.expandWithChildren();
-
-    assert.check(
-        "expand avec parité définie ne duplique pas",
-        expandedO.some(s => s.parity.is(Parity.ODD)),
-        true
-    );
-
-    /* ==========================================================
-       6. expandWithChildren() - unicité
-       ========================================================== */
-
-    const ids = expandedU.map(s => s.id);
-    const uniqueIds = new Set(ids);
-
-    assert.check(
-        "expand ne contient pas de doublons",
-        ids.length === uniqueIds.size,
-        true
-    );
-
-    /* ==========================================================
-       7. expandWithChildren() - cache
-       ========================================================== */
-
-    const expandedAgain = sU!.expandWithChildren();
-
-    assert.check(
-        "cache utilisé (même référence)",
-        expandedU === expandedAgain,
-        true
-    );
-
-    /* ==========================================================
-       8. expandWithChildren() - stabilité
-       ========================================================== */
-
-    assert.check(
-        "expand stable (mêmes éléments)",
-        expandedU.length === expandedAgain.length,
-        true
-    );
-
-    /* ==========================================================
-       9. robustesse visited (anti boucle)
-       ========================================================== */
-
-    const visitedTest = sU!.expandWithChildren(new Set<number>());
-
-    assert.check(
-        "expand avec visited externe fonctionne",
-        visitedTest.length > 0,
-        true
-    );
-
-    /* ==========================================================
-       10. key
-       ========================================================== */
-
-    assert.check("key sans parité", sU!.key, "JY");
-    assert.check("key avec parité", sO!.key, "JY_1");
-
-    /* ==========================================================
-       Résumé
+       SYNTHÈSE
        ========================================================== */
 
     assert.printSummary("testStationWithParity");
 }
 
-function testConnection(options: Partial<AssertDDOptions> = {}) {
+function testConnection(
+    options: Partial<AssertDDOptions> = {}
+) {
 
     const assert = new AssertDD(options);
 
-    /* ==========================================================
-       TESTS DATA-DRIVEN - CLASSE Connections
-       ==========================================================
-       Objectifs :
-       - Vérifier le chargement des connexions
-       - Garantir l’unicité et la cohérence from → to
-       - Tester la cohérence StationWithParity ↔ clés Map
-       - Tester l’impression
-       ========================================================== */
+    Connections.load(true);
 
-   /* ==========================================================
+    /* ==========================================================
        1. load()
        ========================================================== */
 
-       Connections.load(true);
+    const sizeAfterLoad = Connections.size;
 
-       assert.check(
-           "Connections.load(true) - au moins une connexion chargée",
-           Connections.size > 0,
-           true
-       );
- 
-       const sizeAfterLoad = Connections.size;
- 
-       Connections.load(false);
- 
-       assert.check(
-           "Connections.load(false) - pas de rechargement",
-           Connections.size,
-           sizeAfterLoad
-       );
- 
-       /* ==========================================================
-          2. values() / accès
-          ========================================================== */
- 
-       const firstConnection = Connections.values()[0] as Connection;
- 
-       assert.check(
-           "Connections.values() retourne une Connection",
-           firstConnection instanceof Connection,
-           true
-       );
- 
-       /* ==========================================================
-          3. has() / get()
-          ========================================================== */
- 
-       const from = firstConnection.from;
-       const to = firstConnection.to;
- 
-       assert.check(
-           "Connections.has(from, to)",
-           Connections.has(from, to),
-           true
-       );
- 
-       const c = Connections.get(from, to);
- 
-       assert.check(
-           "Connections.get(from, to)",
-           c === firstConnection,
-           true
-       );
- 
-       /* ==========================================================
-          4. Cohérence métier
-          ========================================================== */
- 
-       for (const connection of Connections.values()) {
- 
-           assert.check(
-               `${connection} : from instanceof StationWithParity`,
-               connection.from instanceof StationWithParity,
-               true
-           );
- 
-           assert.check(
-               `${connection} : to instanceof StationWithParity`,
-               connection.to instanceof StationWithParity,
-               true
-           );
- 
-           assert.check(
-               `${connection} : from ≠ to`,
-               !connection.from.equalsTo(connection.to),
-               true
-           );
- 
-           assert.check(
-               `${connection} : temps > 0 sauf retournement`,
-               connection.withTurnaround || connection.time.excelValue > 0,
-               true
-           );
- 
-           assert.check(
-               `${connection} : temps relatif`,
-               connection.time.isRelative,
-               true
-           );
-       }
- 
-       /* ==========================================================
-          5. resolveIds() (cas Station vs StationWithParity)
-          ========================================================== */
- 
-       const station = from.station; // supposé exister
- 
-       assert.check(
-           "has(Station, Station)",
-           Connections.has(station, to.station),
-           true
-       );
- 
-       assert.check(
-           "get(Station, Station)",
-           Connections.get(station, to.station) instanceof Connection,
-           true
-       );
- 
-       /* ==========================================================
-          6. print()
-          ========================================================== */
- 
-       let printOk = true;
- 
-       try {
-           Connections.print("testConnexions", "testConnexions", "A1");
-       } catch {
-           printOk = false;
-       }
- 
-       assert.check(
-           'Connections.print() OK',
-           printOk,
-           true
-       );
- 
-       /* ==========================================================
-          FIN
-          ========================================================== */
- 
-       assert.printSummary("testConnection");
+    Connections.load(false);
+
+    const firstConnection = Connections.values()[0] as Connection;
+
+    const from = firstConnection.from;
+    const to = firstConnection.to;
+
+    const globalTests = [
+        { label: "Connections.load(true)", actual: Connections.size > 0, expected: true },
+        { label: "Connections.load(false)", actual: Connections.size, expected: sizeAfterLoad },
+        { label: "Connections.values()", actual: firstConnection instanceof Connection, expected: true },
+        { label: "Connections.has(from, to)", actual: Connections.has(from, to), expected: true },
+        { label: "Connections.get(from, to)", actual: Connections.get(from, to) === firstConnection, expected: true },
+        { label: "has(Station, Station)", actual: Connections.has(from.station, to.station), expected: true },
+        { label: "get(Station, Station)", actual: Connections.get(from.station, to.station) instanceof Connection, expected: true }
+    ];
+
+    assert.check(globalTests, {
+        category: "Connections"
+    });
+
+    /* ==========================================================
+       2. COHÉRENCE MÉTIER
+       ========================================================== */
+
+       
+    const connectionTests: AssertDDEntry<AssertDDCheck>[] = [];
+
+    for (const connection of Connections.values()) {
+        const  tests: AssertDDEntry<AssertDDCheck>[] = [
+            {
+                label: `${connection} : from instanceof StationWithParity`,
+                actual: connection.from instanceof StationWithParity,
+                expected: true
+            },
+            {
+                label: `${connection} : to instanceof StationWithParity`,
+                actual: connection.to instanceof StationWithParity,
+                expected: true
+            },
+            {
+                label: `${connection} : from ≠ to`,
+                actual: !connection.from.equalsTo(connection.to),
+                expected: true
+            },
+            {
+                label: `${connection} : temps > 0 sauf retournement`,
+                actual: connection.withTurnaround || connection.time.excelValue > 0,
+                expected: true
+            },
+            {
+                label: `${connection} : temps relatif`,
+                actual: connection.time.isRelative,
+                expected: true
+            }
+        ];
+        connectionTests.push(
+            ...tests
+        );
+    }
+
+// Log.debug(connectionTests);
+    assert.check(connectionTests, {
+        category: "Connections"
+    });
+
+    /* ==========================================================
+       3. print()
+       ========================================================== */
+
+    let printOk = true;
+    const sheetAndTableName = "testConnexions";
+
+    try {
+        Connections.print(sheetAndTableName, sheetAndTableName, "A1");
+    } catch {
+        printOk = false;
+    }
+
+    assert.check([
+        {
+            label: "Connections.print()",
+            actual: printOk,
+            expected: true
+        }
+    ], {
+        category: "Connections"
+    });
+
+    WorkbookService.getSheet({
+        sheetName: sheetAndTableName
+    })?.delete();
+
+    /* ==========================================================
+       SYNTHÈSE
+       ========================================================== */
+
+    assert.printSummary("testConnection");
 }
 
-function testStop(options: Partial<AssertDDOptions> = {}) {
+function testStop(
+    options: Partial<AssertDDOptions> = {}
+) {
 
     const assert = new AssertDD(options);
 
     /* ==========================================================
-       1. Création
+       1. CONSTRUCTEUR
        ========================================================== */
 
-    const stop = new Stop(
-        "PZB_1",
-        "PZB_2",
-        "08:00:00",
-        "08:02:00",
-        undefined,
-        false,
-        "A;B"
-    );
+    const stop = new Stop({
+        station: "PZB_1",
+        stationAfterTurnaround: "PZB_2",
+        arrivalTime: "08:00:00",
+        departureTime: "08:02:00",
+        passageTime: undefined,
+        areRelativeTimes: false,
+        tracks: "A;B"
+    });
 
-    assert.check(
-        "Stop - instance créée",
-        stop instanceof Stop,
-        true
-    );
+    assert.check([{
+        label: "instance créée",
+        actual: stop instanceof Stop,
+        expected: true
+    }], {
+        category: "Stop"
+    });
 
     /* ==========================================================
-       2. Station & clé
+       2. Station / key
        ========================================================== */
 
-    assert.check(
-        "Stop.key",
-        stop.key,
-        "PZB_1"
-    );
+    const stationTests = [
+        {
+            label: "key",
+            actual: stop.key,
+            expected: "PZB_1"
+        },
+        {
+            label: "stationAbbreviation",
+            actual: stop.stationAbbreviation,
+            expected: "PZB"
+        }
+    ];
 
-    assert.check(
-        "Stop.stationAbbreviation",
-        stop.stationAbbreviation,
-        "PZB"
-    );
+    assert.check(stationTests, {
+        category: "Stop"
+    });
 
     /* ==========================================================
-       3. Rebroussement
+       3. REBROUSSEMENT
        ========================================================== */
 
-    assert.check(
-        "Stop.withTurnaround",
-        stop.withTurnaround,
-        true
-    );
+    const turnaroundTests = [
+        {
+            label: "withTurnaround",
+            actual: stop.withTurnaround,
+            expected: true
+        },
+        {
+            label: "stationAfterTurnaround",
+            actual: stop.stationAfterTurnaround?.key,
+            expected: "PZB_2"
+        }
+    ];
 
-    assert.check(
-        "Stop.stationAfterTurnaround",
-        stop.stationAfterTurnaround?.key,
-        "PZB_2"
-    );
+    assert.check(turnaroundTests, {
+        category: "Stop"
+    });
 
     /* ==========================================================
-       4. Horaires
+       4. HORAIRES
        ========================================================== */
 
-    assert.check(
-        "Stop.arrivalTime défini",
-        stop.arrivalTime instanceof DateTime,
-        true
-    );
+    const timeTests = [
+        {
+            label: "arrivalTime défini",
+            actual: stop.arrivalTime instanceof DateTime,
+            expected: true
+        },
+        {
+            label: "departureTime défini",
+            actual: stop.departureTime instanceof DateTime,
+            expected: true
+        },
+        {
+            label: "passageTime undefined",
+            actual: stop.passageTime === undefined,
+            expected: true
+        }
+    ];
 
-    assert.check(
-        "Stop.departureTime défini",
-        stop.departureTime instanceof DateTime,
-        true
-    );
-
-    assert.check(
-        "Stop.passageTime undefined",
-        stop.passageTime === undefined,
-        true
-    );
+    assert.check(timeTests, {
+        category: "Stop"
+    });
 
     /* ==========================================================
        5. getTime()
@@ -9831,113 +11069,129 @@ function testStop(options: Partial<AssertDDOptions> = {}) {
     const t1 = stop.getTime();
     const t2 = stop.getTime(true);
 
-    assert.check(
-        "Stop.getTime() retourne DateTime",
-        t1 instanceof DateTime,
-        true
-    );
+    const getTimeTests = [
+        {
+            label: "getTime() retourne DateTime",
+            actual: t1 instanceof DateTime,
+            expected: true
+        },
+        {
+            label: "getTime(true) retourne DateTime",
+            actual: t2 instanceof DateTime,
+            expected: true
+        }
+    ];
 
-    assert.check(
-        "Stop.getTime(true) retourne DateTime",
-        t2 instanceof DateTime,
-        true
-    );
+    assert.check(getTimeTests, {
+        category: "Stop"
+    });
 
     /* ==========================================================
-       6. isIntermediateStop
+       6. isIntermediateStop()
        ========================================================== */
 
-    assert.check(
-        "Stop.isIntermediateStop",
-        stop.isIntermediateStop(),
-        true
-    );
+    assert.check([{
+        label: "isIntermediateStop",
+        actual: () => stop.isIntermediateStop(),
+        expected: true
+    }], {
+        category: "Stop"
+    });
 
     /* ==========================================================
        7. Tracks
        ========================================================== */
 
-    assert.check(
-        "Stop.tracks longueur",
-        stop.tracks.length,
-        2
-    );
-
     stop.addTrack("C");
 
-    assert.check(
-        "Stop.addTrack",
-        stop.tracks.includes("C"),
-        true
-    );
+    const trackTests = [
+        {
+            label: "tracks longueur",
+            actual: stop.tracks.length,
+            expected: 3
+        },
+        {
+            label: "addTrack",
+            actual: stop.tracks.includes("C"),
+            expected: true
+        }
+    ];
+
+    assert.check(trackTests, {
+        category: "Stop"
+    });
 
     /* ==========================================================
-       8. equalsTo, includes
+       8. equalsTo() / includes()
        ========================================================== */
 
-    const stopSame = new Stop(
-        "PZB_1",
-        "PZB_2",
-        "08:00:00",
-        "08:02:00"
-    );
+    const stopSame = new Stop({
+        station: "PZB_1",
+        stationAfterTurnaround: "PZB_2",
+        arrivalTime: "08:00:00",
+        departureTime: "08:02:00"
+    });
 
-    const stopWithoutParity = new Stop(
-        "PZB",
-        undefined,
-        "08:00:00",
-        "08:02:00"
-    );
+    const stopWithoutParity = new Stop({
+        station: "PZB",
+        arrivalTime: "08:00:00",
+        departureTime: "08:02:00"
+    });
 
-    const stopOther = new Stop(
-        "SQY_1",
-        undefined,
-        "08:00:00"
-    );
+    const stopOther = new Stop({
+        station: "SQY_1",
+        arrivalTime: "08:00:00"
+    });
 
-    assert.check(
-        "Stop.equalsTo (identique)",
-        stop.equalsTo(stopSame),
-        true
-    );
+    const compareTests = [
+        {
+            label: "equalsTo identique",
+            actual: stop.equalsTo(stopSame),
+            expected: true
+        },
+        {
+            label: "equalsTo différent",
+            actual: stop.equalsTo(stopOther),
+            expected: false
+        },
+        {
+            label: "includes sans parité -> avec parité",
+            actual: stopWithoutParity.includes(stop),
+            expected: false
+        },
+        {
+            label: "includes avec parité -> sans parité",
+            actual: stop.includes(stopWithoutParity),
+            expected: false
+        }
+    ];
 
-    assert.check(
-        "Stop.equalsTo (différent)",
-        stop.equalsTo(stopOther),
-        false
-    );
-
-    assert.check(
-        "Stop.includes (arrêt sans parité inclut l'arrêt avec parité)",
-        stopWithoutParity.includes(stop),
-        false
-    );
-
-    assert.check(
-        "Stop.includes (arrêt avec parité inclut l'arrêt sans parité)",
-        stop.includes(stopWithoutParity),
-        false
-    );
+    assert.check(compareTests, {
+        category: "Stop"
+    });
 
     /* ==========================================================
-       9. convertToRelativeTime
+       9. convertToRelativeTime()
        ========================================================== */
 
-    const ref = DateTime.from("08:00:00");
+    const ref = DateTime.from("07:00:00");
+    stop.convertToRelativeTime(ref!);
 
-    let convertOk = true;
+    const refTimeTests = [
+        {
+            label: "convertToRelativeTime refTime",
+            actual: stop.arrivalTime!.compareTo(DateTime.from("01:00:00", true)!),
+            expected: 0
+        }
+    ];
 
-    try {
-        stop.convertToRelativeTime(ref);
-    } catch {
-        convertOk = false;
-    }
+    assert.check(refTimeTests, {
+        category: "Stop"
+    });
 
-    assert.check(
-        "Stop.convertToRelativeTime",
-        convertOk,
-        true
-    );
+    /* ==========================================================
+       SYNTHÈSE
+       ========================================================== */
 
     assert.printSummary("testStop");
 }
@@ -9947,7 +11201,7 @@ function testPath(options: Partial<AssertDDOptions> = {}) {
     const assert = new AssertDD(options);
 
     /* ==========================================================
-       1. Création du Path
+       1. CRÉATION DU Path
        ========================================================== */
 
     const path = Path.fromTerminals(
@@ -9962,19 +11216,14 @@ function testPath(options: Partial<AssertDDOptions> = {}) {
         "PZB>SQY>MPU;VC"
     );
 
-    // path.addStop(new Stop("VC", "", "08:30:00", "08:32:00"));
+    const constructorTests = [
+        { label: "Path instance créée", actual: path instanceof Path, expected: true },
+        { label: "Path.signature", actual: path.signature, expected: "PZB>MPU;VC>SQY" }
+    ];
 
-    assert.check(
-        "Path instance créée",
-        path instanceof Path,
-        true
-    );
-
-    assert.check(
-        "Path.signature",
-        path.signature,
-        "PZB>MPU;VC>SQY"
-    );
+    assert.check(constructorTests, {
+        category: "Path"
+    });
 
     /* ==========================================================
        2. findPath()
@@ -9984,181 +11233,135 @@ function testPath(options: Partial<AssertDDOptions> = {}) {
 
     path.check();
 
-    assert.check(
-        "Path.findPath - FULL_PATH",
-        path.stopsChecked,
-        Path.FULL_PATH
-    );
+    const findPathTests = [
+        { label: "Path.findPath - FULL_PATH", actual: path.stopsChecked, expected: Path.FULL_PATH },
+        { label: "Path.stops non vide", actual: path.stops.length > 1, expected: true }
+    ];
 
-    assert.check(
-        "Path.stops non vide",
-        path.stops.length > 1,
-        true
-    );
+    assert.check(findPathTests, {
+        category: "Path"
+    });
 
     /* ==========================================================
-       3. Premier et dernier arrêt
+       3. PREMIER ET DERNIER ARRÊT
        ========================================================== */
 
     const first = path.stops[0];
     const last = path.stops[path.stops.length - 1];
 
-    assert.check(
-        "Premier arrêt PZB",
-        first.stationAbbreviation,
-        "PZB"
-    );
+    const firstAndLastStopsTests = [
+        { label: "Premier arrêt PZB", actual: first.stationAbbreviation, expected: "PZB" },
+        { label: "Dernier arrêt SQY", actual: last.stationAbbreviation, expected: "SQY" }
+    ]
 
-    assert.check(
-        "Dernier arrêt SQY",
-        last.stationAbbreviation,
-        "SQY"
-    );
+    assert.check(firstAndLastStopsTests, {
+        category: "Path"
+    });
 
     /* ==========================================================
-       4. Passage par groupe MPU/VC
+       4. PASSAGE PAR MPU OU VC
        ========================================================== */
 
-    const viaStations = path.stops.map(s => s.stationAbbreviation);
+    const viaTests = [
+        {
+            label: "Path passe par MPU ou VC",
+            actual: path.stops.map(s => s.stationAbbreviation).includes("MPU")
+                || path.stops.map(s => s.stationAbbreviation).includes("VC"),
+            expected: true
+        }
+    ];
 
-    const hasVia =
-        viaStations.includes("MPU") ||
-        viaStations.includes("VC");
-
-    assert.check(
-        "Path passe par MPU ou VC",
-        hasVia,
-        true
-    );
+    assert.check(viaTests, {
+        category: "Path"
+    });
 
     /* ==========================================================
-       5. getStop (direct + parents)
+       5. getStop()
        ========================================================== */
 
-    const stopFromString = path.getStop("PZB");
-    assert.check(
-        "getStop string",
-        stopFromString instanceof Stop,
-        true
-    );
+    const getStopTests = [
+        { label: "getStop number", actual: path.getStop(-1) instanceof Stop, expected: true },
+        { label: "getStop string", actual: path.getStop("PZB") instanceof Stop, expected: true },
+        { label: "getStop Station", actual: path.getStop(first.station)?.stationAbbreviation, expected: first.stationAbbreviation },
+        { label: "getStop SWP key", actual: path.getStop(first.station.key) instanceof Stop, expected: true },
+        { label: "getStop sans parité", actual: path.getStop(first.station.station) instanceof Stop, expected: true }
+    ];
 
-    const stopFromStation = path.getStop(first.station);
-    assert.check(
-        "getStop Station",
-        stopFromStation?.stationAbbreviation,
-        first.stationAbbreviation
-    );
-
-    const stopFromSWP = path.getStop(first.station.key);
-    assert.check(
-        "getStop SWP key",
-        stopFromSWP instanceof Stop,
-        true
-    );
+    assert.check(getStopTests, {
+        category: "Path"
+    });
 
     /* ==========================================================
-       6. nextStop / previousStop
+       6. nextStop() / previousStop()
        ========================================================== */
-
+    
     const next = path.nextStop(first);
 
-    assert.check(
-        "nextStop retourne Stop",
-        next instanceof Stop,
-        true
-    );
+    const nextStopTests = [
+        { label: "nextStop retourne Stop", actual: next instanceof Stop, expected: true },
+        { label: "previousStop cohérent", actual: path.previousStop(next!) === first, expected: true }
+    ];
 
-    const prev = path.previousStop(next!);
-
-    assert.check(
-        "previousStop cohérent",
-        prev === first,
-        true
-    );
+    assert.check(nextStopTests, {
+        category: "Path"
+    });
 
     /* ==========================================================
-       7. Index et positions
+       7. INDEX ET POSITIONS
        ========================================================== */
 
-    const indexCheck = path.stops.every((s, i) =>
-        path["_stopPosition"].get(s.key) === i
-    );
+    const indexTests = [
+        {
+            label: "Positions cohérentes",
+            actual: path.stops.every((s, i) => path["_stopPosition"].get(s.key) === i),
+            expected: true
+        },
+        {
+            label: "signatureIndex contient le Path",
+            actual: Paths.signatureIndex.get(path.signature)![0] === path,
+            expected: true
+        }
+    ];
 
-    assert.check(
-        "Positions cohérentes",
-        indexCheck,
-        true
-    );
+    assert.check(indexTests, {
+        category: "Path"
+    });
 
     /* ==========================================================
-       8. getStop sur gare sans parité
+       8. buildConnectionsFromStops()
        ========================================================== */
 
-    const stopNoParity = path.getStop(first.station.station);
-
-    assert.check(
-        "getStop sans parité fonctionne",
-        stopNoParity instanceof Stop,
-        true
-    );
-
-    /* ==========================================================
-       9. signatureIndex
-       ========================================================== */
-
-    const ref = Paths.signatureIndex.get(path.signature);
-
-    assert.check(
-        "signatureIndex contient le Path",
-        ref![0] === path,
-        true
-    );
-
-    /* ==========================================================
-       10. Reconstruction des connexions
-       ========================================================== */
-
-    const connections = path.buildConnectionsFromStops();
-
-    assert.check(
-        "buildConnectionsFromStops retourne connexions",
-        connections.length > 0,
-        true
-    );
-
-    /* ==========================================================
-       11. Cohérence connexions -> stops
-       ========================================================== */
-
+    const rebuiltConnections = path.buildConnectionsFromStops();
     const rebuilt = new Path();
     rebuilt.stops = Array.from(path.stops);
     rebuilt.stopsChecked = Path.FULL_PATH;
 
-    const rebuiltConnections = rebuilt.buildConnectionsFromStops();
+    const buildConnectionsTests = [
+        {
+            label: "buildConnectionsFromStops retourne connexions",
+            actual: rebuiltConnections.length > 0,
+            expected: true
+        },
+        {
+            label: "Reconstruction cohérente",
+            actual: rebuilt.buildConnectionsFromStops().length === rebuiltConnections.length,
+            expected: true
+        },
+        {
+            label: "Temps ordonnés",
+            actual: path.stops.every((s, i, arr) =>
+                i === 0 || s.getTime()!.compareTo(arr[i - 1].getTime()!) >= 0
+            ),
+            expected: true
+        }
+    ];
 
-    assert.check(
-        "Reconstruction cohérente",
-        rebuiltConnections.length === connections.length,
-        true
-    );
-
-    /* ==========================================================
-       12. Ordre des temps
-       ========================================================== */
-
-    const timesOrdered = path.stops.every((s, i, arr) => {
-        if (i === 0) return true;
-        return s.getTime()!.compareTo(arr[i - 1].getTime()!) >= 0;
+    assert.check(buildConnectionsTests, {
+        category: "Path"
     });
 
-    assert.check(
-        "Temps ordonnés",
-        timesOrdered,
-        true
-    );
-
     /* ==========================================================
-       FIN
+       SYNTHÈSE
        ========================================================== */
 
     assert.printSummary("testPath");

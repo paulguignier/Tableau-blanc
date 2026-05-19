@@ -17,3 +17,6 @@ vérifier que lors de la lecture des horaires, ce n'est pas la valeur 0 qui est 
 méthode mettoyage Paths non utilisés
 
 getFilteredTrains
+
+enlever les forEach
+mettre des retours à la ligne pour les paramètres des méthodes
