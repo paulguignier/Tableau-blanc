@@ -20,3 +20,7 @@ getFilteredTrains
 
 enlever les forEach
 mettre des retours à la ligne pour les paramètres des méthodes
+
+POURQUOI ET COMMENT
+enlever les flatMap
+enlever les forEach
