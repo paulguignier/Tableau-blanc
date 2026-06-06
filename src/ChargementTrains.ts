@@ -16,11 +16,12 @@ var CONSOLE: Console;                   // Console pour l'affichage de messages
 function main(
     workbook: ExcelScript.Workbook
 ) {
+    const startTime = Date.now();
     WORKBOOK = workbook;
     CONSOLE = console;
     const sheet = WORKBOOK.getActiveWorksheet();
 
-    const testMode = true;
+    let testMode = false;
     Log.configure({
         debug: true,
         info: true,
@@ -29,50 +30,72 @@ function main(
     });
 
 
-
-    // Lance la fonction de tests.
-    // Si les tests sont actifs, la suite du programme n'est pas exécuté. 
-    // if (runAllTests({ testMode })) return;
-
     try {
-        Log.info(`Chargement des paramètres`);
-        Params.load();
-        Connections.load();
-        Paths.load();
-        Trains.load();
+
+        // Lance la fonction de tests.
+        // Si les tests sont actifs, la suite du programme n'est pas exécuté.
+        ///////////////////// Décommenter la ligne suivante pour activer les tests ////////////////////
+        // testMode = true;
+        if (testMode) {
+            runAllTests({ testMode, startTime });
+            Log.print(`Fin des tests : ${Date.now() - startTime}ms`);
+
+        } else {
+
         
-        Log.debug(Trains.values().length, Trains.values()[0]);
-        const selection = Trains.find({ numbers: 142202 });
-        Log.debug(selection);
-        Trains.printSelection({ trains: selection });
-        Trains.printDatabase();
- 
-        // Trains.import();
-        // Trains.print();
-        // Paths.print();
+            Log.info(`Chargement des paramètres`);
+            Params.load();
+            Log.print(`Params.load() : ${Date.now() - startTime}ms`);
+            Connections.load();
+            Log.print(`Connections.load() : ${Date.now() - startTime}ms`);
+            // Paths.load();
+            Log.print(`Paths.load() : ${Date.now() - startTime}ms`);
+            // Trains.load();
+            Log.print(`Trains.load() : ${Date.now() - startTime}ms`);
+            Trains.import();
+            // Paths.print();
+            Log.print(`Paths.print : ${Date.now() - startTime}ms`);
+            // Trains.printDatabase();
+
+            // Log.debug('Trains.values', Trains.values().length, Trains.values()[0]);
+            const selection = Trains.find({ numbers: 142202 });
+            const train = selection[0];
+            const path = train.path;
+            const stop = path.getStop("CPM");
+            train.setReuse(0, { reuseKey: 'a', position: 1 });
+            Log.debug(train.reusesMap);
+            Log.debug('serialize', TablePrinter.serializeMap(
+                train.reusesMap,
+                { serializeValue: reuse => reuse?.key }
+            ));
+            Trains.printSelection({ trains: selection, stops: [{ station: "CPM_2" }], sheetName: "TestTrains2", tableName: "TestTrains2", startCell: "A1" });
+            Trains.printDatabase({ sheetName: "TestTrains", tableName: "TestTrains", startCell: "A1" });
+    
+            // Trains.import();
+            // Trains.print();
+            // Paths.print();
 
 
 
 
-        // Paths.load("", "147500_J;148504_J;147201_J;148202_J;147402_J;
-        //      148402_J;147601_J;148602_J;145801_J;145804_J");
-        // Paths.load("2", "142446_J");
-        // Log.debug(Paths.map);
-        // const allCombinations = Paths.generateCombinations("MPU", "ETP", "".split(";"));
-        // Log.info(allCombinations);
-        // const shortestPath = Paths.findShortestPath(allCombinations);
-        // Log.info(shortestPath);
+            // Paths.load("", "147500_J;148504_J;147201_J;148202_J;147402_J;
+            //      148402_J;147601_J;148602_J;145801_J;145804_J");
+            // Paths.load("2", "142446_J");
+            // Log.debug(Paths.map);
+            // const allCombinations = Paths.generateCombinations("MPU", "ETP", "".split(";"));
+            // Log.info(allCombinations);
+            // const shortestPath = Paths.findShortestPath(allCombinations);
+            // Log.info(shortestPath);
 
-        Log.info(`Fin de l'exécution du programme`);
-        Log.info(`-------------`);
-        Log.info(`Fin de l'exécution du programme`);
-        Log.flush();
+            Log.print(`Fin du programme : ${Date.now() - startTime}ms`);
+        }
 
-        return;
 
     } catch (e) {
-        Log.warn(`${e.message}`);
+        Log.warn(`Erreur lors de l'exécution du programme : ${e}`);
     }
+    Log.print(`-------------`);
+    Log.print(`Fin d'exécution.`);
     Log.flush();
 }
 
@@ -85,7 +108,13 @@ function main(
  * @returns {boolean} Vrai si les tests sont actifs, faux sinon.
  */
 function runAllTests(
-    { testMode = false }: { testMode?: boolean } = {}
+    { 
+        testMode = false,
+        startTime = Date.now()
+    }: { 
+        testMode?: boolean,
+        startTime?: number
+    } = {}
 ): boolean {
 
     if (!testMode) return false;
@@ -109,15 +138,11 @@ function runAllTests(
         testPath({ printSuccess: false, printFailure: true });
 
     } catch (e) {
-        Log.warn("Erreur lors des tests", e.message);
+        Log.warn(`Erreur lors de l'exécution des tests : ${e}`);
     }
 
     AssertDD.printGlobalSummary();
 
-    Log.info(`Fin des tests`);
-    Log.info(`-------------`);
-    Log.info(`Fin des tests`);
-    Log.flush();
     return true;
 
  
@@ -463,35 +488,45 @@ class AssertDD {
      * - sinon fallback.
      */
     private resolveProperty<T, TResult>(
-        localValue: AssertDDValue<T, TResult> | undefined,
-        configValue: AssertDDValue<T, TResult> | undefined,
-        value: T,
-        index: number,
-        fallback: TResult
+        {
+            property,
+            local,
+            config,
+            index,
+            fallback
+        }: {
+            property: keyof AssertDDCheck;
+            local: Record<string, unknown>,
+            config: Record<string, unknown>,
+            index: number;
+            fallback: TResult;
+        }
     ): TResult {
 
-        const source = localValue !== undefined
-            ? localValue
-            : configValue;
+        let source: unknown;
 
-        if (source === undefined) {
+        if (property in local) {
+            source = local[property];
+        } else if (property in config) {
+            source = config[property];
+        } else {
             return fallback;
         }
 
         return typeof source === "function"
             ? (
                 source as (
-                    value: T,
+                    local: Record<string, unknown>,
                     index: number
                 ) => TResult
-            )(value, index)
+            )(local, index)
 
-            : source;
+            : source as TResult;
     }
 
     /**
      * Exécute une suite de tests data-driven,
-     *  imprime le résultat avec un symbole de réussite (✔) ou d'échec (✘).
+     *  imprime le résultat avec un symbol de réussite (✔) ou d'échec (✘).
      * Chaque entrée peut :
      *  - contenir des données métier,
      *  - définir directement certaines propriétés du test,
@@ -517,62 +552,62 @@ class AssertDD {
 
         // Génère les tests à partir des valeurs et de la configuration
         let checks: AssertDDCheck[] = values.map((entry, index): AssertDDCheck => ({
-            label: this.resolveProperty(
-                entry.label,
-                config.label,
-                entry,
+            label: this.resolveProperty({
+                property: "label",
+                local: entry,
+                config,
                 index,
-                `Test #${index + 1}`
-            ),
-            actual: () => this.resolveProperty(
-                entry.actual,
-                config.actual,
-                entry,
+                fallback: `Test #${index + 1}`
+            }),
+            actual: () => this.resolveProperty({
+                property: "actual",
+                local: entry,
+                config,
                 index,
-                undefined
-            ),
-            expected: this.resolveProperty(
-                entry.expected,
-                config.expected,
-                entry,
+                fallback: undefined
+            }),
+            expected: this.resolveProperty({
+                property: "expected",
+                local: entry,
+                config,
                 index,
-                (entry as { expected?: unknown; }).expected ?? true
-            ),
-            category: this.resolveProperty(
-                entry.category,
-                config.category,
-                entry,
+                fallback: true
+            }),
+            category: this.resolveProperty({
+                property: "category",
+                local: entry,
+                config,
                 index,
-                undefined
-            ),
-            example: this.resolveProperty(
-                entry.example,
-                config.example,
-                entry,
+                fallback: undefined
+            }),
+            example: this.resolveProperty({
+                property: "example",
+                local: entry,
+                config,
                 index,
-                undefined
-            ),
-            skip: this.resolveProperty(
-                entry.skip,
-                config.skip,
-                entry,
+                fallback: undefined
+            }),
+            skip: this.resolveProperty({
+                property: "skip",
+                local: entry,
+                config,
                 index,
-                false
-            ),
-            only: this.resolveProperty(
-                entry.only,
-                config.only,
-                entry,
+                fallback: false
+            }),
+            only: this.resolveProperty({
+                property: "only",
+                local: entry,
+                config,
                 index,
-                false
-            ),
-            timeout: this.resolveProperty(
-                entry.timeout,
-                config.timeout,
-                entry,
+                fallback: false
+            }),
+            timeout: this.resolveProperty({
+                property: "timeout",
+                local: entry,
+                config,
                 index,
-                undefined
-            )
+                fallback: undefined
+            })
         }));
 
         // Filtre les tests si l'option "only" est activée
@@ -763,7 +798,7 @@ type CellValue = string | number | boolean | undefined;
 class WorkbookService {
 
     /**
-     * Renvoie la feuille de calcul Excel correspondant au nom donné.
+     * Retourne la feuille de calcul Excel correspondant au nom donné.
      * Si la feuille n'existe pas, renvoie null si failOnError est faux,
      *  sinon lance une exception.
      * Si createIfMissing est vrai, crée la feuille si elle n'existe pas.
@@ -804,7 +839,7 @@ class WorkbookService {
     }
  
     /**
-     * Renvoie toutes les données non vides d'une feuille Excel.
+     * Retourne toutes les données non vides d'une feuille Excel.
      * Utilise la plage "utilisée" (used range).
      * @param {string} sheetName - Nom de la feuille.
      * @param {boolean} [failOnError=true] - Si vrai, lance une erreur si la feuille est vide ou inexistante.
@@ -832,7 +867,7 @@ class WorkbookService {
     }
 
     /**
-     * Renvoie le tableau Excel correspondant au nom donné dans la feuille de calcul donnée.
+     * Retourne le tableau Excel correspondant au nom donné dans la feuille de calcul donnée.
      * Si le tableau n'existe pas, renvoie null si failOnError est faux,
      *  sinon lance une exception.
      * @param {string} sheetName - Nom de la feuille de calcul où chercher le tableau.
@@ -860,7 +895,7 @@ class WorkbookService {
     }
 
     /**
-     * Renvoie les données du tableau Excel correspondant au nom donné
+     * Retourne les données du tableau Excel correspondant au nom donné
      *  dans la feuille de calcul donnée.
      * Si le tableau n'existe pas, renvoie null si failOnError est faux,
      *  sinon lance une exception.
@@ -882,7 +917,7 @@ class WorkbookService {
     }
 
     /**
-     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de chaîne.
+     * Retourne la valeur de la cellule à l'adresse {row}[{col}] sous forme de chaîne.
      * Si la valeur est null ou undefined, renvoie undefined.
      * Si la valeur est un nombre, le convertit en chaîne.
      * Si la valeur est une chaîne, la renvoie telle quelle, en supprimant les espaces inutiles.
@@ -901,7 +936,7 @@ class WorkbookService {
     }
 
     /**
-     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de nombre.
+     * Retourne la valeur de la cellule à l'adresse {row}[{col}] sous forme de nombre.
      * Si la valeur est null ou undefined, renvoie undefined.
      * Si la valeur est un nombre, le renvoie tel quel.
      * Si la valeur est une chaîne, essaie de la convertir en nombre en remplaçant les virgules
@@ -926,7 +961,7 @@ class WorkbookService {
     }
 
     /**
-     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de booléen.
+     * Retourne la valeur de la cellule à l'adresse {row}[{col}] sous forme de booléen.
      * Si la valeur est null ou undefined, renvoie undefined.
      * Si la valeur est un booléen, le renvoie tel quel.
      * Si la valeur est un nombre, le renvoie converti en booléen
@@ -955,8 +990,8 @@ class WorkbookService {
     } 
  
     /**
-     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de chaîne,
-     * en supprimant les espaces inutiles, ou la valeur par défaut si la valeur est null ou undefined.
+     * Retourne la valeur de la cellule à l'adresse {row}[{col}] sous forme de chaîne,
+     *  en supprimant les espaces inutiles, ou la valeur par défaut si la valeur est null ou undefined.
      * @param {unknown[]} row - Ligne contenant la cellule.
      * @param {number} col - Colonne contenant la cellule.
      * @param {string} [defaultValue=""] - Valeur par défaut.
@@ -971,8 +1006,8 @@ class WorkbookService {
     }
 
     /**
-     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de nombre,
-     * ou la valeur par défaut si la valeur est null ou undefined.
+     * Retourne la valeur de la cellule à l'adresse {row}[{col}] sous forme de nombre,
+     *  ou la valeur par défaut si la valeur est null ou undefined.
      * @param {unknown[]} row - Ligne contenant la cellule.
      * @param {number} col - Colonne contenant la cellule.
      * @param {number} [defaultValue=0] - Valeur par défaut.
@@ -987,8 +1022,8 @@ class WorkbookService {
     }
 
     /**
-     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de booléen,
-     * ou la valeur par défaut si la valeur est null ou undefined.
+     * Retourne la valeur de la cellule à l'adresse {row}[{col}] sous forme de booléen,
+     *  ou la valeur par défaut si la valeur est null ou undefined.
      * @param {unknown[]} row - Ligne contenant la cellule.
      * @param {number} col - Colonne contenant la cellule.
      * @param {boolean} [defaultValue=false] - Valeur par défaut.
@@ -1003,8 +1038,8 @@ class WorkbookService {
     }
 
     /**
-     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de chaîne,
-     * ou lance une exception si la valeur est null ou undefined, avec un message d'erreur personnalisé.
+     * Retourne la valeur de la cellule à l'adresse {row}[{col}] sous forme de chaîne,
+     *  ou lance une exception si la valeur est null ou undefined, avec un message d'erreur personnalisé.
      * @param {unknown[]} row - Ligne contenant la cellule. 
      * @param {number} col - Colonne contenant la cellule.
      * @param {string} [errorMessage] - Message d'erreur personnalisé.
@@ -1025,8 +1060,8 @@ class WorkbookService {
     }
 
     /**
-     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de nombre,
-     * ou lance une exception si la valeur est null ou undefined, avec un message d'erreur personnalisé.
+     * Retourne la valeur de la cellule à l'adresse {row}[{col}] sous forme de nombre,
+     *  ou lance une exception si la valeur est null ou undefined, avec un message d'erreur personnalisé.
      * @param {unknown[]} row - Ligne contenant la cellule.
      * @param {number} col - Colonne contenant la cellule.
      * @param {string} [errorMessage] - Message d'erreur personnalisé.
@@ -1047,8 +1082,8 @@ class WorkbookService {
     }
 
     /**
-     * Renvoie la valeur de la cellule à l'adresse {row}[{col}] sous forme de booléen,
-     * ou lance une exception si la valeur est null ou undefined, avec un message d'erreur personnalisé.
+     * Retourne la valeur de la cellule à l'adresse {row}[{col}] sous forme de booléen,
+     *  ou lance une exception si la valeur est null ou undefined, avec un message d'erreur personnalisé.
      * @param {unknown[]} row - Ligne contenant la cellule.
      * @param {number} col - Colonne contenant la cellule.
      * @param {string} [errorMessage] - Message d'erreur personnalisé.
@@ -1129,8 +1164,8 @@ class WorkbookService {
     ): ExcelScript.Table | null {
 
         // Combine les en-têtes et les données.
-        if (headers[0].length !== data[0].length) {
-            throw new Error("Les en-têtes et les données doivent avoir la même longueur.");
+        if (headers.length !== data[0].length) {
+            throw new Error(`Les en-têtes et les données doivent avoir la même longueur.`);
         }
         const tableData: CellValue[][] = [headers];
         tableData.push(...data);
@@ -1176,10 +1211,10 @@ class WorkbookService {
  */
 type PrintColumn<T> = {
 
-    column: number;                             // Position dans le tableau
-    header: string;                             // En-tête
-    value: (item: T) => string | number;        // Valeur affichée (statique ou dynamique)
-    numberFormat?: string;                      // Format Excel
+    column: number;                     // Position dans le tableau
+    header: string;                     // En-tête
+    value: (item: T) => CellValue;      // Valeur affichée (statique ou dynamique)
+    numberFormat?: string;              // Format Excel
 };
 
 /**
@@ -1189,6 +1224,164 @@ class TablePrinter {
 
     public static readonly HIDDEN_COLUMN = 1;   // Valeur d'une colonne masquée
 
+    /**
+     * Convertit un tableau en une chaine de caractères, dont les éléments sont séparés par un symbole.
+     * Si les éléments sont identiques, il n'est repris qu'une seule fois.
+     * @param {unknown[]} values - Tableau d'objets ou de valeurs à convertir.
+     * @param {string} [symbol=";"] - Symbole de séparation des éléments.
+     * @param {boolean} [mergeEqualValues=true] - Si vrai, les valeurs identiques sont fusionnées.
+     * @param {string} [defaultValue="?"] - Valeur par défaut pour les valeurs non définies.
+     * @returns 
+     */
+    public static joinArray(
+        values: (unknown)[],
+        {
+            symbol = ";",
+            mergeEqualValues = true,
+            defaultValue = "?"
+        }: {
+            symbol?: string,
+            mergeEqualValues?: boolean,
+            defaultValue?: string
+        } = {}
+    ): string {
+
+        const stringValues: string[] = values
+            .map(v => v?.toString() ?? defaultValue)
+            .filter(v => v !== "");
+        return values.length === 0
+            ? ""
+            : (mergeEqualValues && stringValues.every(v => v === stringValues[0]))
+                ? stringValues[0]
+                : stringValues.join(symbol);
+    }
+
+    public static stringifyMap<K, V>(
+        map: Map<K, V>,
+        {
+            entrySeparator = "|",
+            keyValueSeparator = ">>"
+        }: {
+            entrySeparator?: string;
+            keyValueSeparator?: string;
+        } = {}
+    ): string {
+    
+        return Array.from(map.entries())
+            .map(([key, value]) => `${key}${keyValueSeparator}${value}`)
+            .join(entrySeparator);
+    }
+
+    /**
+     * Sérialise une Map sous forme de chaîne de caractères.
+     * @param {Map<K, V>} map - Map à sérialiser.
+     * @param {(key: K) => string} [serializeKey=String] - Fonction de sérialisation des clés.
+     * @param {(value: V) => string} [serializeValue=String] - Fonction de sérialisation des valeurs.
+     * @param {string} [entrySeparator="|"] - Séparateur entre les entrées.
+     * @param {string} [keyValueSeparator=">>"] - Séparateur entre la clé et la valeur.
+     * @param {string} [defaultValue="?"] - Valeur par défaut pour les valeurs non définies.
+     * @returns {string} - Chaîne sérialisée.
+     */
+    public static serializeMap<K, V>(
+        map: Map<K, V>,
+        {
+            serializeKey = String,
+            serializeValue = String,
+            entrySeparator = "|",
+            keyValueSeparator = ">>",
+            defaultValue = "?"
+        }: {
+            serializeKey?: (key: K) => string,
+            serializeValue?: (value: V) => string | undefined,
+            entrySeparator?: string,
+            keyValueSeparator?: string,
+            defaultValue?: string
+        } = {}
+    ): string {
+        return Array.from(map.entries())
+            .map(([key, value]) => serializeKey(key) + keyValueSeparator + (serializeValue(value) ?? defaultValue))
+            .join(entrySeparator);
+    }
+
+    /**
+     * Désérialise une chaîne de caractères sous forme de Map.
+     * @param {string} value - Chaîne à désérialiser.
+     * @param {(key: string) => K} parseKey - Fonction de conversion des clés.
+     * @param {(value: string) => V} parseValue - Fonction de conversion des valeurs.
+     * @param {string} [entrySeparator="|"] - Séparateur entre les entrées.
+     * @param {string} [keyValueSeparator=">>"] - Séparateur entre la clé et la valeur.
+     * @returns {Map<K, V>} - Map reconstruite.
+     */
+    public static deserializeMap<K, V>(
+        value: string,
+        {
+            parseKey,
+            parseValue,
+            entrySeparator = "|",
+            keyValueSeparator = ">>",
+            defaultValue = "?"
+        }: {
+            parseKey: (key: string) => K,
+            parseValue: (value: string | undefined) => V,
+            entrySeparator?: string,
+            keyValueSeparator?: string,
+            defaultValue?: string
+        }
+    ): Map<K, V> {
+
+        const map = new Map<K, V>();
+        if (!value) return map;
+
+        for (const entry of value.split(entrySeparator)) {
+            const [key, val] = entry.split(keyValueSeparator);
+            if (key === undefined || val === undefined) continue;
+            map.set(parseKey(key), parseValue(val === defaultValue ? undefined : val));
+        }
+
+        return map;
+    }
+
+    /**
+     * Construit la liste des colonnes à imprimer à partir
+     * d'une définition de colonnes et d'une configuration.
+     * @param {Record<string, number>} columns - Colonnes demandées.
+     * @param {Record<string, unknown>} definitions - Définitions disponibles.
+     * @returns {PrintColumn<T>[]} - Colonnes à imprimer.
+     */
+    public static buildColumns<T>(
+        columns: Record<string, number>,
+        definitions: Record<string, unknown>
+    ): PrintColumn<T>[] {
+
+        const result: PrintColumn<T>[] = [];
+
+        for (const [key, column] of Object.entries(columns)) {
+
+            if (column < 0) continue;
+
+            const definition = definitions[key];
+            if (!definition) continue;
+
+            // Ignore les factories dynamiques.
+            if (typeof definition === "function") continue;
+
+            result.push({
+                column,
+                ...(definition as Omit<PrintColumn<T>, "column">)
+            });
+        }
+
+        return result;
+    }
+
+    /**
+     * Imprime dans un tableau Excel les données d'une classe à partir de la liste des colonnes à imprimer.
+     * @param {items: T[]} [items] - Données à imprimer.
+     * @param {PrintColumn<T>[]} [columns] - Colonnes à imprimer.
+     * @param {string} [sheetName] - Nom de la feuille.
+     * @param {string} [tableName] - Nom du tableau.
+     * @param {string} [startCell="A1"] - Cellule de départ.
+     */
     public static print<T>({
         items,
         columns,
@@ -1219,9 +1412,9 @@ class TablePrinter {
         }
 
         // Génère les données
-        const data: (string | number)[][] = items.map(item => {
+        const data: (CellValue)[][] = items.map(item => {
     
-            const row: (string | number)[] = Array(maxColumn + 1).fill("");
+            const row: (CellValue)[] = Array(maxColumn + 1).fill("");
     
             for (const column of visibleColumns) {
                 row[column.column] = column.value(item);
@@ -1260,8 +1453,10 @@ class Params {
     private static readonly SHEET = "Param";                // Feuille contenant les paramètres globaux
     private static readonly TABLE = "Paramètres";           // Tableau contenant les paramètres globaux
     private static readonly ROW_MAX_CONNEXIONS_NUMBER = 1;  // Ligne contenant le nombre maximum de connexions
-    private static readonly ROW_TURNAROUND_TIME = 2;        // Ligne contenant le temps de retournement (en minutes)
-    private static readonly ROW_MAX_TRAIN_UNITS = 3;        // Ligne contenant le nombre maximal d'unités en UM
+    private static readonly ROW_TURNAROUND_TIME = 2;        // Ligne contenant le temps de retournement
+                                                            //  (en minutes)
+    private static readonly ROW_MAX_TRAIN_UNITS = 3;        // Ligne contenant le nombre maximal d'unités
+                                                            //  en UM
     private static readonly ROW_STATIONS_SUFFIXES = 5;      // Ligne contenant les suffixes des gares par défaut
                                                             //  à supprimer lors de la lecture
     // Indicateur de chargement
@@ -1318,18 +1513,18 @@ class ExcelDate {
     public static readonly EXCEL_EPOCH = new Date(Date.UTC(1899, 11, 30));
 
     // Cache des jours fériés par année
-    private static holidayCache = new Map<number, Set<number>>();
+    private static holidayCache: Map<number, Set<number>> = new Map();
  
-    // Propriétés de l'objet DateTime
-    public readonly value: number;
-    public readonly year: number;
-    public readonly month: number;
-    public readonly day: number;
-    public readonly dayOfWeek: Day;
-    public readonly isHoliday: boolean;
+    // Propriétés de la classe DateTime
+    public readonly value: number;          // Valeur Excel
+    public readonly year: number;           // Année
+    public readonly month: number;          // Mois
+    public readonly day: number;            // Jour
+    public readonly dayOfWeek: Day;         // Jour de la semaine
+    public readonly isHoliday: boolean;     // Indique si le jour est férié
 
     /**
-     * Constructeur de l'objet ExcelDate.
+     * Constructeur de la classe ExcelDate.
      * @param {number} excelValue - Valeur Excel du jour, qui représente le nombre de jours
      *  écoulés depuis le 30 décembre 1899.
      */
@@ -1479,14 +1674,14 @@ class ExcelDate {
  */
 class ExcelTime {
 
-    // Propriétés de l'objet DateTime
-    public readonly value: number;
-    public readonly hour: number;
-    public readonly minute: number;
-    public readonly second: number;
+    // Propriétés de la classe DateTime
+    public readonly value: number;      // Valeur Excel
+    public readonly hour: number;       // Heure
+    public readonly minute: number;     // Minutes
+    public readonly second: number;     // Secondes
 
     /**
-     * Constructeur de l'objet ExcelTime.
+     * Constructeur de la classe ExcelTime.
      * @param {number} excelValue - Valeur Excel du temps, dont la fraction de jour représente l'heure.
      */
     public constructor(
@@ -1578,26 +1773,25 @@ class DateTime {
     public static readonly TIME_FORMAT_WITH_SECONDS: string = "hh:nn:ss";
     public static readonly TIME_FORMAT_WITHOUT_SECONDS: string = "hh:nn";
 
-    // Propriétés de l'objet DateTime
-    public readonly excelValue: number;             // Valeur du temps en format Excel
-                                                    //  à partir du 01/01/1900 00:00:00
-    public readonly isRelative: boolean = false;    // Indique si le temps est relatif
-                                                    //  (différence entre 2 horaires)
-    private _computed: boolean = false;             // Indique si les éléments de la date sont calculés
-    private _toString?: string;                     // Cache de la représentation textuelle de l'objet
-    private _formats: Map<string, string> =
-        new Map<string, string>();                  // Cache des formats de la représentation textuelle
+    // Propriétés de la classe DateTime
+    public readonly excelValue: number;                 // Valeur du temps en format Excel
+                                                        //  à partir du 01/01/1900 00:00:00
+    public readonly isRelative: boolean = false;        // Indique si le temps est relatif
+                                                        //  (différence entre 2 horaires)
+    private _computed: boolean = false;                 // Indique si les éléments de la date sont calculés
+    private _toString?: string;                         // Cache de la représentation textuelle de l'objet
+    private _formats: Map<string, string> = new Map();  // Cache des formats de la représentation textuelle
 
     // Valeurs des éléments
-    private _realDate: ExcelDate | undefined;       // Date réelle (uniquement pour les temps absolus
-                                                    //  datés, donc avec excelValue >= MIN_EXCEL_DATE)
-    private _adaptedDate: ExcelDate | undefined;    // Date adaptée (jour suivant) si l'heure de la date
-                                                    //  est inférieure à l'heure de changement de jour
-    private _time: ExcelTime | undefined;           // Heure de la journée 
-                                                    //  (undefined si le temps n'est qu'une date)
+    private _realDate: ExcelDate | undefined;           // Date réelle (uniquement pour les temps absolus
+                                                        //  datés, donc avec excelValue >= MIN_EXCEL_DATE)
+    private _adaptedDate: ExcelDate | undefined;        // Date adaptée (jour suivant) si l'heure de la date
+                                                        //  est inférieure à l'heure de changement de jour
+    private _time: ExcelTime | undefined;               // Heure de la journée 
+                                                        //  (undefined si le temps n'est qu'une date)
 
     /**
-     * Constructeur privé de l'objet DateTime.
+     * Constructeur privé de la classe DateTime.
      * @param {number} [excelValue=0] - Valeur du temps en format Excel
      *  à partir du 01/01/1900 00:00:00.
      * @param {boolean} [isRelative=false] - Indique si le temps est relatif
@@ -1641,7 +1835,7 @@ class DateTime {
     }
 
     /**
-     * Crée un objet DateTime à partir d'une valeur.
+     * Crée une instance objet DateTime à partir d'une valeur.
      * Si la valeur est déjà un objet DateTime, il est retourné tel quel.
      * Sinon, un nouvel objet DateTime est créé avec la valeur fournie.
      * @param {DateTime | number | string | null | undefined} value Valeur du temps en nombre décimal
@@ -1712,7 +1906,7 @@ class DateTime {
      *  ou undefined si le temps n'est pas défini.
      */
     private getDateObj(
-        { adaptTime = true }: { adaptTime?: boolean }
+        { adaptTime = true }: { adaptTime?: boolean } = {}
     ): ExcelDate | undefined {
         return (adaptTime && this._adaptedDate) ? this._adaptedDate : this._realDate;
     }
@@ -1788,7 +1982,7 @@ class DateTime {
         }: {
             adaptTime?: boolean,
             withHolidays?: boolean
-        }
+        } = {}
     ): Day | undefined {
         if (!this._computed) this.compute();
         const dateObj = this.getDateObj({ adaptTime });
@@ -1796,7 +1990,7 @@ class DateTime {
     }
 
     /**
-     * Renvoie l'heure correspondant au temps, adaptée ou non.
+     * Retourne l'heure correspondant au temps, adaptée ou non.
      * Si le temps est relatif, renvoie l'heure relative.
      * Si le temps est absolu (daté ou non), renvoie la fraction d'une journée (tronquée modulo 1).
      * Si le temps est adapté, il est incrémenté de 1 (ex : 25h00).
@@ -1858,6 +2052,10 @@ class DateTime {
         return timeObj?.second ?? 0;
     }
 
+    public hasDate(): boolean {
+        return this.excelValue > DateTime.MIN_EXCEL_DATE;
+    }
+
     /**
      * Retourne si la date correspondant au temps est un jour férié.
      * @param {boolean} [adaptTime=true] - Indique si l'on souhaite avoir la date adaptée ou non.
@@ -1890,7 +2088,7 @@ class DateTime {
         }: {
             isRelative?: boolean,
             adaptTime?: boolean
-        }
+        } = {}
     ): DateTime | undefined {
  
         if (!value) return undefined;
@@ -1956,7 +2154,7 @@ class DateTime {
         let timeOfDays = this.excelValue;
 
         // Calcule les éléments de la date (si temps absolu et daté).
-        if (!this.isRelative && this.excelValue > DateTime.MIN_EXCEL_DATE) {
+        if (!this.isRelative && this.hasDate()) {
             this._realDate = new ExcelDate(this.excelValue);
             timeOfDays = this.excelValue % 1;
             if (timeOfDays < DateTime.rolloverHour) {
@@ -1976,7 +2174,7 @@ class DateTime {
     }
 
     /**
-     * Renvoie un nouvel objet DateTime égal au temps courant
+     * Retourne un nouvel objet DateTime égal au temps courant
      *  résolu par rapport à une référence.
      * Si le temps courant est relatif, il est ajouté à la référence.
      * Sinon, le temps courant est renvoyé tel quel.
@@ -1997,7 +2195,7 @@ class DateTime {
     }
 
     /**
-     * Renvoie un nouvel objet DateTime égal au temps courant relatif par rapport à une référence.
+     * Retourne un nouvel objet DateTime égal au temps courant relatif par rapport à une référence.
      * Les deux temps doivent être absolus.
      * @param {DateTime} reference - Référence à utiliser pour résoudre le temps courant.
      * @returns {DateTime} - Nouvel objet DateTime égal au temps courant relatif par rapport à la référence.
@@ -2157,7 +2355,7 @@ class DateTime {
             d: this.getDay({ adaptTime }).toString(),
             // Jour de la semaine
             dddd: this.getDayOfWeek({ adaptTime, withHolidays })?.fullName ?? "",
-            ddd: this.getDayOfWeek({ adaptTime, withHolidays })?.abreviation ?? "",
+            ddd: this.getDayOfWeek({ adaptTime, withHolidays })?.abbreviation ?? "",
             // Heure
             hh: pad(this.getHours({ adaptTime })),
             h: this.getHours({ adaptTime }).toString(),
@@ -2223,13 +2421,13 @@ class Day {
     // Liste des jours de la semaine identifiés par leur indice
     private static list: Day[] = new Array(8);
 
-    // Propriétés de l'objet Day
+    // Propriétés de la classe Day
     public readonly mask: number;           // Masque de bits contenant les numéro du jour de la semaine
                                             //  (identique à Days)
                                             //  (de lundi > bit 0 à dimanche > bit 6, férié > bit 7)
     public readonly code: string;           // Code chiffre du jour de la semaine
     public readonly fullName: string;       // Nom du jour de la semaine
-    public readonly abreviation: string;    // Abréviation du jour de la semaine
+    public readonly abbreviation: string;   // Abréviation du jour de la semaine
 
     /**
      * Constructeur privé de la classe Day.
@@ -2241,7 +2439,7 @@ class Day {
         this.mask = days.mask;
         this.code = days.code;
         this.fullName = days.fullName;
-        this.abreviation = days.abreviation;
+        this.abbreviation = days.abbreviation;
     }
 
     /**
@@ -2274,7 +2472,7 @@ class Day {
     public static get HOLIDAY(): Day { return this.list[7]!; }
 
     /**
-     * Renvoie un objet Day correspondant au numéro de jour fourni.
+     * Retourne une instance Day correspondant au numéro de jour fourni.
      * Si le numéro de jour n'existe pas, renvoie undefined.
      * @param {Day | number | string | null | undefined} value - Valeur à analyser
      *  pour le jour correspondant.
@@ -2380,14 +2578,14 @@ class Days {
     // Valeur par défaut des jours de la semaine individuels
     //  (si non renseignés dans le tableau des paramètres)
     private static readonly WEEKDAYS = [
-        { number: 1, fullName: "Lundi", abreviation: "Lu" },
-        { number: 2, fullName: "Mardi", abreviation: "Ma" },
-        { number: 3, fullName: "Mercredi", abreviation: "Me" },
-        { number: 4, fullName: "Jeudi", abreviation: "Je" },
-        { number: 5, fullName: "Vendredi", abreviation: "Ve" },
-        { number: 6, fullName: "Samedi", abreviation: "Sa" },
-        { number: 7, fullName: "Dimanche", abreviation: "Di" },
-        { number: 8, fullName: "Férié", abreviation: "Fer", code: "F" }
+        { number: 1, fullName: "Lundi", abbreviation: "Lu" },
+        { number: 2, fullName: "Mardi", abbreviation: "Ma" },
+        { number: 3, fullName: "Mercredi", abbreviation: "Me" },
+        { number: 4, fullName: "Jeudi", abbreviation: "Je" },
+        { number: 5, fullName: "Vendredi", abbreviation: "Ve" },
+        { number: 6, fullName: "Samedi", abbreviation: "Sa" },
+        { number: 7, fullName: "Dimanche", abbreviation: "Di" },
+        { number: 8, fullName: "Férié", abbreviation: "Fer", code: "F" }
     ];
 
     // Indicateur de chargement
@@ -2398,7 +2596,7 @@ class Days {
     private static masksList: (Days | undefined)[] = new Array(256);
     // Map des groupes de jours de la semaine identifiés par leur code, nom ou abréviation,
     //  (plusieurs codes possibles par groupe de jour, y compris ceux non optimisés)
-    private static mapByString: Map<string, Days> = new Map<string, Days>();
+    private static mapByString: Map<string, Days> = new Map();
  
     // Liste des groupes de jours donnés en paramètre, y compris chaque jour de la semaine seul,
     //  triée par leur nombre de jours dans l'ordre décroissant.
@@ -2411,13 +2609,13 @@ class Days {
     //  (les chaines les plus longues sont recherchées en premier).
     private static extractionPatterns: {pattern: string, numbersString: string}[] = [];
 
-    // Propriétés de l'objet Days
+    // Propriétés de la classe Days
     public readonly mask: number;           // Masque de bits contenant les numéro(s) du ou des jours
                                             //  du groupe de jours de la semaine
                                             //  (de 1 : lundi > bit 0 à 7 : dimanche > bit 6, 8 : férié > bit 7)
     public readonly code: string;           // Code alphanumérique du groupe de jours de la semaine
     public readonly fullName: string;       // Nom du jour ou du groupe de jours de la semaine
-    public readonly abreviation: string;    // Abréviation du jour ou du groupe de jours de la semaine
+    public readonly abbreviation: string;   // Abréviation du jour ou du groupe de jours de la semaine
     private _numberString?: string;         // Chaîne de caractères contenant les numéros des jours du groupe de jours
     private _count: number = -1;            // Nombre de jours contenus dans le groupe de jours (-1 si non calculé)
 
@@ -2426,25 +2624,25 @@ class Days {
      * @param {number} mask - Masque de bits des numéro(s) des jours du groupe de jours de la semaine. 
      * @param {string} code - Code alphanumérique du groupe de jours de la semaine.
      * @param {string} fullName - Nom complet du jour ou du groupe de jours de la semaine.
-     * @param {string} abreviation - Abréviation du jour ou du groupe de jours de la semaine.
+     * @param {string} abbreviation - Abréviation du jour ou du groupe de jours de la semaine.
      */
     private constructor(
         {
             mask,
             code,
             fullName = "",
-            abreviation = ""
+            abbreviation = ""
         }: {
             mask: number,
             code: string,
             fullName?: string,
-            abreviation?: string
+            abbreviation?: string
         }
     ) {
         this.mask = mask;
         this.code = code;
         this.fullName = fullName;
-        this.abreviation = abreviation;
+        this.abbreviation = abbreviation;
     }
 
     /**
@@ -2499,7 +2697,7 @@ class Days {
     public static get HOLIDAY(): Days { return this.get('8')!; }
 
     /**
-     * Renvoie un objet Days correspondant au numéro de jour fourni.
+     * Retourne une instance Days correspondant au numéro de jour fourni.
      * Si le numéro de jour n'existe pas, renvoie undefined.
      * Charge les paramètres des jours de la semaine si ce n'est pas déjà fait.
      * @param {Days | number | string | null | undefined} value - Valeur à analyser
@@ -2535,7 +2733,7 @@ class Days {
     }
 
     /**
-     * Renvoie un objet Days correspondant au masque de bits fourni.
+     * Retourne une instance Days correspondant au masque de bits fourni.
      * Crée le groupe de jours si celui-ci n'existe pas encore.
      * @param {number} value - Masque de bits correspondant au groupe de jours.
      * @returns {Days | undefined} - Instance de Days correspondante.
@@ -2772,7 +2970,7 @@ class Days {
      * @param {number[]} numbers - Tableau contenant les numéros des jours du groupe de jours.
      * @param {string} code - Code alphanumérique du groupe de jours.
      * @param {string} fullName - Nom complet du groupe de jours.
-     * @param {string} abreviation - Abréviation du groupe de jours.
+     * @param {string} abbreviation - Abréviation du groupe de jours.
      * @returns {Days} - Nouveau groupe de jours créé.
      * @throws {Error} - Si le groupe de jours est déjà présent dans la base de données.
      */
@@ -2781,12 +2979,12 @@ class Days {
             numbers,
             code = "",
             fullName = "",
-            abreviation = ""
+            abbreviation = ""
         }: {
             numbers: number[],
             code?: string,
             fullName?: string,
-            abreviation?: string
+            abbreviation?: string
         }
     ): Days {
 
@@ -2803,7 +3001,7 @@ class Days {
         //  récupère toutes les valeurs.
         let finalCode = code;
         let finalFullName = fullName;
-        let finalAbbreviation = abreviation;
+        let finalAbbreviation = abbreviation;
 
         // Si seul les numéros de jours sont fournis,
         //  un code optimisé est calculé par assemblage de groupes de jours connus.
@@ -2812,7 +3010,7 @@ class Days {
             const parts = this.optimiseMask(mask);
             finalCode = parts.map(d => d.code).join('');
             finalFullName = parts.map(d => d.fullName).join(' + ');
-            finalAbbreviation = parts.map(d => d.abreviation).join('');
+            finalAbbreviation = parts.map(d => d.abbreviation).join('');
         }
 
         // Instancie le nouveau groupe de jours.
@@ -2820,7 +3018,7 @@ class Days {
             mask,
             code: finalCode,
             fullName: finalFullName,
-            abreviation: finalAbbreviation
+            abbreviation: finalAbbreviation
         });
 
         // Ajoute le groupe de jour à la base de données.
@@ -2896,15 +3094,15 @@ class Days {
                 if (this.has(fullName)) {
                     throw new Error(`Nom complet ${fullName} déjà utilisé.`);
                 }
-                const abreviation = WorkbookService.getRequiredString(
+                const abbreviation = WorkbookService.getRequiredString(
                     row,
                     this.COL_ABBREVIATION,
                     { errorMessage : `Groupe de jours du ${fullName} :`
                         + ` abréviation non renseignée dans le tableau des jours.` }
                 );
-                if (this.has(abreviation)) {
+                if (this.has(abbreviation)) {
                     throw new Error(`Groupe de jours du ${fullName} :`
-                        + ` abbreviation ${abreviation} déjà utilisée.`);
+                        + ` abbreviation ${abbreviation} déjà utilisée.`);
                 }
                 const numbersString = WorkbookService.getString(row, this.COL_NUMBERS);
                 const numbers = this.cleanAndSortNumbers(numbersString);
@@ -2929,7 +3127,7 @@ class Days {
                     numbers,
                     code,
                     fullName,
-                    abreviation
+                    abbreviation
                 });
             }
 
@@ -2945,7 +3143,7 @@ class Days {
                     numbers: [d.number],
                     code: d.code ?? numbersString,
                     fullName: d.fullName,
-                    abreviation: d.abreviation
+                    abbreviation: d.abbreviation
                 });
             }
         });
@@ -2967,7 +3165,7 @@ class Days {
                 numbersString: days.numbersString
             });
             this.extractionPatterns.push({
-                pattern: days.abreviation.toUpperCase(),
+                pattern: days.abbreviation.toUpperCase(),
                 numbersString: days.numbersString
             });
         }
@@ -3003,7 +3201,7 @@ class Days {
  */
 class DaysValues {
 
-    // Propriétés de l'objet Days
+    // Propriétés de la classe Days
  
     public readonly days: Days;                             // Groupe de jours total concerné
     private _entries: { days: Days, value: string }[] = []; // Liste de règles (Days → valeur)
@@ -3042,7 +3240,7 @@ class DaysValues {
     }
 
     /**
-     * Crée un objet DaysValues à partir d'un groupe de jours et d'une chaîne de valeurs.
+     * Crée une instance DaysValues à partir d'un groupe de jours et d'une chaîne de valeurs.
      * La chaîne de valeurs peut contenir des valeurs uniques ou multiples, séparées par des virgules.
      * Si la chaîne de valeurs contient une seule valeur, le groupe de jours est considéré comme un seul jour.
      * Si la chaîne de valeurs contient plusieurs valeurs, chaque valeur est associée à un groupe de jours.
@@ -3087,7 +3285,7 @@ class DaysValues {
     }
 
     /**
-     * Renvoie la valeur associée au jour de la semaine donné.
+     * Retourne la valeur associée au jour de la semaine donné.
      * Si le jour n'est pas couvert par une règle, renvoie une chaîne vide.
      * @param {Day} day - Jour de la semaine.
      * @returns {string} - Valeur associée.
@@ -3142,7 +3340,7 @@ class DaysValues {
      */
     private merge(): void {
 
-        const map = new Map<string, number>();
+        const map: Map<string, number> = new Map();
 
         // Regroupe par valeur
         for (const e of this._entries) {
@@ -3248,7 +3446,7 @@ class Parity {
     // Indicateur de chargement
     private static loaded = false;
 
-    // Propriétés de l'objet Parity
+    // Propriétés de la classe Parity
     public readonly value: number;                          // Valeur de la parité
     private readonly doubleParityAllowed: boolean;          // Autorise une double parité
 
@@ -3388,7 +3586,7 @@ class Parity {
     }
 
     /**
-     * Renvoie l'objet Parité qui n'a pas de valeur définie.
+     * Retourne l'objet Parité qui n'a pas de valeur définie.
      * @param {boolean} [doubleParityAllowed=false] - Si vrai, la parité
      *  accepte les parités doubles, sinon elle les refuse.
      * @returns {Parity} - Parité sans valeur définie.
@@ -3400,7 +3598,7 @@ class Parity {
     }
 
     /**
-     * Renvoie l'objet Parité qui correspond à une parité impaire.
+     * Retourne l'objet Parité qui correspond à une parité impaire.
      * @param {boolean} [doubleParityAllowed=false] - Si vrai, la parité
      *  accepte les parités doubles, sinon elle les refuse.
      * @returns {Parity} - Parité impaire.
@@ -3412,7 +3610,7 @@ class Parity {
     }
 
     /**
-     * Renvoie l'objet Parité qui correspond à une parité paire.
+     * Retourne l'objet Parité qui correspond à une parité paire.
      * @param {boolean} [doubleParityAllowed=false] - Si vrai, la parité
      *  accepte les parités doubles, sinon elle les refuse.
      * @returns {Parity} - Parité paire.
@@ -3424,7 +3622,7 @@ class Parity {
     }
 
     /**
-     * Renvoie l'objet Parité qui correspond à une parité double.
+     * Retourne l'objet Parité qui correspond à une parité double.
      * @returns {Parity} - Parité double.
      */
     public static double(): Parity {
@@ -3686,12 +3884,17 @@ class TrainNumber {
 
     // Constantes de lecture de la base de données Excel
 
-    private static readonly TRAIN_NUMBERS_PARAM_SHEET = "Param";        // Feuille contenant les modèles de numéros de trains
+    private static readonly TRAIN_NUMBERS_PARAM_SHEET = "Param";        // Feuille contenant les modèles
+                                                                        //  de numéros de trains
                                                                         //  à charger comme paramètres
-    private static readonly COMMERCIAL_TABLE = "Commerciaux";           // Tableau contenant les motifs des trains commerciaux
-    private static readonly EMPTY_PASSENGER_TABLE = "W";                // Tableau contenant les motifs des trains W
-    private static readonly MOUVEMENTS_TABLE = "Evolutions";            // Tableau contenant les motifs des évolutions
-    private static readonly TRAINS_4DIGIT_TABLE = "LigneC4chiffres";    // Tableau contenant les motifs des trains abrégeables à 4 chiffres
+    private static readonly COMMERCIAL_TABLE = "Commerciaux";           // Tableau contenant les motifs
+                                                                        //  des trains commerciaux
+    private static readonly EMPTY_PASSENGER_TABLE = "W";                // Tableau contenant les motifs
+                                                                        //  des trains W
+    private static readonly MOUVEMENTS_TABLE = "Evolutions";            // Tableau contenant les motifs
+                                                                        //  des évolutions
+    private static readonly TRAINS_4DIGIT_TABLE = "LigneC4chiffres";    // Tableau contenant les motifs
+                                                                        //  des trains abrégeables à 4 chiffres
 
     // Indicateur de chargement
     private static loaded = false;
@@ -3702,7 +3905,7 @@ class TrainNumber {
     private static mouvementsRegex: RegExp;         // Regex des évolutions
     private static abbreviate4Regex: RegExp;        // Regex des trains abrégeables à 4 chiffres
 
-    // Propriétés de l'objet TrainNumber
+    // Propriétés de la classe TrainNumber
     public readonly value: string;                  // Numéro de train avec parité
                                                     //  (la double parité est marquée par ######/#)
 
@@ -3734,11 +3937,9 @@ class TrainNumber {
         const normalized = TrainNumber.normalize(raw);
 
         if (!TrainNumber.isValidTrainNumber(normalized)) {
-            Log.warn(`Numéro de train invalide : ${value}`);
-            this.value = "";
-            this.variants = new Set();
-            this.variantsByParity = [];
-            return;
+            throw new Error(`Numéro de train invalide : ${value}.`
+                + ` Il doit être constitué d'au moins 4 caractères alphanumériques,`
+                + ` le dernier étant un chiffre.`);
         }
 
         // Calcul unique
@@ -3888,7 +4089,8 @@ class TrainNumber {
     }
 
     /**
-     * Vérifie si un numéro de train est valide.
+     * Vérifie si un numéro de train est valide : 
+     *  code alphanumérique de 4 caractères au moins, le dernier étant un chiffre.
      * @param {string} value - Numéro de train à vérifier.
      * @returns {boolean} - Vrai si le numéro de train est valide, faux sinon.
      */
@@ -3897,7 +4099,7 @@ class TrainNumber {
     ): boolean {
         if (!value) return false;
         const lastChar = value.slice(-1);
-        return /^[0-9]$/.test(lastChar);
+        return value.length >=4 && /^[0-9]$/.test(lastChar);
     }
 
     /**
@@ -3965,7 +4167,7 @@ class TrainNumber {
         }: {
             abbreviate?: boolean,
             withoutDoubleParity?: boolean
-        }
+        } = {}
     ): string {
         let result = withoutDoubleParity ? this.baseValue : this.value;
 
@@ -4047,15 +4249,15 @@ class TrainNumber {
  */
 class Station {
 
-    // Propriétés de l'objet Station
-    public readonly id: number;                             // Id de la gare
-    public readonly abbreviation!: string;                  // Abréviation de la gare
-    public readonly name: string;                           // Nom de la gare
-    public referenceStation: Station | null;                // Gare de rattachement
-    public childStations: Station[];                        // Sous-gares
-    public readonly turnaround: Parity;                     // Parité d'un rebroussement possible
-                                                            //  (la parité est celle du train avant rebroussement)
-    public readonly reverseLineDirection: boolean;          // Parité de la ligne inversée sur cette gare
+    // Propriétés de la classe Station
+    public readonly id: number;                         // Id de la gare
+    public readonly abbreviation!: string;              // Abréviation de la gare
+    public readonly name: string;                       // Nom de la gare
+    public referenceStation: Station | null;            // Gare de rattachement
+    public childStations: Station[];                    // Sous-gares
+    public readonly turnaround: Parity;                 // Parité d'un rebroussement possible
+                                                        //  (la parité est celle du train avant rebroussement)
+    public readonly reverseLineDirection: boolean;      // Parité de la ligne inversée sur cette gare
 
     /**
      * Constructeur d'une gare.
@@ -4105,6 +4307,33 @@ class Station {
      */
     public toString(): string {
         return this.abbreviation;
+    }
+
+    /**
+     * Retourne une instance de Station à partir d'une valeur qui peut être :
+     *  - une instance de Station,
+     *  - une instance de StationWithParity,
+     *  - un nom de gare ou une clé d'arrêt (avec ou sans suffixe parité),
+     *  - null ou undefined (lève une erreur).
+     * @param {Station | StationWithParity | string | null | undefined} value - Valeur à analyser
+     *  pour la gare.
+     * @returns {StationWithParity | undefined} - Instance de Station correspondante.
+     */
+    public static from(
+        value: StationWithParity | Station | string | null | undefined,
+    ): Station | undefined {
+
+        if (value == null || value === "") return undefined;
+
+        // Instance de Station
+        if (value instanceof Station) return value;
+           
+
+        // Instance de StationWithParity
+        if (value instanceof StationWithParity) return value.station;
+
+        // Chaîne qui correspond à la clé d'une gare ou d'une gare avec parité
+        return Stations.get(value.split("_")[0]);
     }
 }
 
@@ -4157,7 +4386,7 @@ class Stations {
     }
 
     /**
-     * Renvoie la gare correspondant à l'ID donné.
+     * Retourne la gare correspondant à l'ID donné.
      * @param {number} id - ID de la gare.
      * @returns {Station} - Gare correspondante.
      */
@@ -4170,7 +4399,7 @@ class Stations {
     }
 
     /**
-     * Renvoie une gare correspondant à l'abréviation ou au nom donné.
+     * Retourne une gare correspondant à l'abréviation ou au nom donné.
      * @param {string} value - Abréviation ou nom de la gare.
      * @returns {Station | undefined} - Gare correspondante, ou undefined si non trouvée.
      */
@@ -4378,13 +4607,13 @@ class Stations {
 class StationWithParity {
 
     // Constantes de parité
-    public static readonly UNDEFINED = 0;   // Valeur de parité undefined pour le calcul de l'ID
-    public static readonly ODD = 1;         // Valeur de parité impaire pour le calcul de l'ID
-    public static readonly EVEN = 2;        // Valeur de parité paire pour le calcul de l'ID
+    public static readonly UNDEFINED = 0;           // Valeur de parité undefined pour le calcul de l'ID
+    public static readonly ODD = 1;                 // Valeur de parité impaire pour le calcul de l'ID
+    public static readonly EVEN = 2;                // Valeur de parité paire pour le calcul de l'ID
 
-    // Propriétés de l'objet StationWithParity
-    public readonly id: number;             // Identifiant unique
-    public readonly key: string;            // Clé (en cache)
+    // Propriétés de la classe StationWithParity
+    public readonly id: number;                     // Identifiant unique
+    public readonly key: string;                    // Clé (en cache)
 
     private _expandedCache?: StationWithParity[];   // Cache des gares avec parité rattachées
 
@@ -4500,7 +4729,7 @@ class StationWithParity {
     }
 
     /**
-     * Renvoie la valeur unique de la parité pour le calcul de l'ID, qui est :
+     * Retourne la valeur unique de la parité pour le calcul de l'ID, qui est :
      *  - this.ODD si la parité est impaire,
      *  - this.EVEN si la parité est paire,
      *  - this.UNDEFINED sinon.
@@ -4620,7 +4849,7 @@ class StationWithParity {
     }
 
     /**
-     * Renvoie une chaîne représentant l'objet StationWithParity sous la forme
+     * Retourne une chaîne représentant l'objet StationWithParity sous la forme
      *  GARE_PARITE, où GARE est le nom de la gare sans suffixe _PARITE et
      *  PARITE est la parité sous forme de chiffre.
      * @param {Station} station - Gare.
@@ -4637,7 +4866,7 @@ class StationWithParity {
     }
 
     /**
-     * Renvoie un tableau de toutes les gares avec parités rattachées en renvoyant : 
+     * Retourne un tableau de toutes les gares avec parités rattachées en renvoyant : 
      *  - les 3 parités si elle n'est pas définie,
      *  - les gares filles.
      * La méthode prend en paramètre un ensemble de gares déjà visitées pour éviter les boucles infinies.
@@ -4727,7 +4956,7 @@ class StationsWithParity {
     }
 
     /**
-     * Renvoie la gare avec parité correspondant à l'ID donné.
+     * Retourne la gare avec parité correspondant à l'ID donné.
      * @param {number} id - ID de la gare avec parité.
      * @returns {StationWithParity} - Gare correspondant si elle existe, undefined sinon.
      */
@@ -4740,7 +4969,7 @@ class StationsWithParity {
     }
  
     /**
-     * Renvoie une gare avec parité correspondant à la clé donnée.
+     * Retourne une gare avec parité correspondant à la clé donnée.
      * @param {string} key - Clé de la gare avec parité.
      * @returns {StationWithParity | undefined} - Gare correspondant si elle existe, undefined sinon.
      */
@@ -4751,7 +4980,7 @@ class StationsWithParity {
     }
  
     /**
-     * Renvoie la gare avec parité correspondant à la gare et la parité données.
+     * Retourne la gare avec parité correspondant à la gare et la parité données.
      * @param {Station} station - Gare à trouver.
      * @param {Parity | string | number} parity - Parité à trouver.
      * @returns {StationWithParity | undefined} - Gare correspondant si elle existe, undefined sinon.
@@ -4858,7 +5087,7 @@ class Connection {
                                                         //  les connexions avec une durée de connexion
                                                         //  déjà évaluée à partir de parcours réels
 
-    // Propriétés de l'objet Connection
+    // Propriétés de la classe Connection
     public readonly from: StationWithParity;            // Gare de départ
     public readonly to: StationWithParity;              // Gare d'arrivée
     private _time: DateTime;                            // Temps de trajet
@@ -4915,7 +5144,7 @@ class Connection {
     }
 
     /**
-     * Renvoie le temps de trajet de la connexion.
+     * Retourne le temps de trajet de la connexion.
      * @returns {DateTime} - Temps de trajet de la connexion.
      */
     public get time(): DateTime {
@@ -5049,7 +5278,7 @@ class Connections {
     }
 
     /**
-     * Renvoie la connexion correspondant aux gares de départ et d'arrivée données.
+     * Retourne la connexion correspondant aux gares de départ et d'arrivée données.
      * @param {Station | StationWithParity} from - Gare de départ.
      * @param {Station | StationWithParity} to - Gare d'arrivée.
      * @returns {Connection | undefined} - Gare correspondante, ou undefined si non trouvée.
@@ -5285,7 +5514,7 @@ class Connections {
         this.load();
 
         const queue: State[] = [];
-        const visited = new Map<number, number>();
+        const visited: Map<number, number> = new Map();
  
         // Expand la route avec toutes les parités possibles.
         const expandedRouteStations: number[][][] =
@@ -5509,7 +5738,7 @@ class State {
     }
 
     /**
-     * Renvoie une clé unique pour l'état de recherche, composée de l'identifiant de la gare,
+     * Retourne une clé unique pour l'état de recherche, composée de l'identifiant de la gare,
      *  de l'index du groupe de gares et du masque des gares visitées.
      * @returns {number} - Clé unique de l'état.
      */
@@ -5546,7 +5775,7 @@ class State {
  */
 class Stop {
 
-    // Propriétés de l'objet Stop
+    // Propriétés de la classe Stop
     public readonly station: StationWithParity;     // Gare de l'arrêt
     private _withTurnaround: boolean = false;       // Arrêt avec rebroussement
     private _arrivalTime?: DateTime;                // Temps / Heure d'arrivée de l'arrêt
@@ -5604,7 +5833,7 @@ class Stop {
     }
 
     /**
-     * Renvoie une clé unique pour l'arrêt, composée du nom de la gare et de la parité (si connue).
+     * Retourne une clé unique pour l'arrêt, composée du nom de la gare et de la parité (si connue).
      * @returns {string} - Clé unique.
      */
     public get key(): string {
@@ -5612,7 +5841,7 @@ class Stop {
     }
 
     /**
-     * Renvoie le nom de la gare associée à cet arrêt.
+     * Retourne le nom de la gare associée à cet arrêt.
      * @returns {string} - Nom de la gare.
      */
     public get stationName(): string {
@@ -5620,7 +5849,7 @@ class Stop {
     }
 
     /**
-     * Renvoie l'abréviation de la gare associée à cet arrêt.
+     * Retourne l'abréviation de la gare associée à cet arrêt.
      * @returns {string} - Abréviation de la gare.
      */
     public get stationAbbreviation(): string {
@@ -5628,7 +5857,7 @@ class Stop {
     }
 
     /**
-     * Renvoie vrai si l'arrêt à un rebroussement possible, faux sinon.
+     * Retourne vrai si l'arrêt à un rebroussement possible, faux sinon.
      * @returns {boolean} - Vrai si l'arrêt a un rebroussement possible, faux sinon.
      */
     public get withTurnaround(): boolean {
@@ -5821,7 +6050,7 @@ class Stop {
     }
 
     /**
-     * Renvoie la plus petite des heures d'arrivée, de départ ou de passage à l'arrêt.
+     * Retourne la plus petite des heures d'arrivée, de départ ou de passage à l'arrêt.
      * Si ignoreArrival est vrai, lit plutôt l'heure de départ ou de passage.
      * @param {boolean} [ignoreArrival=false] - Si vrai, ignore l'heure d'arrivée
      *  et préfère l'heure de départ ou de passage. Si faux (par défaut),
@@ -6232,7 +6461,7 @@ class Path {
     public static readonly  FULL_PATH = 3;          // Parcours complet calculé par chainage de connexions 
     public static readonly  ERROR_WITH_STOPS = -1;  // Parcours avec erreur
  
-    // Propriétés de l'objet Path
+    // Propriétés de la classe Path
     public key: string;                             // Clé du parcours
     public parity: Parity;                          // Parité du parcours
                                                     //  (synthèse des parités pour chaque gare)
@@ -6243,12 +6472,15 @@ class Path {
     private _signature: string;                     // Signature du parcours : gares définissant le parcours
                                                     //  séparées par '>' pour les arrêts ordonnés et
                                                     //  par ';' si leur ordre de parcours est laissé libre
-    private _routeStations?: StationWithParity[][] = [];     // Tableau des gares ou groupes de gares d'arrêts
-                                                    // du parcours définis dans la signature 
+    private _routeStations?: StationWithParity[][] = [];     
+                                                    // Tableau des gares ou groupes de gares d'arrêts
+                                                    //  du parcours définis dans la signature 
     public stops: Stop[] = [];                      // Gares d'arrêt ou gares de passage du parcours
-    private _stopsIndex: Map<string, Stop> = new Map();   // Dictionnaire des arrêts référencés
+    private _stopsIndex: Map<string, Stop> = new Map();
+                                                    // Dictionnaire des arrêts référencés
                                                     //  par leur clé (abréviation_parité)
-    private _stopPosition: Map<string, number> = new Map();    // Dictionnaire de la position des arrêts
+    private _stopPosition: Map<string, number> = new Map();
+                                                    // Dictionnaire de la position des arrêts
                                                     //  dans le parcours (référencés par leur clé)
     public stopsChecked: number = Path.UNCHECKED;   // Résultat de la vérification du parcours
                                                     //  (0 si non vérifié)
@@ -6296,7 +6528,7 @@ class Path {
     }
 
     /**
-     * Renvoie l'arrêt d'origine du parcours.
+     * Retourne l'arrêt d'origine du parcours.
      * @returns {Stop | undefined} - L'arrêt d'origine, ou undefined si le parcours n'a pas d'arrêt.
      */
     public get origin(): Stop | undefined {
@@ -6304,7 +6536,7 @@ class Path {
     }
 
     /**
-     * Renvoie l'arrêt de destination du parcours.
+     * Retourne l'arrêt de destination du parcours.
      * @returns {Stop | undefined} - L'arrêt de destination,
      *  ou undefined si le parcours n'a pas d'arrêt de destination.
      */
@@ -6313,7 +6545,7 @@ class Path {
     }
 
     /**
-     * Renvoie la signature du parcours, qui est la concaténation
+     * Retourne la signature du parcours, qui est la concaténation
      *  des noms des gares d'arrêt du parcours, précédés de "@"
      *  si l'ordre de passage n'est pas imposé.
      * @returns {string} - Signature du parcours.
@@ -6323,7 +6555,7 @@ class Path {
     }
 
     /**
-     * Renvoie le tableau des gares d'arrêt du parcours.
+     * Retourne le tableau des gares d'arrêt du parcours.
      * Le tableau est construit à partir de la signature du parcours.
      * Chaque élément du tableau est ordonné et correspond à une gare d'arrêt du parcours,
      *  ou à un groupe de gares à parcourir dans un ordre indifférent, séparées par un ";".
@@ -6451,27 +6683,31 @@ class Path {
             stops
         });
  
-        // Renvoie directement le parcours s'il existait déjà
+        // Retourne directement le parcours s'il existait déjà
         if (path.stopsChecked !== Path.UNCHECKED) return path;
 
-        if (findPath) {
-            path.findPath();
-        } else {
-            path.stopsChecked = Path.ONLY_FROM_AND_TO;
-            path.check();
-        }
+        // Convertit les horaires en relatifs
+        path.convertStopsToRelative();
+
+        // Finalise le parcours en constituant les index, signature et en le vérifiant
+        path.stopsChecked = Path.ONLY_FROM_AND_TO;
+        path.finalize();
+
+        // Calcule le parcours si demandé
+        if (findPath) path.findPath();
 
         return path;
     }
 
     /**
-     * Renvoie le radical de la clé du parcours constitué de
+     * Retourne le radical de la clé du parcours constitué de
      *  origine_destination_codeMission_nomDuParcours (si ces valeurs existent).
      * @returns {string} - Radical de la clé du parcours.
      */
     public buildRadical(): string {
         const origin = this.origin?.stationAbbreviation ?? "";
         const dest = this.destination?.stationAbbreviation ?? "";
+        if (!origin || !dest) throw new Error(`Pas d'origine ou de destination valide dans le parcours.`);
  
         const parts = [origin + '>' +  dest];
 
@@ -6556,8 +6792,8 @@ class Path {
         // Ajoute l'arrêt dans le tableau des arrêts.
         this.stops.push(stop);
 
-        // Trie les arrêts du parcours, reconstruit l'index et la signature.
-        if (finalize) this.finalizeStops();
+        // Finalise le parcours en triant les arrêts, en constituant index et signature et en le vérifiant
+        if (finalize) this.finalize();
     } 
 
     /**
@@ -6589,9 +6825,16 @@ class Path {
     }
  
     /**
-     * Finalise les arrêts du parcours en triant et reconstruisant l'index et la signature.
+     * Finalise le parcours et ses arrêts en :
+     *  - triant les arrêts,
+     *  - reconstruisant l'index et la signature,
+     *  - recalculant les parités du parcours,
+     *  - vérifiant le parcours.
      */
-    public finalizeStops(): void {
+    public finalize(): void {
+
+        if (this.stops.length === 0) return;
+
         this.orderStops();
         this.rebuildStopIndex();
         this.rebuildStopPosition();
@@ -6603,6 +6846,8 @@ class Path {
         if (!this._signature) {
             this.buildSignatureFromStops();
         }
+
+        this.check();
     }
 
     /**
@@ -6738,7 +6983,7 @@ class Path {
 
         const stationObj = StationWithParity.from(station);
         if (!stationObj) throw new Error(`La gare ${station} est inconnue.`);
- 
+
         // Fonction interne : logique existante appliquée à UNE gare.
         const findDirect = (swp: StationWithParity): Stop | undefined => {
 
@@ -6772,7 +7017,7 @@ class Path {
         };
 
         // Fait une recherche directe.
-        const direct = findDirect(stationObj);
+        const direct = findDirect(stationObj);;
         if (direct) return direct;
 
         // Fait une recherche sur les parents (gare de référence + filles).
@@ -7124,7 +7369,7 @@ class Path {
         const areTimesRelative = this.stops[0].getTime()!.isRelative;
         const sigStations = this.routeStations;
         let j = 1;
-        let stopFromSigToFind = new Map<string, StationWithParity>();
+        let stopFromSigToFind: Map<string, StationWithParity> = new Map();
 
         for (let i = 1; i < this.stops.length; i++) {
             switch (this.stopsChecked) {
@@ -7236,11 +7481,13 @@ class Path {
 
         let connections: Connection[];
         const refList = Paths.signatureIndex.get(this.signature);
-        const ref = refList ? refList[0] : null;
+        let ref = refList ? refList[0] : null;
         try {
             if (ref && ref.stopsChecked !== Path.FULL_PATH) {
-                throw new Error(`Le parcours de référence ${ref}`
+                Log.warn(`Le parcours de référence ${ref}`
                     + ` n'est pas complet et ne peut pas servir de base de calcul pour ${this}.`);
+                Paths.signatureIndex.delete(this.signature);
+                ref = null;
             }
             
             connections = ref 
@@ -7252,7 +7499,6 @@ class Path {
             throw new Error(`Calcul du parcours ${this} : ${e}`);
         }
 
-        this.check();
         // Ajoute le parcours au cache des signatures.
         if (ref){
             // Un autre parcours avec la même signature existe déjà :
@@ -7275,7 +7521,7 @@ class Path {
     private shortestPathThrough(): Connection[] {
 
         if (!this.routeStations || this.routeStations.length < 2) {
-            throw new Error("RouteStations invalide");
+            throw new Error(`RouteStations invalide`);
         }
 
         const connections = Connections.shortestPathWithGroups(this.routeStations);
@@ -7471,7 +7717,9 @@ class Path {
         for (const stop of newStops) {
             this.addStop(stop, { finalize: false });
         }
-        this.finalizeStops();
+
+        // Finalise le parcours en triant les arrêts, en constituant index et signature et en le vérifiant
+        this.finalize();
     }
 }
 
@@ -7532,7 +7780,7 @@ class Paths {
     }
 
     /**
-     * Renvoie le parcours correspondant à la clé donnée.
+     * Retourne le parcours correspondant à la clé donnée.
      * @param {string} key - Clé du parcours.
      * @returns {Path | undefined} - Parcours correspondant, ou undefined si la clé n'existe pas.
      */
@@ -7627,12 +7875,6 @@ class Paths {
             stopsChecked
         });
 
-        // Convertit les horaires en relatifs
-        path.convertStopsToRelative();
-
-        // Finalise la gestion des arrêts (tri et mise à jour des maps)
-        path.finalizeStops();
-
         // Insère le parcours dans la base de données, en générant si besoin la clé
         return this.insert(path);
     }
@@ -7695,7 +7937,7 @@ class Paths {
             radicalMap = new Map();
             this.structure.set(radical, radicalMap);
  
-            const numberMap = new Map<number, Path>();
+            const numberMap: Map<number, Path> = new Map();
             numberMap.set(0, path);
  
             // Par convention, le premier parcours d'un radical différent
@@ -7715,7 +7957,7 @@ class Paths {
         if (letterKey === null) {
             letterKey = this.nextLetter(radicalMap);
  
-            const numberMap = new Map<number, Path>();
+            const numberMap: Map<number, Path> = new Map();
             numberMap.set(0, path);
  
             radicalMap.set(letterKey, numberMap);
@@ -7760,7 +8002,7 @@ class Paths {
         this.map.delete(path.key);
 
         // Détermine les composantes de la clé
-        const radical = path.buildRadical();
+        const radical = this.extractRadical(path.key);
         const letter = this.extractLetter(path.key);
         const number = this.extractNumber(path.key);
  
@@ -7943,8 +8185,9 @@ class Paths {
      * Construit une clé de parcours à partir d'un radical,
      *  d'une lettre de suffixe et d'un numéro de suffixe.
      * La clé est composée de la forme "radical~lettre#nombre" avec
-     *  un suffixe lettre optionnel précédé de "~"
-     *  et un suffixe numérique optionnel précédé de "#".
+     *  - un suffixe lettre optionnel précédé de "~" pour une signature différente avec le même radical,
+     *  - un suffixe numérique optionnel précédé de "#" pour des arrêts avec horaires différents
+     *     pour un radical et une signature identique.
      * @param {string} radical - Radical de la clé.
      * @param {string} letter - Lettre de suffixe (ou une chaîne vide si pas de suffixe lettre).
      * @param {number} number - Numéro de suffixe (ou 0 si pas de suffixe numérique).
@@ -8062,7 +8305,7 @@ class Paths {
         // Vérifie si les parcours sont valides.
         try {
             for (const path of this.values()) {
-                path.check();
+                path.finalize();
             }
         } catch (e) {
             throw new Error(`Paths.load : ${e}`);
@@ -8115,7 +8358,16 @@ class Paths {
 /**
  * Type ReuseTarget reprenant les deux types Train et TrainPath qui peuvent constituer une réutilisation.
  */
-type ReuseTarget = Train | TrainPath | undefined;
+type ReuseTarget = Train | TrainPath;
+
+/**
+ * Type ReuseParameters contenant les paramètres d'une réutilisation.
+ */
+type ReuseParameters = {
+    reuseKey?: string;
+    position?: number;
+    maintenanceCenter?: Station | StationWithParity | string | null;
+};
 
 /**
  * Classe Reuse contenant la réutilisation d'un élément d'un train ou d'un sillon. 
@@ -8123,45 +8375,139 @@ type ReuseTarget = Train | TrainPath | undefined;
 class Reuse<T extends ReuseTarget> {
 
     public readonly type:
-        typeof Train | typeof TrainPath;        // Type de réutilisation (train ou sillon)
-    public readonly key: string;                // Clé du train ou du sillon de réutilisation
-    public readonly position: number;           // Position de l'élément dans le train/sillon de réutilisation
-                                                //  - positif pour la réutilisation suivante
-                                                //  - négatif pour la réutilisation précédente
-    private _target?: T | null;                 // Train ou sillon de réutilisation     
-    private _isMouvement?: boolean | null;      // Indique si le train/sillon de réutilisation est une évolution
-    private _isEmptyPassenger?: boolean | null; // Indique si le train/sillon de réutilisation est vide voyageur
-    private _reuse?: Reuse<T> | null;           // Réutilisation suivante
+        typeof Train | typeof TrainPath;                    // Type de réutilisation (train ou sillon)
+    public readonly reuseKey?: string;                      // Clé du train ou du sillon de réutilisation
+    public readonly position: number;                       // Position de l'élément
+                                                            //  dans le train/sillon de réutilisation :
+                                                            //  - positif pour la réutilisation suivante
+                                                            //  - négatif pour la réutilisation précédente
+                                                            //  - 0 pour un garage en technicentre
+    private _target?: T | null;                             // Train ou sillon de réutilisation     
+    private _isMouvement?: boolean | null;                  // Indique si le train/sillon de réutilisation
+                                                            //  est une évolution
+    private _isEmptyPassenger?: boolean | null;             // Indique si le train/sillon de réutilisation
+                                                            //  est vide voyageur
+    private _reuse?: Reuse<T> | null;                       // Réutilisation suivante
+    public readonly maintenanceCenter?: Station | null;     // Gare du technicentre si la réutilisation
+                                                            //  est un garage au technicentre
 
     /**
-     * Constructeur d'une réutilisation.
+     * Constructeur privé de la classe Reuse.
      * @param {typeof Train | typeof TrainPath} type - Type de réutilisation (train ou sillon).
-     * @param {string} key - Clé du train ou du sillon de réutilisation.
-     * @param {number} position - Position de l'élément dans le train/sillon de réutilisation.
+     * @param {ReuseParameters} params - Paramètres de la réutilisation.
      */
-    public constructor(
-        {
-            type,
-            key,
-            position
-        }: {
-            type: typeof Train | typeof TrainPath
-            key: string,
-            position: number,
-        }
+    private constructor(
+        type: typeof Train | typeof TrainPath,
+        params: ReuseParameters
     ) {
         this.type = type;
-        this.key = key;
-        this.position = position;
+        this.reuseKey = params.reuseKey;
+        
+        if (!Number.isInteger(params.position)) {
+            throw new Error(`La position de réutilisation doit être un entier.`);
+        }
+        if (this.reuseKey) {
+            if (!params.position) throw new Error(`Une réutilisation associée à un train`
+                + ` doit comporter une position non nulle de l'élément dans le train`
+                + ` (positive pour la réutilisation suivante, negative pour la réutilisation précédente).`);
+            this.position = params.position;
+            this.maintenanceCenter = null;
+        } else {
+            this.position = 0;
+            this.maintenanceCenter = Station.from(params.maintenanceCenter);
+            if (!this.maintenanceCenter) {
+                throw new Error(`Une réutilisation de garage doit comporter un technicentre valide.`);
+            }
+        }
     }
 
     /**
-     * Renvoie l'objet du train ou du sillon de réutilisation.
+     * Retourne une instance de Reuse à partir d'une valeur qui peut être :
+     *  - une clé de réutilisation,
+     *  - les paramètres ReuseParameters d'une réutilisation.
+     * @param {Path | string | null | undefined} value - Parcours à retourner,
+     *  sous forme d'objet Path ou de clé string.
+     * @returns {Path | undefined} - Parcours Path correspondant, ou undefined si le clé n'existe pas.
+     */
+    public static from(
+        { type, key, params }: { type: (typeof Train), key?: string, params?: ReuseParameters }
+    ): Reuse<Train> | undefined;
+    
+    public static from(
+        { type, key, params }: { type: (typeof TrainPath), key?: string, params?: ReuseParameters }
+    ): Reuse<TrainPath> | undefined;
+
+    public static from(
+        {
+            type,
+            key,
+            params
+        }: {
+            type: (typeof Train | typeof TrainPath),
+            key?: string,
+            params?: ReuseParameters
+        }
+    ): Reuse<ReuseTarget> | undefined {
+
+        // Instancie la réutilisation à partir de la clé.
+        if (!!key) {
+
+            if (params?.reuseKey !== undefined
+                || params?.position !== undefined
+                || params?.maintenanceCenter !== undefined
+            ) {
+                throw new Error(`Impossible de fournir simultanément key`
+                    + ` et les propriétés d'un réutilisation.`);
+            }
+
+            const parsed = Reuse.parseKey(key);
+            if (!parsed) return undefined;
+            
+            return new Reuse(
+                type,
+                parsed
+            );
+        }
+
+        // Instancie la réutilisation à partir des paramètres de la réutilisation
+        if (!params ||(!params.reuseKey && !params.maintenanceCenter)) return undefined;
+        return new Reuse(
+            type,
+            params
+        );
+    }
+
+    /**
+     * Retourne les paramètres d'une réutilisation à partir d'une clé de réutilisation.
+     * @param {string} key - Clé de réutilisation.
+     * @returns {ReuseParameters | undefined} - Paramètres de la réutilisation.
+     */
+    private static parseKey(
+        key: string
+    ): ReuseParameters | undefined {
+
+        if (!key) return undefined;
+
+        // Clé d'un garage
+        if (key!.slice(0, 2) === "G@") {
+            return { maintenanceCenter: key.slice(2) };
+        }
+
+        // Clé d'une réutilisation avec train ou sillon
+        const [reuseKey, position] = key.split('#');
+        if (!position) return undefined;
+        const parsedPosition = Number(position);
+        if (!Number.isInteger(parsedPosition)) return undefined;
+        return { reuseKey, position: parsedPosition };
+    }
+
+    /**
+     * Retourne l'objet du train ou du sillon de réutilisation.
      * @returns {T | null} - Train ou sillon de réutilisation.
      */
     public get target(): T | null {
         if (this._target === undefined) {
-            this._target = this.type.from(this.key) as T
+            this._target = this.type.from(this.reuseKey) as T
                 ?? null;
         }
         return this._target;
@@ -8192,7 +8538,7 @@ class Reuse<T extends ReuseTarget> {
     }
 
     /**
-     * Renvoie la réutilisation suivante.
+     * Retourne la réutilisation suivante.
      * @returns {Reuse<T> | null} - Réutilisation suivante.
      */
     public get reuse(): Reuse<T> | null {
@@ -8204,7 +8550,33 @@ class Reuse<T extends ReuseTarget> {
     }
 
     /**
-     * Renvoie la nième réutilisation valide, selon le rang indiqué,
+     * Retourne la clé du train ou du sillon de réutilisation,
+     *  composée de la clé de la réutilisation et de la position de l'élément dans la réutilisation.
+     * Si la réutilisation est un garage au technicentre, la clé est composée
+     *  du code de la gare du technicentre et de la position de l'élément, précédés de "G@".
+     * @returns {string} - Clé du train ou du sillon de réutilisation.
+     */
+    public get key(): string {
+        return this.maintenanceCenter
+            ? "G@" + this.maintenanceCenter.abbreviation
+            : this.reuseKey 
+                ? this.reuseKey + "#" + this.position
+                : "?";
+    }
+
+    /**
+     * Retourne une représentation textuelle simple et stable de l'objet,
+     *  utilisée implicitement dans les conversions string (ex: `${obj}`).
+     */
+    public toString(): string {
+        return this.maintenanceCenter
+            ? this.maintenanceCenter.abbreviation
+            : this.target?.number.format()
+                ?? "?";
+    }
+
+    /**
+     * Retourne la nième réutilisation valide, selon le rang indiqué,
      *  et selon si les évolutions ou les W sont acceptés ou non.
      * @param {number} [occurrence=1] - Occurence de la réutilisation à donner.
      * @param {boolean} [excludeMouvements=false] - Exclut les évolutions.
@@ -8214,7 +8586,7 @@ class Reuse<T extends ReuseTarget> {
     public resolve(
         {
             occurrence = 1,
-            excludeMouvements = true,
+            excludeMouvements = false,
             excludeEmptyPassenger = false
         }: {
             occurrence?: number,
@@ -8222,6 +8594,10 @@ class Reuse<T extends ReuseTarget> {
             excludeEmptyPassenger?: boolean
         } = {}
     ): Reuse<T> | undefined {
+
+        if (!Number.isInteger(occurrence) || occurrence < 1) {
+            throw new Error(`Le nombre d'occurrences doit être un entier positif.`);
+        }
 
         let reuse: Reuse<T> | null = this;
 
@@ -8241,7 +8617,7 @@ class Reuse<T extends ReuseTarget> {
                 || (excludeEmptyPassenger && reuse.isEmptyPassenger === true);
 
             if (!excluded) o--;
-            if (o === 0) return reuse;
+            if (o === 0 || reuse.maintenanceCenter) return reuse;
 
             reuse = reuse.reuse;
         }
@@ -8261,28 +8637,26 @@ class Train {
     public static readonly NORTH: number = 0;
     public static readonly SOUTH: number = 1;
 
-    // Propriétés de l'objet Train
-    public key: string;                                 // Clé du train
-    public number: TrainNumber;                         // Numéro du train
-    public date: DateTime;                              // Date et heure de départ du train
-    public service: string;                             // Service auquel le train est rattaché
-    public path: Path;                                  // Parcours sur lequel le train circule
-    public units: string[] = [];                        // Eléments (numéro de matériel)
-    public readonly reusesMap =
-        new Map<number, Reuse<Train>>();                // Map des réutilisations,
-                                                        //  selon la position de chaque élément
-                                                        //  - positif pour la réutilisation suivante
-                                                        //  - négatif pour la réutilisation précédente
+    // Propriétés de la classe Train
+    public key: string;             // Clé du train
+    public number: TrainNumber;     // Numéro du train
+    public date: DateTime;          // Date et heure de départ du train
+    public service: string;         // Service auquel le train est rattaché
+    public path: Path;              // Parcours sur lequel le train circule
+    public units: string[];         // Eléments (numéro de matériel) comptés à partir de 0
+    public readonly reusesMap: Map<number, Reuse<Train> | undefined>;        
+                                    // Map des réutilisations, selon la position de chaque élément
+                                    //  - positif pour la réutilisation suivante
+                                    //  - négatif pour la réutilisation précédente
     /**
-     * Constructeur de l'objet Train.
+     * Constructeur de la classe Train.
      * @param {string} [key=""] - Clé du train.
      * @param {TrainNumber | number | string | undefined} number - Numéro du train.
      * @param {DateTime | number | string | undefined} date - Date et heure de départ du train.
      * @param {string} [service=""] - Service auquel le train est rattaché.
      * @param {Path | string | undefined} path - Parcours sur lequel le train circule.
-     * @param {string[]} [units=[]] - Eléments (numéro de matériel).
-     * @param {string[]} [previousKeys=[]] - Clés des trains précédents.
-     * @param {string[]} [reuseRelations=[]] - Clés des trains de réutilisations.
+     * @param {string[]} [units=[]] - Eléments (numéro de matériel) comptés à partir de 0.
+     * @param {Map<number, Reuse<Train> | undefined>} [reusesMap] - Clés des trains précédents.
      */
     public constructor(
         {
@@ -8292,8 +8666,7 @@ class Train {
             service = "",
             path,
             units = [],
-            previousKeys = [],
-            reuseRelations = []
+            reusesMap = new Map()
         }: {
             key?: string,
             number?: TrainNumber | number | string | undefined,
@@ -8301,8 +8674,7 @@ class Train {
             service?: string,
             path?: Path | string | undefined,
             units?: string[],
-            previousKeys?: string[],
-            reuseRelations?: string[]
+            reusesMap?: Map<number, Reuse<Train> | undefined>
         }
     ) {
         this.key = key;
@@ -8315,6 +8687,9 @@ class Train {
         if (!dateObj) {
             throw new Error(`La date du train ${this.number} est invalide.`);
         }
+        if (!dateObj.hasDate()) {
+            throw new Error(`La date du train ${this.number} ne contient d'une heure non datée.`);
+        }
         this.date = dateObj;
         this.service = service;
         const pathObj = Path.from(path);
@@ -8323,8 +8698,7 @@ class Train {
         }
         this.path = pathObj;
         this.units = units;
-        this.previousKeys = previousKeys;
-        this.reuseRelations = reuseRelations;
+        this.reusesMap = reusesMap;
     }
 
     public get isMouvement(): boolean {
@@ -8346,7 +8720,7 @@ class Train {
     /**
      * Retourne l'objet Train correspondant à la clé ou l'objet Train donné.
      * Si la clé est une string, elle est utilisée pour chercher l'objet Train correspondant
-     * dans l'index des trains. Si la clé est un objet Train, il est retourné tel quel.
+     *  dans l'index des trains. Si la clé est un objet Train, il est retourné tel quel.
      * Si la clé est une string mais que l'objet Train correspondant n'existe pas, undefined est retourné.
      * @param {Train | string | null | undefined} value - Clé ou objet Train.
      * @returns {Train | undefined} - Objet Train correspondant,
@@ -8361,31 +8735,32 @@ class Train {
     }
 
     /**
-     * Construit la clé du train qui est composée de la date suivie du numéro du train.
-     * @returns {string} - Clé du train.
+     * Retourne le radical de la clé du train constitué de date_numéroOrigine.
+     * @returns {string} - Radical de la clé du parcours.
      */
-    public buildKey(): string {
-        return `${this.date.format('yyyy-MM-dd')}_${this.number.format()}`;
+    public buildRadical(): string {
+        return `${this.date.format('yyyy-MM-dd')}_${this.number.format({ withoutDoubleParity: true })}`;
     }
 
     /**
      * Retourne les réutilisations (trains précédents et suivants) correspondants aux clés en paramètres.
      * @param {number} [offset=1] - Indice de la réutilisation par rapport au train en cours
      *  (ex: -1 pour le train précédent, 0 pour le train en cours, 2 pour le deuxième train suivant, etc.).
-     * @param {boolean} [excludeMouvements=true] - Indique si les évolutions sont exclues.
+     * @param {boolean} [excludeMouvements=false] - Indique si les évolutions sont exclues.
      * @param {boolean} [excludeEmptyPassenger=false] - Indique si les W sont exclues.
-     * @returns {(Train | undefined)[]} - Tableau des trains correspondants.
+     * @returns {(Reuse<Train> | undefined)[]} - Tableau des réutilisations
+     *  pour chaque élément compté à partir de 0.
      */
     public reuses(
         offset: number,
         {
-            excludeMouvements = true,
+            excludeMouvements = false,
             excludeEmptyPassenger = false
         }: {
             excludeMouvements?: boolean,
             excludeEmptyPassenger?: boolean
         } = {}
-    ): (Train | undefined)[] {
+    ): (Reuse<Train> | undefined)[] {
 
         // Si offset = 0, retourne le train actuel pour tous les éléments.
         if (offset === 0) return new Array(this.units.length).fill(this);
@@ -8394,12 +8769,42 @@ class Train {
         const direction = offset > 0 ? 1 : -1;
         const occurrence = offset * direction;
     
-        const reuses: (Train | undefined)[] = [];
+        const reuses: (Reuse<Train> | undefined)[] = [];
         for (let p = 0; p < this.units.length; p++) {
             reuses.push(this.reusesMap.get(direction *(p + 1))
-                ?.resolve({ occurrence, excludeMouvements, excludeEmptyPassenger })?.target)
+                ?.resolve({ occurrence, excludeMouvements, excludeEmptyPassenger })
+                    ?? undefined);
         }
         return reuses;
+    }
+
+    /**
+     * Affecte une réutilisation à un élément du train.
+     * @param {number} unit - Numéro de l'élément du train (à partir de 0).
+     */
+    public setReuse(
+        unit: number,
+        reuseParams: ReuseParameters
+    ): void {
+        const reuse = Reuse.from({
+            type: Train,
+            params: reuseParams
+        });
+        if (!reuse) return;
+        this.reusesMap.set(unit, reuse);
+    }
+
+    /**
+     * Affecte la réutilisation inverse au train de réutilisation de l'élément demandé.
+     * @param {number} unit - Numéro de l'élément du train (à partir de 0).
+     */
+    public setReverseReuse(
+        unit: number,
+    ): void {
+        const reuse = this.reusesMap.get(unit);
+        const reuseTrain = reuse?.target;
+        if (!reuseTrain) return;
+        reuseTrain.setReuse(-reuse.position, { reuseKey: this.key, position: -unit });
     }
 
     /**
@@ -8420,7 +8825,7 @@ class Train {
     }
 
     /**
-     * Renvoie la plus petite des heures d'arrivée, de départ ou de passage à l'arrêt indiqué.
+     * Retourne la plus petite des heures d'arrivée, de départ ou de passage à l'arrêt indiqué.
      * Si ignoreArrival est vrai, lit plutôt l'heure de départ ou de passage.
      * @param {Stop | Station | StationWithParity | string | number} stop - L'arrêt à chercher.
      * @param {boolean} [ignoreArrival=false] - Si vrai, ignore l'heure d'arrivée
@@ -8465,6 +8870,15 @@ class Trains {
         "Trains précédents",
         "Réutilisations"
     ]];
+    private static readonly DATABASE_COLUMNS = {
+        key: 0,
+        number: 1,
+        date: 2,
+        service: 3,
+        path: 4,
+        units: 5,
+        reusesMap: 6,
+    } as const;
     private static readonly DEFAULT_PRINT_COLUMNS = {
         key: 0,
         number: 1,
@@ -8472,8 +8886,8 @@ class Trains {
         service: 3,
         path: 4,
         units: 5,
-        previousKeys: 6,
-        reuseRelations: 7
+        previousTrains: 6,
+        nextTrains: 7
     } as const;
     private static readonly COL_KEY = 0;                    // Colonne de la clé du train
     private static readonly COL_NUMBER = 1;                 // Colonne du numéro du train
@@ -8541,7 +8955,7 @@ class Trains {
     }
 
     /**
-     * Renvoie un train correspondant à la clé donnée.
+     * Retourne un train correspondant à la clé donnée.
      * @param {string} key - Clé du train.
      * @returns {Train | undefined} - Train correspondant, ou undefined si non trouvé.
      */
@@ -8552,7 +8966,7 @@ class Trains {
     }
 
     /**
-     * Renvoie une liste de trains correspondant aux critères donnés :
+     * Retourne une liste de trains correspondant aux critères donnés :
      *  - Numéros de train
      *  - Dates de circulation (adaptées ou non)
      *  - Gare de départ
@@ -8744,11 +9158,10 @@ class Trains {
      * @param {string} [service=""] - Service auquel le train est rattaché.
      * @param {Path | string | undefined} path - Parcours sur lequel le train circule.
      * @param {string[]} [units=[]] - Eléments (numéro de matériel).
-     * @param {string[]} [previousKeys=[]] - Clés des trains précedents.
-     * @param {string[]} [reuseRelations=[]] - Clés des trains de réutilisations.
+     * @param {Map<number, Reuse<Train> | undefined>} [reusesMap] - Clés des trains précédents.
      * @returns {Train} - Train créé, ou undefined si le train est déjà présent dans la base de données.
      * @throws {Error} - Si le train est déjà présent dans la base de données.
-     */
+     */   
     public static create(
         {
             key = "",
@@ -8757,8 +9170,7 @@ class Trains {
             service = "",
             path,
             units = [],
-            previousKeys = [],
-            reuseRelations = []
+            reusesMap = new Map()
         }: {
             key?: string,
             number?: TrainNumber | number | string | undefined,
@@ -8766,8 +9178,7 @@ class Trains {
             service?: string,
             path?: Path | string | undefined,
             units?: string[],
-            previousKeys?: string[],
-            reuseRelations?: string[]
+            reusesMap?: Map<number, Reuse<Train> | undefined>,
         }
     ): Train {
 
@@ -8779,8 +9190,7 @@ class Trains {
             service,
             path,
             units,
-            previousKeys,
-            reuseRelations
+            reusesMap
         });
 
         // Insère le train dans la base de données, en générant si besoin la clé
@@ -8809,7 +9219,7 @@ class Trains {
 
         // Clé non existante : génère une nouvelle clé.
 
-        const radical = train.buildKey();
+        const radical = train.buildRadical();
 
         // Si train déjà présent sans suffixe, ajoute les suffixes 1 et 2.
         if (this.has(radical)) {
@@ -8902,11 +9312,6 @@ class Trains {
         const splitAndFilter = (str: string) => 
             str.split(/[ +,:;]+/)
                 .filter(unit => unit.length > 0);
-        const adaptWithUnits = (trainKeys: string, units: string[]) => {
-            const t = splitAndFilter(trainKeys);
-            while (t.length < units.length) t.push(t[0]);
-            return t;
-        };
 
         const dataTable = Array.from(data.slice(1).entries());
         const nbOfRows: number = dataTable.length;
@@ -8923,17 +9328,20 @@ class Trains {
                 excelRow = rowIndex + 2; // +1 pour slice, +1 pour en-tête
  
                 // Récupère les champs.
-                const key = WorkbookService.getString(row, this.COL_KEY);
-                const number = WorkbookService.getString(row, this.COL_NUMBER);
-                const date = WorkbookService.getNumber(row, this.COL_DATE);
-                const service = WorkbookService.getString(row, this.COL_SERVICE);
-                const path = WorkbookService.getString(row, this.COL_PATH);
-                const unitsString = WorkbookService.getString(row, this.COL_UNITS);
+                const key = WorkbookService.getString(row, this.DATABASE_COLUMNS.key);
+                const number = WorkbookService.getString(row, this.DATABASE_COLUMNS.number);
+                const date = WorkbookService.getNumber(row, this.DATABASE_COLUMNS.date);
+                const service = WorkbookService.getString(row, this.DATABASE_COLUMNS.service);
+                const path = WorkbookService.getString(row, this.DATABASE_COLUMNS.path);
+                const unitsString = WorkbookService.getString(row, this.DATABASE_COLUMNS.units);
                 const units = splitAndFilter(unitsString);
-                const previousString = WorkbookService.getString(row, this.COL_PREVIOUS);
-                const previous = adaptWithUnits(previousString, units);
-                const reusesString = WorkbookService.getString(row, this.COL_REUSES);
-                const reuses = adaptWithUnits(reusesString, units);
+                const reusesString = WorkbookService.getString(row, this.DATABASE_COLUMNS.reusesMap);
+                const reusesMap = TablePrinter.deserializeMap( reusesString,
+                    {
+                        parseKey: Number,
+                        parseValue: key => Reuse.from({ type: Train, key })!
+                    }
+                );
 
                 // Crée l'objet Train et l'insère dans la base de données.
                 const train = this.create({
@@ -8943,8 +9351,7 @@ class Trains {
                     service,
                     path,
                     units,
-                    previousKeys: previous,
-                    reuseRelations: reuses
+                    reusesMap
                 });
             } 
 
@@ -9004,14 +9411,7 @@ class Trains {
     //     }
     // }
 
-    private static joinUnits(units: string[]): string {
 
-        return units.length === 0
-            ? ""
-            : units.every(u => u === units[0])
-                ? units[0]
-                : units.join(" + ");
-    }
 
     /**
      * Liste des colonnes des tableaux d'impression des trains :
@@ -9042,6 +9442,12 @@ class Trains {
             value: (train: Train) => train.date.excelValue,
             numberFormat: "dd/MM/yyyy"
         },
+
+        dayOfWeek: {
+            header: "Jour",
+            value: (train: Train) => train.date.getDayOfWeek()?.abbreviation,
+            numberFormat: "dd/MM/yyyy"
+        },
     
         service: {
             header: "Service",
@@ -9052,52 +9458,66 @@ class Trains {
             header: "Parcours",
             value: (train: Train) => train.path.key
         },
+
+        from: {
+            header: "Origine",
+            value: (train: Train) => train.getStop(0)
+        },
+
+        departureTime: {
+            header: "Heure du départ",
+            value: (train: Train) => train.getTime(0)?.excelValue
+        },
+
+        to: {
+            header: "Terminus",
+            value: (train: Train) => train.getStop(-1)
+        },
+
+        arrivalTime: {
+            header: "Heure d'arrivée",
+            value: (train: Train) => train.getTime(-1)?.excelValue
+        },
     
         units: {
             header: "Eléments",
-            value: (train: Train) => this.joinUnits(train.units)
+            value: (train: Train) => TablePrinter.joinArray(train.units)
         },
 
-        previousKeys: {
-            header: "Trains précédents",
-            value: (train: Train) => this.joinUnits(train.previousKeys)
+        reusesMap: {
+            header: "Clés des réutilisations",
+            value: (train: Train) => 
+                TablePrinter.serializeMap(train.reusesMap, { serializeValue: reuse => reuse?.key })
         },
     
-        reuseRelations: {
-            header: "Réutilisations",
-            value: (train: Train) => this.joinUnits(train.reuseRelations)
-        },
-    
-        previousNumbers: ({
-            excludeMouvements = false
+        previousTrains: ({
+            excludeMouvements = true,
+            excludeEmptyPassenger = false
         }: {
-            excludeMouvements?: boolean
+            excludeMouvements?: boolean,
+            excludeEmptyPassenger?: boolean
         } = {}) => ({
             header: "Trains précédents",
-            value: (train: Train) => this.joinUnits(
-                train.previous({ excludeMouvements })
-                    .flatMap(train => train ? [train.number.format({
-                        abbreviate: false,
-                        withoutDoubleParity: true
-                    })] : []
-                )
+            value: (train: Train) => TablePrinter.joinArray(
+                train.reuses(-1, { excludeMouvements, excludeEmptyPassenger })
+                    .map((reuse: Reuse<Train> | undefined) => reuse?.toString() ?? "?"),
+                { symbol: " + " }
             )
         }),
     
-        reuseNumbers: ({
-            excludeMouvements = false
+        nextTrains: ({
+            excludeMouvements = true,
+            excludeEmptyPassenger = false
         }: {
-            excludeMouvements?: boolean
+            excludeMouvements?: boolean,
+            excludeEmptyPassenger?: boolean
         } = {}) => ({
     
-            header: "Réutilisations",
-            value: (train: Train) => this.joinUnits(
-                train.reuse({ excludeMouvements })
-                    .flatMap(train => train ? [train.number.format({
-                        abbreviate: false,
-                        withoutDoubleParity: true
-                    })] : []
-                )
+            header: "Trains suivants",
+            value: (train: Train) => TablePrinter.joinArray(
+                train.reuses(1, { excludeMouvements, excludeEmptyPassenger })
+                    .map((reuse: Reuse<Train> | undefined) => reuse?.toString() ?? "?"),
+                { symbol: " + " }
             )
         }),
     
@@ -9106,7 +9526,7 @@ class Trains {
             ignoreArrival = false,
             ignorePassage = false
         }: {
-            station: string,
+            station: Stop | Station | StationWithParity | string,
             ignoreArrival?: boolean,
             ignorePassage?: boolean
         }) => ({
@@ -9114,43 +9534,10 @@ class Trains {
                 ? `${station} Arrivée / Passage`
                 : `${station} Départ`,
             value: (train: Train) => train.getTime(station, { ignoreArrival, ignorePassage })
-                ?.excelValue ?? "",
-            numberFormat: "hh:mm"
+                ?.excelValue,
+            numberFormat: "hh:mm:ss"
         })
     };
-
-    /**
-     * Construit les colonnes fixes des tableaux à imprimer
-     * @param {Record<string, number>} columns - Dictionnaire des colonnes.
-     */
-    private static buildColumns(
-        columns: Record<string, number>
-    ): PrintColumn<Train>[] {
-    
-        return Object
-            .entries(columns)
-            .flatMap(([key, column]) => {
-    
-                if (column < 0) {
-                    return [];
-                }
-    
-                const definition =
-                    this.COLUMNS[
-                        key as keyof typeof this.COLUMNS
-                    ];
-    
-                // Ignore les factories dynamiques.
-                if (typeof definition === "function") {
-                    return [];
-                }
-    
-                return [{
-                    column,
-                    ...definition
-                }];
-            });
-    }
 
     /**
      * Sauvegarde les trains de la base de données dans un tableau.
@@ -9164,16 +9551,17 @@ class Trains {
             tableName = this.TABLE,
             startCell = "A1"
         }: {
-            sheetName: string,
-            tableName: string,
+            sheetName?: string,
+            tableName?: string,
             startCell?: string
-        }
+        } = {}
     ): void {
     
         TablePrinter.print({
             items: Array.from(this.map.values()),
-            columns: this.buildColumns(
-                this.DEFAULT_PRINT_COLUMNS
+            columns: TablePrinter.buildColumns<Train>(
+                this.DATABASE_COLUMNS,
+                Trains.COLUMNS
             ),
             sheetName,
             tableName,
@@ -9215,8 +9603,13 @@ class Trains {
                 { column: 0, ...this.COLUMNS.key },
                 { column: 1, ...this.COLUMNS.number },
                 { column: 2, ...this.COLUMNS.date },
-                ...stops.map((stop, index) =>
-                    ({ column: 3 + index, ...this.COLUMNS.stopTime(stop) }))
+                ...stops.map((stop, index) => ({
+                    column: 3 + index,
+                    ...this.COLUMNS.stopTime({
+                        station: stop.station,
+                        ignoreArrival: stop.ignoreArrival
+                    })
+                }))
             ],
             sheetName,
             tableName,
@@ -9311,21 +9704,20 @@ class TrainPath {
     public static readonly NORTH: number = 0;
     public static readonly SOUTH: number = 1;
 
-    // Propriétés de l'objet TrainPath
-    public key: string;                             // Clé du sillon
-    public number: TrainNumber;                     // Numéro du sillon
-    public days: Days;                              // Jours de circulation du sillon
-    public services: string[];                      // Services auxquels le sillon est rattaché
-    public path: Path;                              // Parcours sur lequel le sillon circule
-    public units: string[] = []                     // Composistion du sillon
-    public readonly reusesMap =
-        new Map<number, Reuse<Train>>();                // Map des réutilisations,
-                                                        //  selon la position de chaque élément
-                                                        //  - positif pour la réutilisation suivante
-                                                        //  - négatif pour la réutilisation précédente
+    // Propriétés de la classe TrainPath
+    public key: string;             // Clé du sillon
+    public number: TrainNumber;     // Numéro du sillon
+    public days: Days;              // Jours de circulation du sillon
+    public services: string[];      // Services auxquels le sillon est rattaché
+    public path: Path;              // Parcours sur lequel le sillon circule
+    public units: string[] = []     // Composistion du sillon
+    public readonly reusesMap: Map<number, Reuse<Train>> = new Map();              
+                                    // Map des réutilisations, selon la position de chaque élément
+                                    //  - positif pour la réutilisation suivante
+                                    //  - négatif pour la réutilisation précédente
 
     /**
-     * Constructeur de l'objet TrainPath.
+     * Constructeur de la classe TrainPath.
      * @param {string} [key=""] - Clé du sillon.
      * @param {TrainNumber | number | string | undefined} number - Numéro du sillon.
      * @param {Days | string | number} days - Jours de circulation du sillon.
@@ -9416,7 +9808,7 @@ class TrainPath {
     /**
      * Retourne l'objet TrainPath correspondant à la clé ou l'objet TrainPath donné.
      * Si la clé est une string, elle est utilisée pour chercher l'objet TrainPath correspondant
-     * dans l'index des sillons. Si la clé est un objet TrainPath, il est retourné tel quel.
+     *  dans l'index des sillons. Si la clé est un objet TrainPath, il est retourné tel quel.
      * Si la clé est une string mais que l'objet TrainPath correspondant n'existe pas, undefined est retourné.
      * @param {TrainPath | string | null | undefined} value - Clé ou objet TrainPath.
      * @returns {TrainPath | undefined} - Objet TrainPath correspondant,
@@ -9502,7 +9894,7 @@ class TrainPaths {
     }
 
     /**
-     * Renvoie un sillon correspondant à la clé donnée.
+     * Retourne un sillon correspondant à la clé donnée.
      * @param {string} key - Clé du sillon.
      * @returns {TrainPath | undefined} - TrainPath correspondant, ou undefined si non trouvé.
      */
@@ -9721,48 +10113,41 @@ class TrainPaths {
         } 
     }
 
-    /**
-     * Sauvegarde les sillons de la base de données dans un tableau.
-     * @param {string} [sheetName=this.SHEET] - Nom de la feuille de calcul.
-     * @param {string} [tableName=this.TABLE] - Nom du tableau.
-     * @param {string} [startCell="A1"] - Adresse de la cellule de départ pour le tableau.
-     */
-    public static print(
-        sheetName: string = this.SHEET,
-        tableName: string = this.TABLE,
-        startCell: string = "A1"
-    ): void {
+//     /**
+//      * Sauvegarde les sillons de la base de données dans un tableau.
+//      * @param {string} [sheetName=this.SHEET] - Nom de la feuille de calcul.
+//      * @param {string} [tableName=this.TABLE] - Nom du tableau.
+//      * @param {string} [startCell="A1"] - Adresse de la cellule de départ pour le tableau.
+//      */
+//     public static print(
+//         sheetName: string = this.SHEET,
+//         tableName: string = this.TABLE,
+//         startCell: string = "A1"
+//     ): void {
 
-        const joinUnits = (units: string[]) =>
-            units.length === 0
-                ? ""
-                : units.every(u => u === units[0])
-                    ? units[0]
-                    : units.join(' + ');
+//         // Convertit la base de données en un tableau de données.
+//         const data: (string | number)[][] = Array
+//             .from(this.map.values())
+//             .map((trainPath: TrainPath) => [
+//                 trainPath.key,
+//                 trainPath.number.format({ abbreviate: false, withoutDoubleParity: true }),
+//                 trainPath.days.code,
+//                 trainPath.services.join(' ,'),
+//                 trainPath.path.key,
+//                 TablePrinter.joinArray(trainPath.units),
+//                 joinUnits(trainPath.previousKeys),
+//                 joinUnits(trainPath.reuseRelations)
+//             ]);
 
-        // Convertit la base de données en un tableau de données.
-        const data: (string | number)[][] = Array
-            .from(this.map.values())
-            .map((trainPath: TrainPath) => [
-                trainPath.key,
-                trainPath.number.format({ abbreviate: false, withoutDoubleParity: true }),
-                trainPath.days.code,
-                trainPath.services.join(' ,'),
-                trainPath.path.key,
-                joinUnits(trainPath.units),
-                joinUnits(trainPath.previousKeys),
-                joinUnits(trainPath.reuseRelations)
-            ]);
-
-        // Imprime le tableau.
-        const table = WorkbookService.printTable({
-            headers: this.HEADERS, 
-            data,
-            sheetName, 
-            tableName, 
-            startCell
-        });
-    }
+//         // Imprime le tableau.
+//         const table = WorkbookService.printTable({
+//             headers: this.HEADERS, 
+//             data,
+//             sheetName, 
+//             tableName, 
+//             startCell
+//         });
+//     }
 }
 
 function testWorkbookService(
@@ -9877,7 +10262,7 @@ function testWorkbookService(
 
     assert.check(getStringTests, {
         category: "WorkbookService",
-        label: t =>  `getString ${t.desc})`,
+        label: t =>  `getString(${t.desc})`,
         actual: (t: typeof getStringTests[number]) => 
             ("defaultValue" in t)
                 ? WorkbookService.getString(t.row, t.col, { defaultValue: t.defaultValue })
@@ -9897,7 +10282,7 @@ function testWorkbookService(
 
     assert.check(getNumberTests, {
         category: "WorkbookService",
-        label: t =>  `getNumber ${t.desc})`,
+        label: t =>  `getNumber(${t.desc})`,
         actual: (t: typeof getNumberTests[number]) => 
             ("defaultValue" in t)
                 ? WorkbookService.getNumber(t.row, t.col, { defaultValue: t.defaultValue })
@@ -9917,7 +10302,7 @@ function testWorkbookService(
 
     assert.check(getBooleanTests, {
         category: "WorkbookService",
-        label: t =>  `getBoolean ${t.desc})`,
+        label: t =>  `getBoolean(${t.desc})`,
         actual: (t: typeof getBooleanTests[number]) =>
             ("defaultValue" in t)
                 ? WorkbookService.getBoolean(t.row, t.col, { defaultValue: t.defaultValue })
@@ -9935,7 +10320,7 @@ function testWorkbookService(
 
     assert.check(getRequiredStringTests, {
         category: "WorkbookService",
-        label: t =>  `getRequiredString ${t.desc})`,
+        label: t =>  `getRequiredString(${t.desc})`,
         actual: (t: typeof getRequiredStringTests[number]) => 
             WorkbookService.getRequiredString(t.row, t.col)
     });
@@ -9951,7 +10336,7 @@ function testWorkbookService(
 
     assert.check(getRequiredNumberTests, {
         category: "WorkbookService",
-        label: t =>  `getRequiredNumber ${t.desc})`,
+        label: t =>  `getRequiredNumber(${t.desc})`,
         actual: (t: typeof getRequiredNumberTests[number]) => 
             WorkbookService.getRequiredNumber(t.row, t.col)
     });
@@ -9967,7 +10352,7 @@ function testWorkbookService(
 
     assert.check(getRequiredBooleanTests, {
         category: "WorkbookService",
-        label: t =>  `getRequiredBoolean ${t.desc})`,
+        label: t =>  `getRequiredBoolean(${t.desc})`,
         actual: (t: typeof getRequiredBooleanTests[number]) => 
             WorkbookService.getRequiredBoolean(t.row, t.col)
     });
@@ -10754,8 +11139,8 @@ function testParity(
     assert.check([
         {
             label: "Pool même instance",
-            actual: () => Parity.from("I") === Parity.from(1),
-            expected: true
+            actual: () => Parity.from("I"),
+            expected: Parity.from(1)
         },
         {
             label: "Pool différent selon doubleParityAllowed",
@@ -10807,7 +11192,7 @@ function testParity(
         { a: "I",       b: "P",         expected: true },
         { a: "P",       b: "I",         expected: true },
         { a: "I",       b: "I",         expected: false },
-        { a: undefined, b: "I",         xpected: false },
+        { a: undefined, b: "I",         expected: false },
         { a: undefined, b: undefined,   expected: false }
     ];
 
@@ -10942,19 +11327,15 @@ function testParity(
     const pDouble = Parity.double();
     const pUndefined = Parity.undefined();
 
-    assert.check([
-        {
-            label: "invert DOUBLE retourne même instance",
-            actual: () => pDouble.invert() === pDouble,
-            expected: true
-        },
-        {
-            label: "invert UNDEFINED retourne même instance",
-            actual: () => pUndefined.invert() === pUndefined,
-            expected: true
-        }
-    ], {
-        category: "Parity"
+    const invert2Tests = [
+        { label: "invert DOUBLE retourne même instance",    value: pDouble,     expected: pDouble },
+        { label: "invert UNDEFINED retourne même instance", value: pUndefined,  expected: pUndefined }
+    ];
+
+    assert.check(invert2Tests, {
+        category: "Parity",
+        actual: (t: typeof invert2Tests[number]) =>
+            t.value.invert()
     });
 
     /* ==========================================================
@@ -11391,7 +11772,27 @@ function testStation(
     });
 
     /* ==========================================================
-       2. get() / getById()
+       2. from()
+       ========================================================== */
+
+    StationsWithParity.load();
+
+    const fromTests = [
+        { label: "from(chaine)",                value: "PZB",                           expected: "PZB" },
+        { label: "from(chaine avec parité)",    value: "PZB_1",                         expected: "PZB" },
+        { label: "from(instance)",              value: Station.from("PZB"),             expected: "PZB" },
+        { label: "from(StationWithParity)",     value: StationWithParity.from("PZB_1"), expected: "PZB" },
+        { label: "from(null)",                  value: StationWithParity.from(null),    expected: undefined }
+    ];
+
+    assert.check(fromTests, {
+        category: "Station",
+        actual: (t: typeof fromTests[number]) =>
+            Station.from(t.value)?.abbreviation
+    })
+
+    /* ==========================================================
+       3. get() / getById()
        ========================================================== */
 
     const firstStation = Stations.values()[0] as Station;
@@ -11419,7 +11820,7 @@ function testStation(
     });
 
     /* ==========================================================
-       3. RATTACHEMENTS
+       4. RATTACHEMENTS
        ========================================================== */
 
     const attachmentTests: AssertDDCheck[] = [];
@@ -11438,8 +11839,8 @@ function testStation(
         for (const child of station.childStations) {
             attachmentTests.push({
                 label: `${child.abbreviation}.referenceStation === ${station.abbreviation}`,
-                actual: child.referenceStation === station,
-                expected: true
+                actual: child.referenceStation,
+                expected: station
             });
         }
     }
@@ -11449,7 +11850,7 @@ function testStation(
     });
 
     /* ==========================================================
-       4. DONNÉES MÉTIERS
+       5. DONNÉES MÉTIERS
        ========================================================== */
 
     const dataTests = Array.from(Stations.values()).map(station => ({
@@ -11463,27 +11864,27 @@ function testStation(
     });
 
     /* ==========================================================
-       5. print()
+       6. print()
        ========================================================== */
 
     let printSucceeded = true;
     const sheetAndTableName = "testGares";
 
-    try {
-        Stations.print(sheetAndTableName, sheetAndTableName, "A1");
-    } catch {
-        printSucceeded = false;
-    }
+    // try {
+    //     Stations.print(sheetAndTableName, sheetAndTableName, "A1");
+    // } catch {
+    //     printSucceeded = false;
+    // }
 
-    assert.check([{
-        label: 'Stations.print() - impression dans "testGares"',
-        actual: printSucceeded,
-        expected: true
-    }], {
-        category: "Stations"
-    });
+    // assert.check([{
+    //     label: 'Stations.print() - impression dans "testGares"',
+    //     actual: printSucceeded,
+    //     expected: true
+    // }], {
+    //     category: "Stations"
+    // });
 
-    WorkbookService.getSheet(sheetAndTableName)?.delete();
+    // WorkbookService.getSheet(sheetAndTableName)?.delete();
 
     /* ==========================================================
        SYNTHÈSE
@@ -11504,6 +11905,7 @@ function testStationWithParity(
        1. CONSTRUCTION / hasDefinedParity()
        ========================================================== */
 
+    const s = Station.from("JY");
     const sU = StationWithParity.from("JY");
     const sO = StationWithParity.from("JY_1");
     const sE = StationWithParity.from("JY_2");
@@ -11527,12 +11929,17 @@ function testStationWithParity(
        ========================================================== */
 
     const fromTests = [
-        { label: "from(instance)",  actual: StationWithParity.from(sO) === sO,          expected: true },
-        { label: "from(null)",      actual: StationWithParity.from(null) === undefined, expected: true }
+        { label: "from(chaine sans parité)",    value: "JY",                    expected: "JY" },
+        { label: "from(chaine avec parité)",    value: "JY_1",                  expected: "JY_1" },
+        { label: "from(instance)",              value: sO,                      expected: "JY_1" },
+        { label: "from(Station)",               value: Station.from("JY_1"),    expected: "JY" },
+        { label: "from(null)",                  value: null,                    expected: undefined }
     ];
 
     assert.check(fromTests, {
-        category: "StationWithParity"
+        category: "StationWithParity",
+        actual: (t: typeof fromTests[number]) =>
+            StationWithParity.from(t.value)?.toString()
     })
 
     /* ==========================================================
@@ -11579,18 +11986,18 @@ function testStationWithParity(
         },
         { 
             label: "expand sans doublons",
-            actual: ids.length === new Set(ids).size, 
-            expected: true 
+            actual: ids.length, 
+            expected: new Set(ids).size 
         },
         { 
             label: "cache utilisé", 
-            actual: expandedU === expandedAgain, 
-            expected: true 
+            actual: expandedU, 
+            expected: expandedAgain 
         },
         { 
             label: "expand stable", 
-            actual: expandedU.length === expandedAgain.length, 
-            expected: true
+            actual: expandedU.length, 
+            expected: expandedAgain.length
         },
         { 
             label: "expand avec visited externe", 
@@ -11622,7 +12029,7 @@ function testStationWithParity(
     if (turned) {
 
         const turnaroundTests = [
-            { label: "turnaround station identique", actual: turned.station === sO!.station, expected: true },
+            { label: "turnaround station identique", actual: turned.station, expected: sO!.station },
             { label: "turnaround parité inversée",   actual: turned.parity.is(Parity.EVEN),  expected: true }
         ]
         assert.check(turnaroundTests, {
@@ -11679,8 +12086,8 @@ function testConnection(
         },
         { 
             label: "Connections.get(from, to)",
-            actual: Connections.get(from, to) === firstConnection,
-            expected: true },
+            actual: Connections.get(from, to),
+            expected: firstConnection },
         { 
             label: "has(Station, Station)",
             actual: Connections.has(from.station, to.station),
@@ -11735,7 +12142,6 @@ function testConnection(
         );
     }
 
-// Log.debug(connectionTests);
     assert.check(connectionTests, {
         category: "Connections"
     });
@@ -11747,23 +12153,23 @@ function testConnection(
     let printOk = true;
     const sheetAndTableName = "testConnexions";
 
-    try {
-        Connections.print(sheetAndTableName, sheetAndTableName, "A1");
-    } catch {
-        printOk = false;
-    }
+    // try {
+    //     Connections.print(sheetAndTableName, sheetAndTableName, "A1");
+    // } catch {
+    //     printOk = false;
+    // }
 
-    assert.check([
-        {
-            label: "Connections.print()",
-            actual: printOk,
-            expected: true
-        }
-    ], {
-        category: "Connections"
-    });
+    // assert.check([
+    //     {
+    //         label: "Connections.print()",
+    //         actual: printOk,
+    //         expected: true
+    //     }
+    // ], {
+    //     category: "Connections"
+    // });
 
-    WorkbookService.getSheet(sheetAndTableName)?.delete();
+    // WorkbookService.getSheet(sheetAndTableName)?.delete();
 
     /* ==========================================================
        SYNTHÈSE
@@ -11859,8 +12265,8 @@ function testStop(
         },
         {
             label: "passageTime undefined",
-            actual: stop.passageTime === undefined,
-            expected: true
+            actual: stop.passageTime,
+            expected: undefined
         }
     ];
 
@@ -12123,7 +12529,7 @@ function testPath(options: Partial<AssertDDOptions> = {}) {
 
     const nextStopTests = [
         { label: "nextStop retourne Stop", actual: next instanceof Stop,                expected: true },
-        { label: "previousStop cohérent",  actual: path.previousStop(next!) === first,  expected: true }
+        { label: "previousStop cohérent",  actual: path.previousStop(next!),  expected: first }
     ];
 
     assert.check(nextStopTests, {
@@ -12142,8 +12548,8 @@ function testPath(options: Partial<AssertDDOptions> = {}) {
         },
         {
             label: "signatureIndex contient le Path",
-            actual: Paths.signatureIndex.get(path.signature)![0] === path,
-            expected: true
+            actual: Paths.signatureIndex.get(path.signature)![0],
+            expected: path
         }
     ];
 
@@ -12168,8 +12574,8 @@ function testPath(options: Partial<AssertDDOptions> = {}) {
         },
         {
             label: "Reconstruction cohérente",
-            actual: rebuilt.buildConnectionsFromStops().length === rebuiltConnections.length,
-            expected: true
+            actual: rebuilt.buildConnectionsFromStops().length,
+            expected: rebuiltConnections.length
         },
         {
             label: "Temps ordonnés",
